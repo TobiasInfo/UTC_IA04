@@ -7,6 +7,14 @@ import (
 )
 
 func main() {
+
+	simu := simulation.NewSimulation()
+
+	simu.StartSimulation(10)
+
+}
+
+func second() {
 	// Get the singleton instance of the map
 	mapInstance := simulation.GetMap(10, 10)
 
