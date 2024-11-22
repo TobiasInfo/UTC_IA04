@@ -8,7 +8,7 @@ import (
 
 func main() {
 
-	simu := simulation.NewSimulation()
+	simu := simulation.NewSimulation(10, 30, 10)
 
 	simu.StartSimulation(10)
 

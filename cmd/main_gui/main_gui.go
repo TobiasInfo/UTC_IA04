@@ -1,229 +1,230 @@
 package main
 
 import (
-    "image/color"
-    "math/rand"
-    "strconv"
-    "time"
+	"UTC_IA04/pkg/simulation" // Ajustez le chemin selon votre projet
+	"fmt"
+	"image/color"
+	"sync"
+	"time"
 
-    "fyne.io/fyne/v2"
-    "fyne.io/fyne/v2/app"
-    "fyne.io/fyne/v2/canvas"
-    "fyne.io/fyne/v2/container"
-    "fyne.io/fyne/v2/layout"
-    "fyne.io/fyne/v2/widget"
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/widget"
+)
+
+var (
+	colorEmpty  = color.RGBA{R: 200, G: 200, B: 200, A: 255}
+	colorDrone  = color.RGBA{R: 0, G: 0, B: 255, A: 255}
+	colorCrowd  = color.RGBA{R: 255, G: 0, B: 0, A: 255}
+	colorBorder = color.RGBA{R: 255, G: 255, B: 255, A: 255}
 )
 
 // Simulation parameters
 var (
-    numDrones       = 5
-    numCrowdMembers = 10
-    numObstacles    = 3
-    mapWidth        = 20
-    mapHeight       = 20
-    cellSize        = 40.0 // Size of each cell in pixels
+	numDrones       = 5
+	numCrowdMembers = 10
+	numObstacles    = 3
+	cellSize        = 40.0 // Size of each cell in pixels
 )
 
-// Point represents a position with floating-point coordinates
-type Point struct {
-    X, Y float64
+const (
+	mapWidth  = 30
+	mapHeight = 20
+)
+
+type SimulationGUI struct {
+	sim           *simulation.Simulation
+	grid          *fyne.Container
+	isRunning     bool
+	stopChannel   chan bool
+	mutex         sync.Mutex
+	distressLabel *widget.Label
 }
 
-// CellContent represents what is in a cell
-type CellContent struct {
-    Drones        int
-    CrowdMembers  []Point // Now stores points for precise positioning
-    Obstacles     int
+// Fonction pour normaliser les coordonnées dans les limites de la grille
+func normalizeCoordinates(x, y float64) (int, int) {
+	// Gestion des coordonnées négatives avec modulo
+	normX := ((int(x) % mapWidth) + mapWidth) % mapWidth
+	normY := ((int(y) % mapHeight) + mapHeight) % mapHeight
+	return normX, normY
 }
 
-// MapCell represents a single cell on the map
-type MapCell struct {
-    content    *CellContent
-    background *canvas.Rectangle
-    entities   *fyne.Container // Container for all shapes in the cell
+// Initialisation de la grille (à faire une seule fois au début)
+func initGrid(grid *fyne.Container) {
+	for y := 0; y < mapHeight; y++ {
+		for x := 0; x < mapWidth; x++ {
+			cell := createCell()
+			grid.Add(cell)
+		}
+	}
+	grid.Refresh()
 }
 
-// createShape creates a circle or square based on entity type
-func createShape(entityType string, x, y, size float64) fyne.CanvasObject {
-    switch entityType {
-    case "drone":
-        circle := canvas.NewCircle(color.RGBA{0, 0, 255, 255}) // Blue drone
-		circle.StrokeWidth = 0
-        circle.Resize(fyne.NewSize(float32(size), float32(size)))
-        circle.Move(fyne.NewPos(float32(x), float32(y)))
-        return circle
-    case "crowd":
-        circle := canvas.NewCircle(color.RGBA{255, 255, 255, 255}) // White crowd member
-		circle.StrokeWidth = 0
-        circle.Resize(fyne.NewSize(float32(size), float32(size)))
-        circle.Move(fyne.NewPos(float32(x), float32(y)))
-        return circle
-    case "obstacle":
-        square := canvas.NewRectangle(color.RGBA{0, 0, 0, 255}) // Black obstacle
-		square.StrokeWidth = 0
-        square.Resize(fyne.NewSize(float32(size), float32(size)))
-        square.Move(fyne.NewPos(float32(x), float32(y)))
-        return square
-    default:
-        return nil
-    }
+// Mise à jour de la grille (à chaque frame)
+func updateGridFromSimulation(sim *simulation.Simulation, grid *fyne.Container) {
+	// Réinitialiser toutes les cellules
+	for i := range grid.Objects {
+		if cell, ok := grid.Objects[i].(*canvas.Rectangle); ok {
+			cell.FillColor = colorEmpty
+		}
+	}
+
+	// Mise à jour des positions des drones
+	for _, drone := range sim.Drones {
+		x, y := normalizeCoordinates(drone.Position.X, drone.Position.Y)
+		idx := y*mapWidth + x
+		if idx >= 0 && idx < len(grid.Objects) {
+			if cell, ok := grid.Objects[idx].(*canvas.Rectangle); ok {
+				cell.FillColor = colorDrone
+			}
+		}
+	}
+
+	// Mise à jour des positions de la foule
+	for _, member := range sim.Crowd {
+		x, y := normalizeCoordinates(member.Position.X, member.Position.Y)
+		idx := y*mapWidth + x
+		if idx >= 0 && idx < len(grid.Objects) {
+			if cell, ok := grid.Objects[idx].(*canvas.Rectangle); ok {
+				cell.FillColor = colorCrowd
+				// TODO : devide the cell to display several points in the same cell
+				// Each point should represent a crowd member in the same cell with his float coordinates
+			}
+		}
+	}
+
+	grid.Refresh()
 }
 
-func createInitialMap(grid *fyne.Container, contents [][]*CellContent) {
-    for y := 0; y < mapHeight; y++ {
-        for x := 0; x < mapWidth; x++ {
-            // Create background without border
-            background := canvas.NewRectangle(color.RGBA{220, 220, 220, 255})
-            background.StrokeWidth = 0 // Remove border
-            background.FillColor = color.RGBA{220, 220, 220, 255}
-            background.Resize(fyne.NewSize(float32(cellSize), float32(cellSize)))
-            
-            entities := container.NewWithoutLayout()
-            
-            _ = &MapCell{
-                content:    contents[y][x],
-                background: background,
-                entities:   entities,
-            }
-
-            // Use MaxLayout to ensure background fills the entire cell space
-            cellContainer := container.New(layout.NewMaxLayout(), background, entities)
-            grid.Add(cellContainer)
-        }
-    }
+func createCell() *canvas.Rectangle {
+	cell := canvas.NewRectangle(colorEmpty)
+	cell.Resize(fyne.NewSize(20, 20))
+	cell.StrokeWidth = 0
+	cell.StrokeColor = colorBorder
+	return cell
 }
 
-// Update map cells without recreating the grid
-func updateMap(contents [][]*CellContent, grid *fyne.Container) {
-    for y := 0; y < mapHeight; y++ {
-        for x := 0; x < mapWidth; x++ {
-            cell := grid.Objects[y*mapWidth+x].(*fyne.Container)
-            content := contents[y][x]
-            
-            // Clear existing entities
-            entitiesContainer := cell.Objects[1].(*fyne.Container)
-            entitiesContainer.Objects = nil
+func createControlPanel(sim *SimulationGUI) *fyne.Container {
+	// Slider pour les membres de la foule
+	crowdSlider := widget.NewSlider(1, 500) // Min 1, Max 50 membres
+	crowdSlider.Value = float64(len(sim.sim.Crowd))
+	crowdLabel := widget.NewLabel("Nombre de membres : " + fmt.Sprintf("%d", int(crowdSlider.Value)))
 
-            // Add drone if present (large circle)
-            if content.Drones > 0 {
-                droneShape := createShape("drone", 2, 2, cellSize-4)
-                entitiesContainer.Add(droneShape)
-            }
+	crowdSlider.OnChanged = func(value float64) {
+		crowdLabel.SetText("Nombre de membres : " + fmt.Sprintf("%d", int(value)))
+		// Mettre à jour la simulation avec le nouveau nombre
+		sim.mutex.Lock()
+		sim.sim.UpdateCrowdSize(int(value))
+		sim.mutex.Unlock()
+	}
 
-            // Add obstacles if present (square)
-            if content.Obstacles > 0 {
-                obstacleShape := createShape("obstacle", 2, 2, cellSize-4)
-                entitiesContainer.Add(obstacleShape)
-            }
+	dronesSlider := widget.NewSlider(1, 20) // Min 1, Max 20 drones
+	dronesSlider.Value = float64(len(sim.sim.Drones))
+	dronesLabel := widget.NewLabel("Nombre de drones : " + fmt.Sprintf("%d", int(dronesSlider.Value)))
 
-            // Add crowd members (small circles with specific positions)
-            for _, point := range content.CrowdMembers {
-                // Convert relative coordinates (0-1) to pixel positions within cell
-                x := point.X * (cellSize - 6) // Subtract size to keep within bounds
-                y := point.Y * (cellSize - 6)
-                crowdShape := createShape("crowd", x+2, y+2, 6) // Small 6-pixel circles
-                entitiesContainer.Add(crowdShape)
-            }
+	dronesSlider.OnChanged = func(value float64) {
+		dronesLabel.SetText("Nombre de drones : " + fmt.Sprintf("%d", int(value)))
+		// Mettre à jour la simulation avec le nouveau nombre
+		sim.mutex.Lock()
+		sim.sim.UpdateDroneSize(int(value))
+		sim.mutex.Unlock()
+	}
 
-            entitiesContainer.Refresh()
-        }
-    }
+	// Display the metrics
+	// TODO : display the metrics of the simulation
+	// Print the number crowd members in destress
+
+	cmInDistress := sim.sim.CountCrowdMembersInDistress()
+	sim.distressLabel = widget.NewLabel("Nombre de membres en détresse : " + fmt.Sprintf("%d", cmInDistress))
+
+	return container.NewVBox(
+		widget.NewLabel("Contrôles"),
+		widget.NewSeparator(),
+		crowdLabel,
+		crowdSlider,
+		widget.NewSeparator(),
+		dronesLabel,
+		dronesSlider,
+		widget.NewSeparator(),
+		sim.distressLabel,
+	)
 }
 
-// Generate random content with floating-point positions for crowd members
-func generateRandomContent() [][]*CellContent {
-    rand.Seed(time.Now().UnixNano())
-    contents := make([][]*CellContent, mapHeight)
+func (s *SimulationGUI) runSimulation() {
+	for {
+		select {
+		case <-s.stopChannel:
+			return
+		default:
+			s.mutex.Lock()
+			if !s.isRunning {
+				s.mutex.Unlock()
+				return
+			}
+			s.sim.Update()
+			s.mutex.Unlock()
 
-    // Initialize empty grid
-    for y := 0; y < mapHeight; y++ {
-        row := make([]*CellContent, mapWidth)
-        for x := 0; x < mapWidth; x++ {
-            row[x] = &CellContent{
-                CrowdMembers: make([]Point, 0),
-            }
-        }
-        contents[y] = row
-    }
+			// Mise à jour UI thread-safe
+			if window := fyne.CurrentApp().Driver().CanvasForObject(s.grid); window != nil {
+				s.mutex.Lock()
+				cmInDistress := s.sim.CountCrowdMembersInDistress()
+				s.distressLabel.SetText(fmt.Sprintf("Nombre de membres en détresse : %d", cmInDistress))
+				updateGridFromSimulation(s.sim, s.grid)
+				window.Refresh(s.grid)
+				s.mutex.Unlock()
+			}
 
-    // Place drones
-    for i := 0; i < numDrones; i++ {
-        x, y := rand.Intn(mapWidth), rand.Intn(mapHeight)
-        contents[y][x].Drones++
-    }
-
-    // Place crowd members with random positions within cells
-    for i := 0; i < numCrowdMembers; i++ {
-        x, y := rand.Intn(mapWidth), rand.Intn(mapHeight)
-        point := Point{
-            X: rand.Float64(), // Random position within cell (0-1)
-            Y: rand.Float64(),
-        }
-        contents[y][x].CrowdMembers = append(contents[y][x].CrowdMembers, point)
-    }
-
-    // Place obstacles
-    for i := 0; i < numObstacles; i++ {
-        x, y := rand.Intn(mapWidth), rand.Intn(mapHeight)
-        contents[y][x].Obstacles++
-    }
-
-    return contents
-}
-
-// Create settings panel
-func createSettingsPanel(grid *fyne.Container, contents [][]*CellContent) *fyne.Container {
-    droneEntry := widget.NewEntry()
-    droneEntry.SetPlaceHolder("Enter # of Drones")
-
-    crowdEntry := widget.NewEntry()
-    crowdEntry.SetPlaceHolder("Enter # of Crowd Members")
-
-    obstacleEntry := widget.NewEntry()
-    obstacleEntry.SetPlaceHolder("Enter # of Obstacles")
-
-    applyButton := widget.NewButton("Apply Settings", func() {
-        if d, err := strconv.Atoi(droneEntry.Text); err == nil && d >= 0 {
-            numDrones = d
-        }
-        if c, err := strconv.Atoi(crowdEntry.Text); err == nil && c >= 0 {
-            numCrowdMembers = c
-        }
-        if o, err := strconv.Atoi(obstacleEntry.Text); err == nil && o >= 0 {
-            numObstacles = o
-        }
-
-        contents = generateRandomContent()
-        updateMap(contents, grid)
-        grid.Refresh()
-    })
-
-    return container.NewVBox(
-        widget.NewLabel("Settings"),
-        droneEntry,
-        crowdEntry,
-        obstacleEntry,
-        applyButton,
-        layout.NewSpacer(),
-    )
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
 }
 
 func main() {
-    myApp := app.New()
-    myWindow := myApp.NewWindow("Enhanced Drone Simulation")
+	myApp := app.New()
+	myWindow := myApp.NewWindow("Simulation")
 
-    grid := container.NewGridWithColumns(mapWidth)
-    contents := generateRandomContent()
-    createInitialMap(grid, contents)
+	// Création de la grille
+	grid := container.NewGridWithColumns(mapWidth)
+	initGrid(grid)
 
-    settingsPanel := createSettingsPanel(grid, contents)
+	simGUI := &SimulationGUI{
+		sim:         simulation.NewSimulation(numDrones, numCrowdMembers, numObstacles),
+		grid:        grid,
+		isRunning:   false,
+		stopChannel: make(chan bool),
+	}
 
-    content := container.NewBorder(
-        nil, nil, nil, settingsPanel,
-        grid,
-    )
+	// Création du panneau de contrôle
+	controlPanel := createControlPanel(simGUI)
 
-    myWindow.SetContent(content)
-    myWindow.Resize(fyne.NewSize(1000, 700))
-    myWindow.ShowAndRun()
+	// Boutons de contrôle
+	controls := container.NewHBox(
+		widget.NewButton("Start", func() {
+			if !simGUI.isRunning {
+				simGUI.isRunning = true
+				go simGUI.runSimulation()
+			}
+		}),
+		widget.NewButton("Stop", func() {
+			simGUI.mutex.Lock()
+			simGUI.isRunning = false
+			simGUI.mutex.Unlock()
+			simGUI.stopChannel <- true
+		}),
+	)
+
+	// Layout principal avec la grille au centre et le panneau de contrôle à droite
+	content := container.NewBorder(
+		nil,          // top
+		controls,     // bottom
+		nil,          // left
+		controlPanel, // right
+		grid,         // center
+	)
+
+	myWindow.SetContent(content)
+	myWindow.Resize(fyne.NewSize(800, 600))
+	myWindow.ShowAndRun()
 }
