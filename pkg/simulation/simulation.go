@@ -9,16 +9,61 @@ import (
 type Simulation struct {
 	Map        *Map
 	DroneRange int
+	MoveChan   chan models.MovementRequest
+
+	//Debug vars
+	debug     bool
+	hardDebug bool
 }
 
 // Initialize the simulation with the given number of drones, crowd members, and obstacles
 func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 	s := &Simulation{
 		Map:        GetMap(30, 20),
-		DroneRange: 10,
+		DroneRange: 2,
+		MoveChan:   make(chan models.MovementRequest),
+		debug:      false,
+		hardDebug:  false,
 	}
 	s.Initialize(numDrones, numCrowdMembers, numObstacles)
+	go s.handleMovementRequests()
 	return s
+}
+
+func (s *Simulation) handleMovementRequests() {
+	for req := range s.MoveChan {
+		if !s.Map.IsBlocked(req.NewPosition) {
+			if req.MemberType != "person" && req.MemberType != "drone" {
+				req.ResponseChan <- models.MovementResponse{Authorized: false}
+				continue
+			}
+
+			var entity interface{}
+
+			if req.MemberType == "drone" {
+				for _, drone := range s.Map.Drones {
+					if drone.ID == req.MemberID {
+						entity = drone
+						break
+					}
+				}
+			}
+
+			if req.MemberType == "person" {
+				for _, person := range s.Map.Persons {
+					if person.ID == req.MemberID {
+						entity = person
+						break
+					}
+				}
+			}
+
+			s.Map.MoveEntity(entity, req.NewPosition)
+			req.ResponseChan <- models.MovementResponse{Authorized: true}
+		} else {
+			req.ResponseChan <- models.MovementResponse{Authorized: false}
+		}
+	}
 }
 
 func (s *Simulation) Initialize(nDrones int, nCrowd int, nObstacles int) {
@@ -26,7 +71,7 @@ func (s *Simulation) Initialize(nDrones int, nCrowd int, nObstacles int) {
 	s.createDrones(nDrones)
 
 	for i := 0; i < nCrowd; i++ {
-		member := NewCrowdMember(i, models.Position{X: 0, Y: 0}, 0.001, 20)
+		member := NewCrowdMember(i, models.Position{X: 0, Y: 0}, 0.001, 20, s.Map.Width, s.Map.Height, s.MoveChan)
 		s.Map.AddCrowdMember(member)
 	}
 
@@ -41,12 +86,12 @@ func (s *Simulation) createDrones(n int) {
 	detectionFunc := func() []float64 {
 		pourcentageArray := make([]float64, s.DroneRange+1)
 		for i := 0; i < s.DroneRange+1; i++ {
-			pourcentageArray[i] = 1.0 - float64(i)/float64(s.DroneRange+1)
+			pourcentageArray[i] = 1.0 - float64(i)/float64(s.DroneRange)
 		}
 		return pourcentageArray
 	}
 
-	droneSeeFunction := func(d *SurveillanceDrone) []CrowdMember {
+	droneSeeFunction := func(d *Drone) []Person {
 		// Get the current cell of the drone
 		currentCell := d.Position
 		rangeDrone := s.DroneRange
@@ -54,35 +99,36 @@ func (s *Simulation) createDrones(n int) {
 		Vector := models.Vector{X: currentCell.X, Y: currentCell.Y}
 		_, valuesInt := Vector.GenerateCircleValues(rangeDrone)
 
-		droneInformations := make([]CrowdMember, 0)
+		droneInformations := make([]Person, 0)
 
 		probs := d.DetectionPrecisionFunc()
-		fmt.Println(probs)
 
-		for i := range s.Map.Cells {
-			if len(s.Map.Cells[i].Drones) > 0 {
-				fmt.Printf("%.2f, %.2f : %d Citizens\n", s.Map.Cells[i].Position.X, s.Map.Cells[i].Position.Y, len(s.Map.Cells[i].CrowdMembers))
-			}
-			if len(s.Map.Cells[i].CrowdMembers) > 0 {
-				fmt.Printf("%.2f, %.2f : %d Citizens\n", s.Map.Cells[i].Position.X, s.Map.Cells[i].Position.Y, len(s.Map.Cells[i].CrowdMembers))
-			}
+		if s.hardDebug {
+			fmt.Println("Detection probabilities & Int values")
+			fmt.Println(valuesInt)
+			fmt.Println(probs)
 		}
 
 		// Get The crowd members around the drone in the range of the drone
 		for i := 0; i < len(valuesInt); i++ {
-			position := models.Position{X: valuesInt[i].X, Y: valuesInt[i].Y}
+			position := valuesInt[i]
 			// Ensure the position is within the map boundaries
 			if cell, exists := s.Map.Cells[position]; exists {
+				distance := currentCell.CalculateDistance(position)
+				if s.debug {
+					fmt.Printf("Distance : %.2f\n", distance)
+				}
 				if !s.Map.IsBlocked(position) {
-					fmt.Printf("1- Accessed : %.2f, %.2f \n", valuesInt[i].X, valuesInt[i].Y)
-					fmt.Println("Size of the crowd members", len(cell.CrowdMembers))
-					for _, member := range cell.CrowdMembers {
-						distance := currentCell.CalculateDistance(member.Position)
-						fmt.Println("Distance between drone and member", distance)
-						fmt.Printf("2- Crowd member : %.2f, %.2f \n", member.Position.X, member.Position.Y)
+					if s.hardDebug {
+						fmt.Printf("1- Accessed : %.2f, %.2f \n", valuesInt[i].X, valuesInt[i].Y)
+						fmt.Println("Size of the crowd members", len(cell.Persons))
+					}
+					for _, member := range cell.Persons {
+						if member.Position.X != position.X || member.Position.Y != position.Y {
+							fmt.Printf("ATTENTION -- ACCES MEMBRE ET CELLULE NON MEMBRE --- MEMBRE : %.2f, %.2f --- CELLEULE %.2f, %.2f \n", member.Position.X, member.Position.Y, position.X, position.Y)
+						}
 						if rand.Float64() < probs[int(distance)] {
-							fmt.Printf("Drone %d sees crowd member %d at distance %.2f\n", d.ID, member.ID, distance)
-							fmt.Printf("Drone %d sees crowd member %d at distance %.2f\n", d.ID, member.ID, distance)
+							fmt.Printf("Drone %d (%.2f, %.2f) sees crowd member %d (%.2f, %.2f) at distance %.2f\n", d.ID, d.Position.X, d.Position.Y, member.ID, member.Position.X, member.Position.Y, distance)
 							droneInformations = append(droneInformations, *member)
 						}
 					}
@@ -114,7 +160,7 @@ func (s *Simulation) StartSimulation(numberIteration int) {
 
 		// Update crowd members
 		for _, cell := range s.Map.Cells {
-			for _, member := range cell.CrowdMembers {
+			for _, member := range cell.Persons {
 				member.Myturn()
 			}
 		}
@@ -127,7 +173,7 @@ func (s *Simulation) StartSimulation(numberIteration int) {
 	}
 
 	for _, cell := range s.Map.Cells {
-		for _, member := range cell.CrowdMembers {
+		for _, member := range cell.Persons {
 			fmt.Printf("Position du membre %d : X = %f , Y = %f\n", member.ID, member.Position.X, member.Position.Y)
 		}
 	}
@@ -144,7 +190,7 @@ func (s *Simulation) Update() {
 
 	// Update crowd members
 	for _, cell := range s.Map.Cells {
-		for _, member := range cell.CrowdMembers {
+		for _, member := range cell.Persons {
 			member.Myturn()
 		}
 	}
@@ -153,18 +199,18 @@ func (s *Simulation) Update() {
 func (s *Simulation) UpdateCrowdSize(newSize int) {
 	currentSize := 0
 	for _, cell := range s.Map.Cells {
-		currentSize += len(cell.CrowdMembers)
+		currentSize += len(cell.Persons)
 	}
 
 	if newSize > currentSize {
 		for i := currentSize; i < newSize; i++ {
-			member := NewCrowdMember(i, models.Position{X: 0, Y: 0}, 0.001, 20)
+			member := NewCrowdMember(i, models.Position{X: 0, Y: 0}, 0.001, 20, s.Map.Width, s.Map.Height, s.MoveChan)
 			s.Map.AddCrowdMember(member)
 		}
 	} else if newSize < currentSize {
 		for _, cell := range s.Map.Cells {
-			for len(cell.CrowdMembers) > 0 && currentSize > newSize {
-				cell.CrowdMembers = cell.CrowdMembers[:len(cell.CrowdMembers)-1]
+			for len(cell.Persons) > 0 && currentSize > newSize {
+				cell.Persons = cell.Persons[:len(cell.Persons)-1]
 				currentSize--
 			}
 		}
@@ -194,7 +240,7 @@ func (s *Simulation) UpdateDroneSize(newSize int) {
 func (s *Simulation) CountCrowdMembersInDistress() int {
 	count := 0
 	for _, cell := range s.Map.Cells {
-		for _, member := range cell.CrowdMembers {
+		for _, member := range cell.Persons {
 			if member.InDistress {
 				count++
 			}

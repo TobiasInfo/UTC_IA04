@@ -11,30 +11,32 @@ import (
 //précise avec ses drones, jsp comment on peut implémenter ça
 
 // SurveillanceDrone represents a drone in the simulation
-type SurveillanceDrone struct {
+type Drone struct {
 	ID                      int
 	visionCapacity          int
 	Position                models.Position
 	Battery                 float64
 	DetectionPrecisionFunc  func() []float64
-	droneSeeFunction        func(d *SurveillanceDrone) []CrowdMember
+	droneSeeFunction        func(d *Drone) []Person
 	ReportedZonesByCentrale []models.Position
+	SeenPeople              []*Person
 }
 
 // NewSurveillanceDrone creates a new instance of SurveillanceDrone
-func NewSurveillanceDrone(id int, position models.Position, battery float64, detectionFunc func() []float64, droneSeeFunc func(d *SurveillanceDrone) []CrowdMember) *SurveillanceDrone {
-	return &SurveillanceDrone{
+func NewSurveillanceDrone(id int, position models.Position, battery float64, detectionFunc func() []float64, droneSeeFunc func(d *Drone) []Person) *Drone {
+	return &Drone{
 		ID:                      id,
 		Position:                position,
 		Battery:                 battery,
 		DetectionPrecisionFunc:  detectionFunc,
 		droneSeeFunction:        droneSeeFunc,
 		ReportedZonesByCentrale: []models.Position{},
+		SeenPeople:              []*Person{},
 	}
 }
 
 // Move updates the drone's position to the destination
-func (d *SurveillanceDrone) Move(destination models.Position) {
+func (d *Drone) Move(destination models.Position) {
 	if d.Battery <= 0 {
 		fmt.Printf("Drone %d cannot move. Battery is empty.\n", d.ID)
 		return
@@ -46,7 +48,7 @@ func (d *SurveillanceDrone) Move(destination models.Position) {
 }
 
 // DetectIncident simulates the detection of incidents in the drone's vicinity
-func (d *SurveillanceDrone) DetectIncident() map[models.Position][2]int {
+func (d *Drone) DetectIncident() map[models.Position][2]int {
 	detectedIncidents := make(map[models.Position][2]int)
 
 	//A voir comment on gère le radius de vision
@@ -75,7 +77,7 @@ func (d *SurveillanceDrone) DetectIncident() map[models.Position][2]int {
 	return detectedIncidents
 }
 
-func (d *SurveillanceDrone) ReceiveInfo() {
+func (d *Drone) ReceiveInfo() {
 	//Recupère les informations qui lui ont été envoyées lors des tours précédents
 	//J'imagine qu'on fait marcher ça avec un channel associé à chaque drone pour la réception
 
@@ -84,15 +86,19 @@ func (d *SurveillanceDrone) ReceiveInfo() {
 	//infoReception = readChannel()
 
 	infos := d.droneSeeFunction(d)
+	seenPeople := make([]*Person, 0)
+
 	for _, info := range infos {
-		fmt.Printf("Drone %d sees crowd member %d at distance %.2f \n", d.ID, info.ID, d.Position.CalculateDistance(info.Position))
+		seenPeople = append(seenPeople, &info)
 	}
+
+	d.SeenPeople = seenPeople
 
 	d.ReportedZonesByCentrale = infoReception
 
 }
 
-func (d *SurveillanceDrone) Think() models.Position {
+func (d *Drone) Think() models.Position {
 	//Traite les informations reçues, les compare à ses objectifs, trouve son nouveau but et retourne la case adjacente vers laquelle il veut aller
 
 	if d.Battery < 20 {
@@ -125,7 +131,7 @@ func (d *SurveillanceDrone) Think() models.Position {
 }
 
 // Communicate sends data to a centrale or another protocol
-func (d *SurveillanceDrone) SendInfo(protocol string, observation map[models.Position][2]int) {
+func (d *Drone) SendInfo(protocol string, observation map[models.Position][2]int) {
 	switch protocol {
 	case "Centrale":
 		fmt.Printf("Drone %d communicating with Centrale.\n", d.ID)
@@ -135,7 +141,7 @@ func (d *SurveillanceDrone) SendInfo(protocol string, observation map[models.Pos
 	}
 }
 
-func (d *SurveillanceDrone) Myturn() {
+func (d *Drone) Myturn() {
 
 	d.ReceiveInfo()
 
@@ -161,7 +167,7 @@ type WeightedParameters struct {
 	ClusteringWeight float64 // Poids pour favoriser les zones avec plus de points proches
 }
 
-func (d *SurveillanceDrone) CalculateOptimalPosition(params WeightedParameters) models.Position {
+func (d *Drone) CalculateOptimalPosition(params WeightedParameters) models.Position {
 	if len(d.ReportedZonesByCentrale) == 0 {
 		return d.Position // Si pas de zones, reste sur place
 	}
@@ -190,7 +196,7 @@ func (d *SurveillanceDrone) CalculateOptimalPosition(params WeightedParameters) 
 }
 
 // calculateZoneWeight calcule le poids d'une zone spécifique
-func calculateZoneWeight(d *SurveillanceDrone, zone models.Position, params WeightedParameters) float64 {
+func calculateZoneWeight(d *Drone, zone models.Position, params WeightedParameters) float64 {
 	// Distance entre le drone et la zones
 	distance := calculateDistance(d.Position, zone)
 
@@ -220,7 +226,7 @@ func calculateDistance(pos1, pos2 models.Position) float64 {
 }
 
 // calculateClusterFactor évalue combien de zones sont proches de la zone donnée
-func calculateClusterFactor(d *SurveillanceDrone, targetZone models.Position) float64 {
+func calculateClusterFactor(d *Drone, targetZone models.Position) float64 {
 	const proximityThreshold = 2.0 // Distance considérée comme "proche"
 	nearbyZones := 0.0
 

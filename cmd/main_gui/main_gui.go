@@ -19,6 +19,7 @@ var (
 	colorDrone  = color.RGBA{R: 0, G: 0, B: 255, A: 255}
 	colorCrowd  = color.RGBA{R: 255, G: 0, B: 0, A: 255}
 	colorBorder = color.RGBA{R: 255, G: 255, B: 255, A: 255}
+	colorSeen   = color.RGBA{R: 80, G: 255, B: 20, A: 255} // New color
 )
 
 // Simulation parameters
@@ -86,7 +87,7 @@ func updateGridFromSimulation(sim *simulation.Simulation, grid *fyne.Container) 
 
 	// Mise à jour des positions de la foule
 	for _, cell := range sim.Map.Cells {
-		for _, member := range cell.CrowdMembers {
+		for _, member := range cell.Persons {
 			x, y := normalizeCoordinates(member.Position.X, member.Position.Y)
 			idx := y*mapWidth + x
 			if idx >= 0 && idx < len(grid.Objects) {
@@ -94,6 +95,20 @@ func updateGridFromSimulation(sim *simulation.Simulation, grid *fyne.Container) 
 					cell.FillColor = colorCrowd
 					// TODO : devide the cell to display several points in the same cell
 					// Each point should represent a crowd member in the same cell with his float coordinates
+				}
+			}
+		}
+	}
+
+	for _, cell := range sim.Map.Cells {
+		for _, drone := range cell.Drones {
+			for _, member := range drone.SeenPeople {
+				x, y := normalizeCoordinates(member.Position.X, member.Position.Y)
+				idx := y*mapWidth + x
+				if idx >= 0 && idx < len(grid.Objects) {
+					if cell, ok := grid.Objects[idx].(*canvas.Rectangle); ok {
+						cell.FillColor = colorSeen
+					}
 				}
 			}
 		}

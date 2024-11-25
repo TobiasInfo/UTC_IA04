@@ -6,41 +6,69 @@ import (
 )
 
 // CrowdMember represents a person in the simulation
-type CrowdMember struct {
+type Person struct {
 	ID                      int
 	Position                models.Position
 	InDistress              bool
 	DistressProbability     float64
 	Lifespan                int // Maximum duration in distress before "death"
 	CurrentDistressDuration int
+	width                   int
+	height                  int
+	MoveChan                chan models.MovementRequest
 }
 
 // NewCrowdMember creates a new instance of a CrowdMember
-func NewCrowdMember(id int, position models.Position, distressProbability float64, lifespan int) *CrowdMember {
-	return &CrowdMember{
+func NewCrowdMember(id int, position models.Position, distressProbability float64, lifespan int, width int, height int, moveChan chan models.MovementRequest) *Person {
+	return &Person{
 		ID:                      id,
 		Position:                position,
 		InDistress:              false,
 		DistressProbability:     distressProbability,
 		Lifespan:                lifespan,
 		CurrentDistressDuration: 0,
+		width:                   width,
+		height:                  height,
+		MoveChan:                moveChan,
 	}
 }
 
 // Move randomly updates the CrowdMember's position
-func (c *CrowdMember) MoveRandom() {
-	if c.Position.X == -1 && c.Position.Y == -1 {
-		//The Member is Dead, so no moving
-		return
+func (c *Person) MoveRandom() {
+	for {
+		if c.Position.X == -1 && c.Position.Y == -1 {
+			return
+		}
 
+		newX := c.Position.X + float64(rand.Intn(3)-1)
+		newY := c.Position.Y + float64(rand.Intn(3)-1)
+
+		if newX < 0 {
+			newX = 0
+		}
+		if newY < 0 {
+			newY = 0
+		}
+		if newX > float64(c.width) {
+			newX = float64(c.width)
+		}
+		if newY > float64(c.height) {
+			newY = float64(c.height)
+		}
+
+		newPosition := models.Position{X: newX, Y: newY}
+		responseChan := make(chan models.MovementResponse)
+		c.MoveChan <- models.MovementRequest{MemberID: c.ID, MemberType: "person", NewPosition: newPosition, ResponseChan: responseChan}
+		response := <-responseChan
+
+		if response.Authorized {
+			break
+		}
 	}
-
-	c.Position.X += float64(rand.Intn(3) - 1) // Move randomly in X direction (-1, 0, 1)
-	c.Position.Y += float64(rand.Intn(3) - 1) // Move randomly in Y direction (-1, 0, 1)
 }
 
 // MoveTo updates the CrowdMember's position towards a target position, at random speed
-func (c *CrowdMember) MoveTo(position models.Position) {
+func (c *Person) MoveTo(position models.Position) {
 
 	if c.Position.X == -1 && c.Position.Y == -1 {
 		//The Member is Dead, so no moving
@@ -63,7 +91,7 @@ func (c *CrowdMember) MoveTo(position models.Position) {
 }
 
 // UpdateHealth updates the health state of the CrowdMember
-func (c *CrowdMember) UpdateHealth() {
+func (c *Person) UpdateHealth() {
 
 	//TODO use a function to communicate with the global map to know how many people are around our crowdMember
 	neighborCount := 3
@@ -89,7 +117,7 @@ func (c *CrowdMember) UpdateHealth() {
 }
 
 // CountNeighbors counts the number of neighboring CrowdMembers in the threshold distance
-func (c *CrowdMember) CountNeighbors(crowd []*CrowdMember, threshold float64) int {
+func (c *Person) CountNeighbors(crowd []*Person, threshold float64) int {
 	count := 0
 	for _, neighbor := range crowd {
 		if c != neighbor && c.Position.CalculateDistance(neighbor.Position) <= threshold { // Neighbor threshold
@@ -100,7 +128,7 @@ func (c *CrowdMember) CountNeighbors(crowd []*CrowdMember, threshold float64) in
 }
 
 // Die handles the death of a CrowdMember
-func (c *CrowdMember) Die() {
+func (c *Person) Die() {
 
 	// TODO : CHeck how to recover the map size properly
 	c.InDistress = false
@@ -115,11 +143,11 @@ func (c *CrowdMember) Die() {
 }
 
 // IsAlive checks if the CrowdMember is still alive
-func (c *CrowdMember) IsAlive() bool {
+func (c *Person) IsAlive() bool {
 	return c.Position.X >= 0 && c.Position.Y >= 0
 }
 
-func (c *CrowdMember) Myturn() {
+func (c *Person) Myturn() {
 
 	c.MoveRandom()
 
