@@ -8,10 +8,10 @@ import (
 
 // MapCell represents a single cell on the map
 type MapCell struct {
-	Position      models.Position
-	Obstacles     []*Obstacle
-	CrowdMembers  []*CrowdMember
-	Drones        []*SurveillanceDrone
+	Position     models.Position
+	Obstacles    []*Obstacle
+	CrowdMembers []*CrowdMember
+	Drones       []*SurveillanceDrone
 }
 
 // Map represents the entire simulation environment
@@ -22,8 +22,8 @@ type Map struct {
 }
 
 var (
-	instance *Map       // The singleton instance
-	once     sync.Once  // Ensures Map is initialized only once
+	instance *Map      // The singleton instance
+	once     sync.Once // Ensures Map is initialized only once
 )
 
 // NewMap creates a new map with the given dimensions, but we will only use it once due to the singleton pattern.
@@ -34,10 +34,10 @@ func newMap(width, height int) *Map {
 		for y := 0; y < height; y++ {
 			pos := models.Position{X: float64(x), Y: float64(y)}
 			cells[pos] = &MapCell{
-				Position:      pos,
-				Obstacles:     []*Obstacle{},
-				CrowdMembers:  []*CrowdMember{},
-				Drones:        []*SurveillanceDrone{},
+				Position:     pos,
+				Obstacles:    []*Obstacle{},
+				CrowdMembers: []*CrowdMember{},
+				Drones:       []*SurveillanceDrone{},
 			}
 		}
 	}
@@ -112,7 +112,27 @@ func (m *Map) IsBlocked(position models.Position) bool {
 	if !exists {
 		return true // Outside the map boundaries
 	}
-	return len(cell.Obstacles) > 0
+	state := len(cell.Obstacles) > 0
+	fmt.Println("Position", position, "is blocked:", state)
+	return state
+}
+
+// CountCrowdMembers returns the total number of crowd members on the map
+func (m *Map) CountCrowdMembers() int {
+	count := 0
+	for _, cell := range m.Cells {
+		count += len(cell.CrowdMembers)
+	}
+	return count
+}
+
+// CountDrones returns the total number of drones on the map
+func (m *Map) CountDrones() int {
+	count := 0
+	for _, cell := range m.Cells {
+		count += len(cell.Drones)
+	}
+	return count
 }
 
 // removeDroneFromCell removes a drone from a map cell

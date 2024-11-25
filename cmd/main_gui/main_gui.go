@@ -72,25 +72,29 @@ func updateGridFromSimulation(sim *simulation.Simulation, grid *fyne.Container) 
 	}
 
 	// Mise à jour des positions des drones
-	for _, drone := range sim.Drones {
-		x, y := normalizeCoordinates(drone.Position.X, drone.Position.Y)
-		idx := y*mapWidth + x
-		if idx >= 0 && idx < len(grid.Objects) {
-			if cell, ok := grid.Objects[idx].(*canvas.Rectangle); ok {
-				cell.FillColor = colorDrone
+	for _, cell := range sim.Map.Cells {
+		for _, drone := range cell.Drones {
+			x, y := normalizeCoordinates(drone.Position.X, drone.Position.Y)
+			idx := y*mapWidth + x
+			if idx >= 0 && idx < len(grid.Objects) {
+				if cell, ok := grid.Objects[idx].(*canvas.Rectangle); ok {
+					cell.FillColor = colorDrone
+				}
 			}
 		}
 	}
 
 	// Mise à jour des positions de la foule
-	for _, member := range sim.Crowd {
-		x, y := normalizeCoordinates(member.Position.X, member.Position.Y)
-		idx := y*mapWidth + x
-		if idx >= 0 && idx < len(grid.Objects) {
-			if cell, ok := grid.Objects[idx].(*canvas.Rectangle); ok {
-				cell.FillColor = colorCrowd
-				// TODO : devide the cell to display several points in the same cell
-				// Each point should represent a crowd member in the same cell with his float coordinates
+	for _, cell := range sim.Map.Cells {
+		for _, member := range cell.CrowdMembers {
+			x, y := normalizeCoordinates(member.Position.X, member.Position.Y)
+			idx := y*mapWidth + x
+			if idx >= 0 && idx < len(grid.Objects) {
+				if cell, ok := grid.Objects[idx].(*canvas.Rectangle); ok {
+					cell.FillColor = colorCrowd
+					// TODO : devide the cell to display several points in the same cell
+					// Each point should represent a crowd member in the same cell with his float coordinates
+				}
 			}
 		}
 	}
@@ -109,7 +113,7 @@ func createCell() *canvas.Rectangle {
 func createControlPanel(sim *SimulationGUI) *fyne.Container {
 	// Slider pour les membres de la foule
 	crowdSlider := widget.NewSlider(1, 500) // Min 1, Max 50 membres
-	crowdSlider.Value = float64(len(sim.sim.Crowd))
+	crowdSlider.Value = float64(sim.sim.Map.CountCrowdMembers())
 	crowdLabel := widget.NewLabel("Nombre de membres : " + fmt.Sprintf("%d", int(crowdSlider.Value)))
 
 	crowdSlider.OnChanged = func(value float64) {
@@ -121,7 +125,7 @@ func createControlPanel(sim *SimulationGUI) *fyne.Container {
 	}
 
 	dronesSlider := widget.NewSlider(1, 20) // Min 1, Max 20 drones
-	dronesSlider.Value = float64(len(sim.sim.Drones))
+	dronesSlider.Value = float64(sim.sim.Map.CountDrones())
 	dronesLabel := widget.NewLabel("Nombre de drones : " + fmt.Sprintf("%d", int(dronesSlider.Value)))
 
 	dronesSlider.OnChanged = func(value float64) {

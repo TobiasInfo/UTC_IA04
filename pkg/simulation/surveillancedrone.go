@@ -13,19 +13,22 @@ import (
 // SurveillanceDrone represents a drone in the simulation
 type SurveillanceDrone struct {
 	ID                      int
+	visionCapacity          int
 	Position                models.Position
 	Battery                 float64
-	DetectionPrecisionFunc  func(x int) []int
+	DetectionPrecisionFunc  func() []float64
+	droneSeeFunction        func(d *SurveillanceDrone) []CrowdMember
 	ReportedZonesByCentrale []models.Position
 }
 
 // NewSurveillanceDrone creates a new instance of SurveillanceDrone
-func NewSurveillanceDrone(id int, position models.Position, battery float64, detectionFunc func(x int) []int) *SurveillanceDrone {
+func NewSurveillanceDrone(id int, position models.Position, battery float64, detectionFunc func() []float64, droneSeeFunc func(d *SurveillanceDrone) []CrowdMember) *SurveillanceDrone {
 	return &SurveillanceDrone{
 		ID:                      id,
 		Position:                position,
 		Battery:                 battery,
 		DetectionPrecisionFunc:  detectionFunc,
+		droneSeeFunction:        droneSeeFunc,
 		ReportedZonesByCentrale: []models.Position{},
 	}
 }
@@ -68,7 +71,7 @@ func (d *SurveillanceDrone) DetectIncident() map[models.Position][2]int {
 		}
 	}
 
-	fmt.Printf("Drone %d detected incidents: %v\n", d.ID, detectedIncidents)
+	//fmt.Printf("Drone %d detected incidents: %v\n", d.ID, detectedIncidents)
 	return detectedIncidents
 }
 
@@ -79,6 +82,11 @@ func (d *SurveillanceDrone) ReceiveInfo() {
 	//Lire les informations sur le channel jusqu'à ce qu'il soit vide, garder la dernière carte reçue
 	var infoReception []models.Position
 	//infoReception = readChannel()
+
+	infos := d.droneSeeFunction(d)
+	for _, info := range infos {
+		fmt.Printf("Drone %d sees crowd member %d at distance %.2f \n", d.ID, info.ID, d.Position.CalculateDistance(info.Position))
+	}
 
 	d.ReportedZonesByCentrale = infoReception
 
