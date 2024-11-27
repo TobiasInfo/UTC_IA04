@@ -21,7 +21,7 @@ Les paramètres à faire varier sont :
 - configuration du festival (obstacles, lieu de recharge, lieu de récupération trousse à pharmacie)
 - nombre de festivaliers
 - taux de malaise (forte chaleur ou non)
-Les drones peuvent aussi varier : (pas sûr qu'on veuille faire ça)
+\nLes drones peuvent aussi varier : (pas sûr qu'on veuille faire ça)
 - autonomie
 - vitesse
 - protocole 
