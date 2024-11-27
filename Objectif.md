@@ -14,7 +14,7 @@ Drones qui communiquent entre eux en P2P
 Leur objectif est de sauver tout le monde
 On va mesurer : 
 - temps de sauvetage des victimes 
-- nombre de personnes non pris en charge en temps limité
+- nombre de personnes non pris en charge avant la fin de leur durée de survie
 
 On va utiliser la simulation pour montrer 3 protocoles des drones, et les performances selon des paramètres à changer. La simulation est un moyen de mesurer la pertinence de chaque protocole.
 Les paramètres à faire varier sont :
