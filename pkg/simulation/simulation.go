@@ -87,7 +87,7 @@ func (s *Simulation) handleDeadPerson() {
 
 		for _, person := range s.Map.Persons {
 			if person.ID == req.MemberID {
-				entity = &person
+				entity = person
 				break
 			}
 		}
@@ -186,41 +186,6 @@ func (s *Simulation) createDrones(n int) {
 			if drone.ID == d.ID {
 				s.Map.AddDrone(&drone)
 			}
-		}
-	}
-}
-
-func (s *Simulation) StartSimulation(numberIteration int) {
-	fmt.Println("Simulation started")
-	// Logic to initialize and run the simulation
-
-	s.Initialize(5, 40, 3)
-
-	for tick := 0; tick < numberIteration; tick++ {
-		// Update drones
-		for _, cell := range s.Map.Cells {
-			for _, drone := range cell.Drones {
-				drone.Myturn()
-			}
-		}
-
-		// Update crowd members
-		for _, cell := range s.Map.Cells {
-			for _, member := range cell.Persons {
-				member.Myturn()
-			}
-		}
-	}
-
-	for _, cell := range s.Map.Cells {
-		for _, drone := range cell.Drones {
-			fmt.Printf("Position du drones %d : X = %f , Y = %f\n", drone.ID, drone.Position.X, drone.Position.Y)
-		}
-	}
-
-	for _, cell := range s.Map.Cells {
-		for _, member := range cell.Persons {
-			fmt.Printf("Position du membre %d : X = %f , Y = %f\n", member.ID, member.Position.X, member.Position.Y)
 		}
 	}
 }
