@@ -1,6 +1,6 @@
 Simulation d'une journée sur un festival 
-- phase d'arrivée []
-- phase concert
+- [ ] phase d'arrivée 
+- [X] phase concert
 - phase déplacement 
 - phase fin
 
