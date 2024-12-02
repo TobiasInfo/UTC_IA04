@@ -21,10 +21,11 @@ type Drone struct {
 	DroneSeeFunction        func(d *Drone) []*persons.Person
 	ReportedZonesByCentrale []models.Position
 	SeenPeople              []*persons.Person
+	MoveChan                chan models.MovementRequest
 }
 
 // NewSurveillanceDrone creates a new instance of SurveillanceDrone
-func NewSurveillanceDrone(id int, position models.Position, battery float64, detectionFunc func() []float64, droneSeeFunc func(d *Drone) []*persons.Person) Drone {
+func NewSurveillanceDrone(id int, position models.Position, battery float64, detectionFunc func() []float64, droneSeeFunc func(d *Drone) []*persons.Person, moveChan chan models.MovementRequest) Drone {
 	return Drone{
 		ID:                      id,
 		Position:                position,
@@ -33,19 +34,36 @@ func NewSurveillanceDrone(id int, position models.Position, battery float64, det
 		DroneSeeFunction:        droneSeeFunc,
 		ReportedZonesByCentrale: []models.Position{},
 		SeenPeople:              []*persons.Person{},
+		MoveChan:                moveChan,
 	}
 }
 
 // Move updates the drones's position to the destination
-func (d *Drone) Move(destination models.Position) {
+func (d *Drone) Move(target models.Position) bool {
 	if d.Battery <= 0 {
 		fmt.Printf("Drone %d cannot move. Battery is empty.\n", d.ID)
-		return
+		return false
 	}
 
-	//fmt.Printf("Drone %d moving from %v to %v\n", d.ID, d.Position, destination)
-	d.Position = destination
-	d.Battery -= 1.0 // Simulate battery usage
+	fmt.Printf("Trying to move person %d to %v\n", d.ID, target)
+
+	if d.Position.X == target.X && d.Position.Y == target.Y {
+		return false
+	}
+
+	responseChan := make(chan models.MovementResponse)
+	d.MoveChan <- models.MovementRequest{MemberID: d.ID, MemberType: "drone", NewPosition: target, ResponseChan: responseChan}
+	response := <-responseChan
+
+	if response.Authorized {
+		d.Battery -= 1.0
+		d.Position.X = target.X
+		d.Position.Y = target.Y
+		fmt.Printf("Drone %d moved to %v\n", d.ID, d.Position)
+		return true
+	}
+
+	return false
 }
 
 // DetectIncident simulates the detection of incidents in the drones's vicinity
@@ -102,45 +120,9 @@ func (d *Drone) ReceiveInfo() {
 func (d *Drone) Think() models.Position {
 	//Traite les informations reçues, les compare à ses objectifs, trouve son nouveau but et retourne la case adjacente vers laquelle il veut aller
 
-	if d.Battery < 20 {
-		//On va à la base, peu importe la situation
-		return models.Position{X: 0, Y: 0}
+	// @TODO: Implémenter la logique de réflexion du drones - Selon les protocoles.
 
-	}
-
-	zoneASurveiller := d.CalculateOptimalPosition(WeightedParameters{1.0, 0.5, 1.5})
-
-	var nouvellePosition models.Position
-
-	if d.Position.X < zoneASurveiller.X {
-		nouvellePosition.X = 1.0
-	} else if d.Position.X > zoneASurveiller.X {
-		nouvellePosition.X = -1.0
-	} else {
-		nouvellePosition.X = 0.0
-	}
-	if d.Position.Y < zoneASurveiller.Y {
-		nouvellePosition.Y = 1.0
-	} else if d.Position.Y > zoneASurveiller.Y {
-		nouvellePosition.Y = -1.0
-	} else {
-		nouvellePosition.Y = 0.0
-	}
-
-	return nouvellePosition
-
-}
-
-// Communicate sends data to a centrale or another protocol
-func (d *Drone) SendInfo(protocol string, observation map[models.Position][2]int) {
-	switch protocol {
-	case "Centrale":
-		break
-		//fmt.Printf("Drone %d communicating with Centrale.\n", d.ID)
-		// Add logic for communication
-	default:
-		fmt.Printf("Drone %d: Unknown protocol '%s'\n", d.ID, protocol)
-	}
+	return d.Position
 }
 
 func (d *Drone) Myturn() {
@@ -149,11 +131,13 @@ func (d *Drone) Myturn() {
 
 	nouvelleCase := d.Think()
 
-	d.Move(nouvelleCase)
+	moved := d.Move(nouvelleCase)
 
-	observation := d.DetectIncident()
+	if !moved && d.Position != nouvelleCase {
+		fmt.Printf("Drone %d could not move to %v\n", d.ID, nouvelleCase)
+	}
 
-	d.SendInfo("Centrale", observation)
+	//observation := d.DetectIncident()
 
 	return
 

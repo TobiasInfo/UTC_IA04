@@ -89,37 +89,20 @@ func (c *Person) MoveTo(target models.Position) {
 	}
 
 	for {
-		speed := 0.5 + rand.Float64()*0.5
+		fmt.Printf("Trying to move person %d to %v\n", c.ID, target)
 
-		deltaX := target.X - c.Position.X
-		deltaY := target.Y - c.Position.Y
-
-		newX := c.Position.X + deltaX*speed
-		newY := c.Position.Y + deltaY*speed
-
-		if newX < 0 {
-			newX = 0
-		}
-		if newY < 0 {
-			newY = 0
-		}
-		if newX > float64(c.width) {
-			newX = float64(c.width)
-		}
-		if newY > float64(c.height) {
-			newY = float64(c.height)
+		if c.Position.X == target.X && c.Position.Y == target.Y {
+			return
 		}
 
-		newPosition := models.Position{X: newX, Y: newY}
 		responseChan := make(chan models.MovementResponse)
-		c.MoveChan <- models.MovementRequest{MemberID: c.ID, MemberType: "persons", NewPosition: newPosition, ResponseChan: responseChan}
+		c.MoveChan <- models.MovementRequest{MemberID: c.ID, MemberType: "persons", NewPosition: target, ResponseChan: responseChan}
 		response := <-responseChan
 
 		if response.Authorized {
-			c.Position = newPosition
-		}
-
-		if c.Position.X == target.X && c.Position.Y == target.Y {
+			c.Position.X = target.X
+			c.Position.Y = target.Y
+			fmt.Printf("Person %d moved to %v\n", c.ID, c.Position)
 			break
 		}
 	}

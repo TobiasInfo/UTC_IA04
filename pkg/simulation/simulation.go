@@ -180,7 +180,7 @@ func (s *Simulation) createDrones(n int) {
 	}
 
 	for i := 0; i < n; i++ {
-		d := drones.NewSurveillanceDrone(i, models.Position{X: 0, Y: 0}, 100.0, detectionFunc, droneSeeFunction)
+		d := drones.NewSurveillanceDrone(i, models.Position{X: 0, Y: 0}, 100.0, detectionFunc, droneSeeFunction, s.MoveChan)
 		s.Drones = append(s.Drones, d)
 		for _, drone := range s.Drones {
 			if drone.ID == d.ID {
