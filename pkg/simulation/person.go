@@ -2,6 +2,7 @@ package simulation
 
 import (
 	"UTC_IA04/pkg/models"
+	"fmt"
 	"math/rand"
 )
 
@@ -16,10 +17,11 @@ type Person struct {
 	width                   int
 	height                  int
 	MoveChan                chan models.MovementRequest
+	DeadChan                chan models.DeadRequest
 }
 
 // NewCrowdMember creates a new instance of a CrowdMember
-func NewCrowdMember(id int, position models.Position, distressProbability float64, lifespan int, width int, height int, moveChan chan models.MovementRequest) *Person {
+func NewCrowdMember(id int, position models.Position, distressProbability float64, lifespan int, width int, height int, moveChan chan models.MovementRequest, deadChan chan models.DeadRequest) *Person {
 	return &Person{
 		ID:                      id,
 		Position:                position,
@@ -30,6 +32,7 @@ func NewCrowdMember(id int, position models.Position, distressProbability float6
 		width:                   width,
 		height:                  height,
 		MoveChan:                moveChan,
+		DeadChan:                deadChan,
 	}
 }
 
@@ -57,36 +60,64 @@ func (c *Person) MoveRandom() {
 		}
 
 		newPosition := models.Position{X: newX, Y: newY}
+
+		if c.Position.X == newPosition.X && c.Position.Y == newPosition.Y {
+			return
+		}
+
 		responseChan := make(chan models.MovementResponse)
 		c.MoveChan <- models.MovementRequest{MemberID: c.ID, MemberType: "person", NewPosition: newPosition, ResponseChan: responseChan}
 		response := <-responseChan
 
 		if response.Authorized {
+			c.Position.X = newPosition.X
+			c.Position.Y = newPosition.Y
+			fmt.Printf("Person %d moved to %v\n", c.ID, c.Position)
 			break
 		}
 	}
 }
 
 // MoveTo updates the CrowdMember's position towards a target position, at random speed
-func (c *Person) MoveTo(position models.Position) {
-
+func (c *Person) MoveTo(target models.Position) {
 	if c.Position.X == -1 && c.Position.Y == -1 {
-		//The Member is Dead, so no moving
 		return
-
 	}
 
-	speed := rand.Float64()
-	if c.Position.X < position.X {
-		c.Position.X += speed
-	} else if c.Position.X > position.X {
-		c.Position.X -= speed
-	}
+	for {
+		speed := 0.5 + rand.Float64()*0.5
 
-	if c.Position.Y < position.Y {
-		c.Position.Y += speed
-	} else if c.Position.Y > position.Y {
-		c.Position.Y -= speed
+		deltaX := target.X - c.Position.X
+		deltaY := target.Y - c.Position.Y
+
+		newX := c.Position.X + deltaX*speed
+		newY := c.Position.Y + deltaY*speed
+
+		if newX < 0 {
+			newX = 0
+		}
+		if newY < 0 {
+			newY = 0
+		}
+		if newX > float64(c.width) {
+			newX = float64(c.width)
+		}
+		if newY > float64(c.height) {
+			newY = float64(c.height)
+		}
+
+		newPosition := models.Position{X: newX, Y: newY}
+		responseChan := make(chan models.MovementResponse)
+		c.MoveChan <- models.MovementRequest{MemberID: c.ID, MemberType: "person", NewPosition: newPosition, ResponseChan: responseChan}
+		response := <-responseChan
+
+		if response.Authorized {
+			c.Position = newPosition
+		}
+
+		if c.Position.X == target.X && c.Position.Y == target.Y {
+			break
+		}
 	}
 }
 
@@ -130,16 +161,35 @@ func (c *Person) CountNeighbors(crowd []*Person, threshold float64) int {
 // Die handles the death of a CrowdMember
 func (c *Person) Die() {
 
-	// TODO : CHeck how to recover the map size properly
+	// TODO : Check how to recover the map size properly
 	c.InDistress = false
 	c.CurrentDistressDuration = 0
 	// Descroy the curent crowd member
-	// TODO : Destroy propoerly the crowd member using map instance
-	// simulation.Map.DestroyCrowdMember(c)
 
 	// For now, I just set the position to -1 to indicate that the crowd member is dead
+	// I Kept the position in (-1, -1) to comply with the old code, but now it is done in simulation and it is not necessary anymore
+	//c.Position.X = -1
+	//c.Position.Y = -1
+
+	// Send a message to the simulation to remove the dead person from the map
+	responseChan := make(chan models.DeadResponse)
+	var response models.DeadResponse
+	c.DeadChan <- models.DeadRequest{MemberID: c.ID, MemberType: "person", ResponseChan: responseChan}
+
+	fmt.Printf("Trying to remove person %d from the map\n", c.ID)
+
+	response = <-responseChan
+
+	if !response.Authorized {
+		fmt.Printf("Person %d could not be removed from the map\n", c.ID)
+		return
+	}
+
 	c.Position.X = -1
 	c.Position.Y = -1
+
+	fmt.Printf("Person %d died :c\n", c.ID)
+
 }
 
 // IsAlive checks if the CrowdMember is still alive

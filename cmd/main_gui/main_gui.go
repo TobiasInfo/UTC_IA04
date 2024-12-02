@@ -195,7 +195,9 @@ func (s *SimulationGUI) runSimulation() {
 				s.mutex.Unlock()
 			}
 
-			time.Sleep(100 * time.Millisecond)
+			// Vaut mieux gérer le ticking depuis la simulation elle même.
+
+			time.Sleep(1000 * time.Millisecond)
 		}
 	}
 }

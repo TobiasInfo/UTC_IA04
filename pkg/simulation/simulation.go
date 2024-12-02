@@ -10,6 +10,7 @@ type Simulation struct {
 	Map        *Map
 	DroneRange int
 	MoveChan   chan models.MovementRequest
+	DeadChan   chan models.DeadRequest
 
 	//Debug vars
 	debug     bool
@@ -22,11 +23,13 @@ func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 		Map:        GetMap(30, 20),
 		DroneRange: 2,
 		MoveChan:   make(chan models.MovementRequest),
+		DeadChan:   make(chan models.DeadRequest),
 		debug:      false,
 		hardDebug:  false,
 	}
 	s.Initialize(numDrones, numCrowdMembers, numObstacles)
 	go s.handleMovementRequests()
+	go s.handleDeadPerson()
 	return s
 }
 
@@ -43,7 +46,7 @@ func (s *Simulation) handleMovementRequests() {
 			if req.MemberType == "drone" {
 				for _, drone := range s.Map.Drones {
 					if drone.ID == req.MemberID {
-						entity = drone
+						entity = &drone
 						break
 					}
 				}
@@ -52,7 +55,7 @@ func (s *Simulation) handleMovementRequests() {
 			if req.MemberType == "person" {
 				for _, person := range s.Map.Persons {
 					if person.ID == req.MemberID {
-						entity = person
+						entity = &person
 						break
 					}
 				}
@@ -66,12 +69,33 @@ func (s *Simulation) handleMovementRequests() {
 	}
 }
 
+func (s *Simulation) handleDeadPerson() {
+	for req := range s.DeadChan {
+		if req.MemberType != "person" {
+			req.ResponseChan <- models.DeadResponse{Authorized: false}
+			continue
+		}
+
+		var entity interface{}
+
+		for _, person := range s.Map.Persons {
+			if person.ID == req.MemberID {
+				entity = &person
+				break
+			}
+		}
+
+		s.Map.RemoveEntity(entity)
+		req.ResponseChan <- models.DeadResponse{Authorized: true}
+	}
+}
+
 func (s *Simulation) Initialize(nDrones int, nCrowd int, nObstacles int) {
 
 	s.createDrones(nDrones)
 
 	for i := 0; i < nCrowd; i++ {
-		member := NewCrowdMember(i, models.Position{X: 0, Y: 0}, 0.001, 20, s.Map.Width, s.Map.Height, s.MoveChan)
+		member := NewCrowdMember(i, models.Position{X: 0, Y: 0}, 0.001, 20, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan)
 		s.Map.AddCrowdMember(member)
 	}
 
@@ -181,6 +205,7 @@ func (s *Simulation) StartSimulation(numberIteration int) {
 
 // Update the simulation state
 func (s *Simulation) Update() {
+	fmt.Println("New Tick")
 	// Update drones
 	for _, cell := range s.Map.Cells {
 		for _, drone := range cell.Drones {
@@ -194,6 +219,8 @@ func (s *Simulation) Update() {
 			member.Myturn()
 		}
 	}
+
+	fmt.Println("End of the tick")
 }
 
 func (s *Simulation) UpdateCrowdSize(newSize int) {
@@ -204,7 +231,7 @@ func (s *Simulation) UpdateCrowdSize(newSize int) {
 
 	if newSize > currentSize {
 		for i := currentSize; i < newSize; i++ {
-			member := NewCrowdMember(i, models.Position{X: 0, Y: 0}, 0.001, 20, s.Map.Width, s.Map.Height, s.MoveChan)
+			member := NewCrowdMember(i, models.Position{X: 0, Y: 0}, 0.001, 20, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan)
 			s.Map.AddCrowdMember(member)
 		}
 	} else if newSize < currentSize {

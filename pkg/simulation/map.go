@@ -63,6 +63,11 @@ func GetMap(width, height int) *Map {
 	return instance
 }
 
+// GetCells returns a pointer to the map cells
+func (m *Map) GetCells() map[models.Position]*MapCell {
+	return m.Cells
+}
+
 // GetDrones returns the drones at a specific position on the map
 func (m *Map) GetDrones(position models.Position) []*Drone {
 	cell, exists := m.Cells[position]
@@ -102,13 +107,25 @@ func (m *Map) MoveEntity(entity interface{}, newPosition models.Position) {
 		newCell = m.Cells[newPosition]
 		removeDroneFromCell(currentCell, e)
 		newCell.Drones = append(newCell.Drones, e)
-		e.Position = newPosition
 	case *Person:
 		currentCell = m.Cells[e.Position]
 		newCell = m.Cells[newPosition]
 		removeCrowdMemberFromCell(currentCell, e)
 		newCell.Persons = append(newCell.Persons, e)
-		e.Position = newPosition
+	default:
+		fmt.Println("Unknown entity type")
+	}
+}
+
+func (m *Map) RemoveEntity(entity interface{}) {
+	var currentCell *MapCell
+	switch e := entity.(type) {
+	case *Drone:
+		currentCell = m.Cells[e.Position]
+		removeDroneFromCell(currentCell, e)
+	case *Person:
+		currentCell = m.Cells[e.Position]
+		removeCrowdMemberFromCell(currentCell, e)
 	default:
 		fmt.Println("Unknown entity type")
 	}
@@ -161,10 +178,14 @@ func removeDroneFromCell(cell *MapCell, drone *Drone) {
 // removeCrowdMemberFromCell removes a crowd member from a map cell
 func removeCrowdMemberFromCell(cell *MapCell, member *Person) {
 	moved := false
+	fmt.Printf("Removing crowd member %d from cell (%.2f, %.2f) \n", member.ID, cell.Position.X, cell.Position.Y)
 	for i, m := range cell.Persons {
 		if m.ID == member.ID {
 			cell.Persons = append(cell.Persons[:i], cell.Persons[i+1:]...)
 			moved = true
+			for _, c := range cell.Persons {
+				fmt.Printf("Remaining member %d in cell\n", c.ID)
+			}
 			break
 		}
 	}
