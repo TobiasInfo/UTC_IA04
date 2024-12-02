@@ -7,6 +7,7 @@ import (
 	"UTC_IA04/pkg/models"
 	"fmt"
 	"math/rand"
+	"sync"
 )
 
 type Simulation struct {
@@ -104,21 +105,23 @@ func (s *Simulation) Initialize(nDrones int, nCrowd int, nObstacles int) {
 	for i := 0; i < nCrowd; i++ {
 		member := persons.NewCrowdMember(i, models.Position{X: 0, Y: 0}, 0.001, 20, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan)
 		s.Persons = append(s.Persons, member)
-		for _, p := range s.Persons {
-			if p.ID == member.ID {
-				s.Map.AddCrowdMember(&p)
-			}
-		}
+		s.Map.AddCrowdMember(&s.Persons[len(s.Persons)-1])
+		//for _, p := range s.Persons {
+		//	if p.ID == member.ID {
+		//		s.Map.AddCrowdMember(&p)
+		//	}
+		//}
 	}
 
 	for i := 0; i < nObstacles; i++ {
 		obstacle := obstacles.NewObstacle(i, models.Position{X: 0, Y: 0})
 		s.Obstacles = append(s.Obstacles, obstacle)
-		for _, o := range s.Obstacles {
-			if o.GetUid() == obstacle.GetUid() {
-				s.Map.AddObstacle(&o)
-			}
-		}
+		s.Map.AddObstacle(&s.Obstacles[len(s.Obstacles)-1])
+		//for _, o := range s.Obstacles {
+		//	if o.GetUid() == obstacle.GetUid() {
+		//		s.Map.AddObstacle(&o)
+		//	}
+		//}
 	}
 }
 
@@ -166,7 +169,7 @@ func (s *Simulation) createDrones(n int) {
 					}
 					for _, member := range cell.Persons {
 						if member.Position.X != position.X || member.Position.Y != position.Y {
-							fmt.Printf("ATTENTION -- ACCES MEMBRE ET CELLULE NON MEMBRE --- MEMBRE : %.2f, %.2f --- CELLEULE %.2f, %.2f \n", member.Position.X, member.Position.Y, position.X, position.Y)
+							fmt.Printf("ATTENTION -- ACCES MEMBRE (%d) ET CELLULE NON MEMBRE --- MEMBRE : %.2f, %.2f --- CELLEULE %.2f, %.2f \n", member.ID, member.Position.X, member.Position.Y, position.X, position.Y)
 						}
 						if rand.Float64() < probs[int(distance)] {
 							//fmt.Printf("Drone %d (%.2f, %.2f) sees crowd member %d (%.2f, %.2f) at distance %.2f\n", d.ID, d.Position.X, d.Position.Y, member.ID, member.Position.X, member.Position.Y, distance)
@@ -182,28 +185,64 @@ func (s *Simulation) createDrones(n int) {
 	for i := 0; i < n; i++ {
 		d := drones.NewSurveillanceDrone(i, models.Position{X: 0, Y: 0}, 100.0, detectionFunc, droneSeeFunction, s.MoveChan)
 		s.Drones = append(s.Drones, d)
-		for _, drone := range s.Drones {
-			if drone.ID == d.ID {
-				s.Map.AddDrone(&drone)
-			}
-		}
+		s.Map.AddDrone(&s.Drones[len(s.Drones)-1])
 	}
 }
 
 // Update the simulation state
 func (s *Simulation) Update() {
 	fmt.Println("New Tick")
-	// Update drones
-	for _, cell := range s.Map.Cells {
-		for _, drone := range cell.Drones {
-			drone.Myturn()
+	var wg sync.WaitGroup
+
+	updatedPersons := make(map[int]struct{})
+	updatedDrones := make(map[int]struct{})
+
+	// Create indexes slice and shuffle it
+	indexes := make([]int, len(s.Persons))
+	for i := range indexes {
+		indexes[i] = i
+	}
+	rand.Shuffle(len(indexes), func(i, j int) {
+		indexes[i], indexes[j] = indexes[j], indexes[i]
+	})
+
+	// Update persons in random order
+	for _, idx := range indexes {
+		if _, exists := updatedPersons[s.Persons[idx].ID]; !exists {
+			updatedPersons[s.Persons[idx].ID] = struct{}{}
+			wg.Add(1)
+			go func(p *persons.Person) {
+				defer wg.Done()
+				p.Myturn()
+			}(&s.Persons[idx])
 		}
 	}
+	wg.Wait()
 
-	// Update crowd members
-	for _, cell := range s.Map.Cells {
+	// Shuffle and update drones
+	indexes = make([]int, len(s.Drones))
+	for i := range indexes {
+		indexes[i] = i
+	}
+	rand.Shuffle(len(indexes), func(i, j int) {
+		indexes[i], indexes[j] = indexes[j], indexes[i]
+	})
+
+	for _, idx := range indexes {
+		if _, exists := updatedDrones[s.Drones[idx].ID]; !exists {
+			wg.Add(1)
+			updatedDrones[s.Drones[idx].ID] = struct{}{}
+			go func(d *drones.Drone) {
+				defer wg.Done()
+				d.Myturn()
+			}(&s.Drones[idx])
+		}
+	}
+	wg.Wait()
+
+	for index, cell := range s.Map.Cells {
 		for _, member := range cell.Persons {
-			member.Myturn()
+			fmt.Printf("%v - Person %d is at position (%.2f, %.2f) -- Current Cell = (%.2f, %.2f) \n", index, member.ID, member.Position.X, member.Position.Y, cell.Position.X, cell.Position.Y)
 		}
 	}
 
@@ -220,11 +259,7 @@ func (s *Simulation) UpdateCrowdSize(newSize int) {
 		for i := currentSize; i < newSize; i++ {
 			member := persons.NewCrowdMember(i, models.Position{X: 0, Y: 0}, 0.001, 20, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan)
 			s.Persons = append(s.Persons, member)
-			for _, p := range s.Persons {
-				if p.ID == member.ID {
-					s.Map.AddCrowdMember(&p)
-				}
-			}
+			s.Map.AddCrowdMember(&s.Persons[len(s.Persons)-1])
 		}
 	} else if newSize < currentSize {
 		for _, cell := range s.Map.Cells {

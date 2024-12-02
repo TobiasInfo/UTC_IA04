@@ -25,14 +25,14 @@ var (
 // Simulation parameters
 var (
 	numDrones       = 5
-	numCrowdMembers = 10
+	numCrowdMembers = 2
 	numObstacles    = 3
 	cellSize        = 40.0 // Size of each cell in pixels
 )
 
 const (
-	mapWidth  = 30
-	mapHeight = 20
+	mapWidth  = 3
+	mapHeight = 3
 )
 
 type SimulationGUI struct {
@@ -197,7 +197,7 @@ func (s *SimulationGUI) runSimulation() {
 
 			// Vaut mieux gérer le ticking depuis la simulation elle même.
 
-			time.Sleep(1000 * time.Millisecond)
+			time.Sleep(2000 * time.Millisecond)
 		}
 	}
 }

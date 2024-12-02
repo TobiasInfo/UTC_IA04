@@ -6,7 +6,6 @@ import (
 	"UTC_IA04/pkg/entities/persons"
 	"UTC_IA04/pkg/models"
 	"fmt"
-	"reflect"
 	"sync"
 )
 
@@ -16,6 +15,7 @@ type MapCell struct {
 	Obstacles []*obstacles.Obstacle
 	Persons   []*persons.Person
 	Drones    []*drones.Drone
+	mu        sync.RWMutex
 }
 
 // Map represents the entire simulation environment
@@ -26,6 +26,7 @@ type Map struct {
 	Drones    []*drones.Drone
 	Obstacles []*obstacles.Obstacle
 	Cells     map[models.Position]*MapCell
+	mu        sync.RWMutex
 }
 
 var (
@@ -45,6 +46,7 @@ func newMap(width, height int) *Map {
 				Obstacles: []*obstacles.Obstacle{},
 				Persons:   []*persons.Person{},
 				Drones:    []*drones.Drone{},
+				mu:        sync.RWMutex{},
 			}
 		}
 	}
@@ -55,6 +57,7 @@ func newMap(width, height int) *Map {
 		Cells:   cells,
 		Persons: []*persons.Person{},
 		Drones:  []*drones.Drone{},
+		mu:      sync.RWMutex{},
 	}
 }
 
@@ -74,65 +77,130 @@ func (m *Map) GetCells() map[models.Position]*MapCell {
 
 // GetDrones returns the drones at a specific position on the map
 func (m *Map) GetDrones(position models.Position) []*drones.Drone {
+	m.mu.RLock()
 	cell, exists := m.Cells[position]
+	m.mu.RUnlock()
+
 	if !exists {
 		return nil
 	}
+
+	cell.mu.RLock()
+	defer cell.mu.RUnlock()
 	return cell.Drones
 }
 
 // AddObstacle adds an obstacles to a specific position on the map
 func (m *Map) AddObstacle(obstacle *obstacles.Obstacle) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	cell := m.Cells[obstacle.Position]
+	cell.mu.Lock()
 	cell.Obstacles = append(cell.Obstacles, obstacle)
+	cell.mu.Unlock()
+
 	m.Obstacles = append(m.Obstacles, obstacle)
 }
 
 // AddCrowdMember adds a crowd member to a specific position on the map
 func (m *Map) AddCrowdMember(member *persons.Person) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	cell := m.Cells[member.Position]
+	cell.mu.Lock()
 	cell.Persons = append(cell.Persons, member)
+	cell.mu.Unlock()
+
 	m.Persons = append(m.Persons, member)
 }
 
 // AddDrone adds a drones to a specific position on the map
 func (m *Map) AddDrone(drone *drones.Drone) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	cell := m.Cells[drone.Position]
+	cell.mu.Lock()
 	cell.Drones = append(cell.Drones, drone)
+	cell.mu.Unlock()
+
 	m.Drones = append(m.Drones, drone)
 }
 
 // MoveEntity updates the position of an entity (e.g., drones, crowd member)
 func (m *Map) MoveEntity(entity interface{}, newPosition models.Position) {
 	var currentCell, newCell *MapCell
+
+	m.mu.RLock()
 	switch e := entity.(type) {
 	case *drones.Drone:
 		currentCell = m.Cells[e.Position]
 		newCell = m.Cells[newPosition]
+
+		// Lock cells in order to prevent deadlock
+		if currentCell.Position.X < newCell.Position.X ||
+			(currentCell.Position.X == newCell.Position.X && currentCell.Position.Y < newCell.Position.Y) {
+			currentCell.mu.Lock()
+			newCell.mu.Lock()
+		} else {
+			newCell.mu.Lock()
+			currentCell.mu.Lock()
+		}
+
 		removeDroneFromCell(currentCell, e)
 		newCell.Drones = append(newCell.Drones, e)
+		e.Position = newPosition
+
+		currentCell.mu.Unlock()
+		newCell.mu.Unlock()
+
 	case *persons.Person:
 		currentCell = m.Cells[e.Position]
 		newCell = m.Cells[newPosition]
+
+		// Lock cells in order to prevent deadlock
+		if currentCell.Position.X < newCell.Position.X ||
+			(currentCell.Position.X == newCell.Position.X && currentCell.Position.Y < newCell.Position.Y) {
+			currentCell.mu.Lock()
+			newCell.mu.Lock()
+		} else {
+			newCell.mu.Lock()
+			currentCell.mu.Lock()
+		}
+
 		removeCrowdMemberFromCell(currentCell, e)
 		newCell.Persons = append(newCell.Persons, e)
+		e.Position = newPosition
+
+		currentCell.mu.Unlock()
+		newCell.mu.Unlock()
+
 	default:
 		fmt.Println("Unknown entity type; cannot move entity")
-		//Print type of entity
-		fmt.Println(reflect.TypeOf(entity))
-		//fmt.Println("Unknown entity type")
 	}
+	m.mu.RUnlock()
 }
 
 func (m *Map) RemoveEntity(entity interface{}) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	var currentCell *MapCell
 	switch e := entity.(type) {
 	case *drones.Drone:
 		currentCell = m.Cells[e.Position]
+		currentCell.mu.Lock()
 		removeDroneFromCell(currentCell, e)
+		currentCell.mu.Unlock()
+
 	case *persons.Person:
 		currentCell = m.Cells[e.Position]
+		currentCell.mu.Lock()
 		removeCrowdMemberFromCell(currentCell, e)
+		currentCell.mu.Unlock()
+
 	default:
 		fmt.Println("Unknown entity type")
 	}
@@ -140,13 +208,17 @@ func (m *Map) RemoveEntity(entity interface{}) {
 
 // IsBlocked checks if a position is blocked by obstacles
 func (m *Map) IsBlocked(position models.Position) bool {
+	m.mu.RLock()
 	cell, exists := m.Cells[position]
+	m.mu.RUnlock()
+
 	if !exists {
 		return true // Outside the map boundaries
 	}
-	state := len(cell.Obstacles) > 0
-	//fmt.Println("Position", position, "is blocked:", state)
-	return state
+
+	cell.mu.RLock()
+	defer cell.mu.RUnlock()
+	return len(cell.Obstacles) > 0
 }
 
 // CountCrowdMembers returns the total number of crowd members on the map

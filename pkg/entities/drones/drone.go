@@ -45,7 +45,7 @@ func (d *Drone) Move(target models.Position) bool {
 		return false
 	}
 
-	fmt.Printf("Trying to move person %d to %v\n", d.ID, target)
+	fmt.Printf("Trying to move drones %d to %v\n", d.ID, target)
 
 	if d.Position.X == target.X && d.Position.Y == target.Y {
 		return false
