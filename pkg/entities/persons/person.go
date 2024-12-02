@@ -1,12 +1,13 @@
-package simulation
+package persons
 
 import (
 	"UTC_IA04/pkg/models"
 	"fmt"
 	"math/rand"
+	"time"
 )
 
-// CrowdMember represents a person in the simulation
+// CrowdMember represents a persons in the simulation
 type Person struct {
 	ID                      int
 	Position                models.Position
@@ -21,16 +22,16 @@ type Person struct {
 }
 
 // NewCrowdMember creates a new instance of a CrowdMember
-func NewCrowdMember(id int, position models.Position, distressProbability float64, lifespan int, width int, height int, moveChan chan models.MovementRequest, deadChan chan models.DeadRequest) *Person {
-	return &Person{
+func NewCrowdMember(id int, position models.Position, distressProbability float64, lifespan int, width int, height int, moveChan chan models.MovementRequest, deadChan chan models.DeadRequest) Person {
+	return Person{
 		ID:                      id,
 		Position:                position,
 		InDistress:              false,
 		DistressProbability:     distressProbability,
 		Lifespan:                lifespan,
-		CurrentDistressDuration: 0,
 		width:                   width,
 		height:                  height,
+		CurrentDistressDuration: 0,
 		MoveChan:                moveChan,
 		DeadChan:                deadChan,
 	}
@@ -42,6 +43,8 @@ func (c *Person) MoveRandom() {
 		if c.Position.X == -1 && c.Position.Y == -1 {
 			return
 		}
+
+		rand.Seed(time.Now().UnixNano())
 
 		newX := c.Position.X + float64(rand.Intn(3)-1)
 		newY := c.Position.Y + float64(rand.Intn(3)-1)
@@ -60,13 +63,14 @@ func (c *Person) MoveRandom() {
 		}
 
 		newPosition := models.Position{X: newX, Y: newY}
+		fmt.Printf("Trying to move person %d to %v\n", c.ID, newPosition)
 
 		if c.Position.X == newPosition.X && c.Position.Y == newPosition.Y {
 			return
 		}
 
 		responseChan := make(chan models.MovementResponse)
-		c.MoveChan <- models.MovementRequest{MemberID: c.ID, MemberType: "person", NewPosition: newPosition, ResponseChan: responseChan}
+		c.MoveChan <- models.MovementRequest{MemberID: c.ID, MemberType: "persons", NewPosition: newPosition, ResponseChan: responseChan}
 		response := <-responseChan
 
 		if response.Authorized {
@@ -108,7 +112,7 @@ func (c *Person) MoveTo(target models.Position) {
 
 		newPosition := models.Position{X: newX, Y: newY}
 		responseChan := make(chan models.MovementResponse)
-		c.MoveChan <- models.MovementRequest{MemberID: c.ID, MemberType: "person", NewPosition: newPosition, ResponseChan: responseChan}
+		c.MoveChan <- models.MovementRequest{MemberID: c.ID, MemberType: "persons", NewPosition: newPosition, ResponseChan: responseChan}
 		response := <-responseChan
 
 		if response.Authorized {
@@ -171,12 +175,12 @@ func (c *Person) Die() {
 	//c.Position.X = -1
 	//c.Position.Y = -1
 
-	// Send a message to the simulation to remove the dead person from the map
+	// Send a message to the simulation to remove the dead persons from the map
 	responseChan := make(chan models.DeadResponse)
 	var response models.DeadResponse
-	c.DeadChan <- models.DeadRequest{MemberID: c.ID, MemberType: "person", ResponseChan: responseChan}
+	c.DeadChan <- models.DeadRequest{MemberID: c.ID, MemberType: "persons", ResponseChan: responseChan}
 
-	fmt.Printf("Trying to remove person %d from the map\n", c.ID)
+	fmt.Printf("Trying to remove persons %d from the map\n", c.ID)
 
 	response = <-responseChan
 
@@ -198,9 +202,7 @@ func (c *Person) IsAlive() bool {
 }
 
 func (c *Person) Myturn() {
-
 	c.MoveRandom()
-
 	c.UpdateHealth()
 
 	return

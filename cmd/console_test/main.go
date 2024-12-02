@@ -18,7 +18,7 @@ func second() {
 	// Get the singleton instance of the map
 	mapInstance := simulation.GetMap(10, 10)
 
-	// Add a drone to the map
+	// Add a drones to the map
 	drone := &simulation.SurveillanceDrone{Position: models.Position{X: 5, Y: 5}}
 	mapInstance.AddDrone(drone)
 
@@ -26,7 +26,7 @@ func second() {
 	crowdMember := &simulation.CrowdMember{ID: 1, Position: models.Position{X: 5, Y: 5}}
 	mapInstance.AddCrowdMember(crowdMember)
 
-	// Move a drone
+	// Move a drones
 	newPosition := models.Position{X: 6, Y: 6}
 	mapInstance.MoveEntity(drone, newPosition)
 

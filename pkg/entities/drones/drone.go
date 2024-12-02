@@ -1,53 +1,54 @@
-package simulation
+package drones
 
 import (
+	"UTC_IA04/pkg/entities/persons"
 	"UTC_IA04/pkg/models"
 	"fmt"
 	"math"
 	"math/rand"
 )
 
-//TODO il faut un channel par drone pour que la centrale puisse communiquer de manière
+//TODO il faut un channel par drones pour que la centrale puisse communiquer de manière
 //précise avec ses drones, jsp comment on peut implémenter ça
 
-// SurveillanceDrone represents a drone in the simulation
+// SurveillanceDrone represents a drones in the simulation
 type Drone struct {
 	ID                      int
 	visionCapacity          int
 	Position                models.Position
 	Battery                 float64
 	DetectionPrecisionFunc  func() []float64
-	droneSeeFunction        func(d *Drone) []Person
+	DroneSeeFunction        func(d *Drone) []*persons.Person
 	ReportedZonesByCentrale []models.Position
-	SeenPeople              []*Person
+	SeenPeople              []*persons.Person
 }
 
 // NewSurveillanceDrone creates a new instance of SurveillanceDrone
-func NewSurveillanceDrone(id int, position models.Position, battery float64, detectionFunc func() []float64, droneSeeFunc func(d *Drone) []Person) *Drone {
-	return &Drone{
+func NewSurveillanceDrone(id int, position models.Position, battery float64, detectionFunc func() []float64, droneSeeFunc func(d *Drone) []*persons.Person) Drone {
+	return Drone{
 		ID:                      id,
 		Position:                position,
 		Battery:                 battery,
 		DetectionPrecisionFunc:  detectionFunc,
-		droneSeeFunction:        droneSeeFunc,
+		DroneSeeFunction:        droneSeeFunc,
 		ReportedZonesByCentrale: []models.Position{},
-		SeenPeople:              []*Person{},
+		SeenPeople:              []*persons.Person{},
 	}
 }
 
-// Move updates the drone's position to the destination
+// Move updates the drones's position to the destination
 func (d *Drone) Move(destination models.Position) {
 	if d.Battery <= 0 {
 		fmt.Printf("Drone %d cannot move. Battery is empty.\n", d.ID)
 		return
 	}
 
-	fmt.Printf("Drone %d moving from %v to %v\n", d.ID, d.Position, destination)
+	//fmt.Printf("Drone %d moving from %v to %v\n", d.ID, d.Position, destination)
 	d.Position = destination
 	d.Battery -= 1.0 // Simulate battery usage
 }
 
-// DetectIncident simulates the detection of incidents in the drone's vicinity
+// DetectIncident simulates the detection of incidents in the drones's vicinity
 func (d *Drone) DetectIncident() map[models.Position][2]int {
 	detectedIncidents := make(map[models.Position][2]int)
 
@@ -79,17 +80,17 @@ func (d *Drone) DetectIncident() map[models.Position][2]int {
 
 func (d *Drone) ReceiveInfo() {
 	//Recupère les informations qui lui ont été envoyées lors des tours précédents
-	//J'imagine qu'on fait marcher ça avec un channel associé à chaque drone pour la réception
+	//J'imagine qu'on fait marcher ça avec un channel associé à chaque drones pour la réception
 
 	//Lire les informations sur le channel jusqu'à ce qu'il soit vide, garder la dernière carte reçue
 	var infoReception []models.Position
 	//infoReception = readChannel()
 
-	infos := d.droneSeeFunction(d)
-	seenPeople := make([]*Person, 0)
+	infos := d.DroneSeeFunction(d)
+	seenPeople := make([]*persons.Person, 0)
 
 	for _, info := range infos {
-		seenPeople = append(seenPeople, &info)
+		seenPeople = append(seenPeople, info)
 	}
 
 	d.SeenPeople = seenPeople
@@ -134,7 +135,8 @@ func (d *Drone) Think() models.Position {
 func (d *Drone) SendInfo(protocol string, observation map[models.Position][2]int) {
 	switch protocol {
 	case "Centrale":
-		fmt.Printf("Drone %d communicating with Centrale.\n", d.ID)
+		break
+		//fmt.Printf("Drone %d communicating with Centrale.\n", d.ID)
 		// Add logic for communication
 	default:
 		fmt.Printf("Drone %d: Unknown protocol '%s'\n", d.ID, protocol)
@@ -197,7 +199,7 @@ func (d *Drone) CalculateOptimalPosition(params WeightedParameters) models.Posit
 
 // calculateZoneWeight calcule le poids d'une zone spécifique
 func calculateZoneWeight(d *Drone, zone models.Position, params WeightedParameters) float64 {
-	// Distance entre le drone et la zones
+	// Distance entre le drones et la zones
 	distance := calculateDistance(d.Position, zone)
 
 	// Facteur de distance inversé (plus proche = plus important)

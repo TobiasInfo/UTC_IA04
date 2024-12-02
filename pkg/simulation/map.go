@@ -1,26 +1,30 @@
 package simulation
 
 import (
+	"UTC_IA04/pkg/entities/drones"
+	"UTC_IA04/pkg/entities/obstacles"
+	"UTC_IA04/pkg/entities/persons"
 	"UTC_IA04/pkg/models"
 	"fmt"
+	"reflect"
 	"sync"
 )
 
 // MapCell represents a single cell on the map
 type MapCell struct {
 	Position  models.Position
-	Obstacles []*Obstacle
-	Persons   []*Person
-	Drones    []*Drone
+	Obstacles []*obstacles.Obstacle
+	Persons   []*persons.Person
+	Drones    []*drones.Drone
 }
 
 // Map represents the entire simulation environment
 type Map struct {
 	Width     int
 	Height    int
-	Persons   []*Person
-	Drones    []*Drone
-	Obstacles []*Obstacle
+	Persons   []*persons.Person
+	Drones    []*drones.Drone
+	Obstacles []*obstacles.Obstacle
 	Cells     map[models.Position]*MapCell
 }
 
@@ -38,9 +42,9 @@ func newMap(width, height int) *Map {
 			pos := models.Position{X: float64(x), Y: float64(y)}
 			cells[pos] = &MapCell{
 				Position:  pos,
-				Obstacles: []*Obstacle{},
-				Persons:   []*Person{},
-				Drones:    []*Drone{},
+				Obstacles: []*obstacles.Obstacle{},
+				Persons:   []*persons.Person{},
+				Drones:    []*drones.Drone{},
 			}
 		}
 	}
@@ -49,8 +53,8 @@ func newMap(width, height int) *Map {
 		Width:   width,
 		Height:  height,
 		Cells:   cells,
-		Persons: []*Person{},
-		Drones:  []*Drone{},
+		Persons: []*persons.Person{},
+		Drones:  []*drones.Drone{},
 	}
 }
 
@@ -69,7 +73,7 @@ func (m *Map) GetCells() map[models.Position]*MapCell {
 }
 
 // GetDrones returns the drones at a specific position on the map
-func (m *Map) GetDrones(position models.Position) []*Drone {
+func (m *Map) GetDrones(position models.Position) []*drones.Drone {
 	cell, exists := m.Cells[position]
 	if !exists {
 		return nil
@@ -77,53 +81,56 @@ func (m *Map) GetDrones(position models.Position) []*Drone {
 	return cell.Drones
 }
 
-// AddObstacle adds an obstacle to a specific position on the map
-func (m *Map) AddObstacle(obstacle *Obstacle) {
+// AddObstacle adds an obstacles to a specific position on the map
+func (m *Map) AddObstacle(obstacle *obstacles.Obstacle) {
 	cell := m.Cells[obstacle.Position]
 	cell.Obstacles = append(cell.Obstacles, obstacle)
 	m.Obstacles = append(m.Obstacles, obstacle)
 }
 
 // AddCrowdMember adds a crowd member to a specific position on the map
-func (m *Map) AddCrowdMember(member *Person) {
+func (m *Map) AddCrowdMember(member *persons.Person) {
 	cell := m.Cells[member.Position]
 	cell.Persons = append(cell.Persons, member)
 	m.Persons = append(m.Persons, member)
 }
 
-// AddDrone adds a drone to a specific position on the map
-func (m *Map) AddDrone(drone *Drone) {
+// AddDrone adds a drones to a specific position on the map
+func (m *Map) AddDrone(drone *drones.Drone) {
 	cell := m.Cells[drone.Position]
 	cell.Drones = append(cell.Drones, drone)
 	m.Drones = append(m.Drones, drone)
 }
 
-// MoveEntity updates the position of an entity (e.g., drone, crowd member)
+// MoveEntity updates the position of an entity (e.g., drones, crowd member)
 func (m *Map) MoveEntity(entity interface{}, newPosition models.Position) {
 	var currentCell, newCell *MapCell
 	switch e := entity.(type) {
-	case *Drone:
+	case *drones.Drone:
 		currentCell = m.Cells[e.Position]
 		newCell = m.Cells[newPosition]
 		removeDroneFromCell(currentCell, e)
 		newCell.Drones = append(newCell.Drones, e)
-	case *Person:
+	case *persons.Person:
 		currentCell = m.Cells[e.Position]
 		newCell = m.Cells[newPosition]
 		removeCrowdMemberFromCell(currentCell, e)
 		newCell.Persons = append(newCell.Persons, e)
 	default:
-		fmt.Println("Unknown entity type")
+		fmt.Println("Unknown entity type; cannot move entity")
+		//Print type of entity
+		fmt.Println(reflect.TypeOf(entity))
+		//fmt.Println("Unknown entity type")
 	}
 }
 
 func (m *Map) RemoveEntity(entity interface{}) {
 	var currentCell *MapCell
 	switch e := entity.(type) {
-	case *Drone:
+	case *drones.Drone:
 		currentCell = m.Cells[e.Position]
 		removeDroneFromCell(currentCell, e)
-	case *Person:
+	case *persons.Person:
 		currentCell = m.Cells[e.Position]
 		removeCrowdMemberFromCell(currentCell, e)
 	default:
@@ -160,8 +167,8 @@ func (m *Map) CountDrones() int {
 	return count
 }
 
-// removeDroneFromCell removes a drone from a map cell
-func removeDroneFromCell(cell *MapCell, drone *Drone) {
+// removeDroneFromCell removes a drones from a map cell
+func removeDroneFromCell(cell *MapCell, drone *drones.Drone) {
 	moved := false
 	for i, d := range cell.Drones {
 		if d.ID == drone.ID {
@@ -176,7 +183,7 @@ func removeDroneFromCell(cell *MapCell, drone *Drone) {
 }
 
 // removeCrowdMemberFromCell removes a crowd member from a map cell
-func removeCrowdMemberFromCell(cell *MapCell, member *Person) {
+func removeCrowdMemberFromCell(cell *MapCell, member *persons.Person) {
 	moved := false
 	fmt.Printf("Removing crowd member %d from cell (%.2f, %.2f) \n", member.ID, cell.Position.X, cell.Position.Y)
 	for i, m := range cell.Persons {
