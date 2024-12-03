@@ -21,17 +21,20 @@ type Simulation struct {
 	FestivalConfig *models.FestivalConfig
 	debug          bool
 	hardDebug      bool
+	currentTick    int // Add this line
+
 }
 
 // Initialize the simulation with the given number of drones, crowd members, and obstacles
 func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 	s := &Simulation{
-		Map:        GetMap(30, 20),
-		DroneRange: 2,
-		MoveChan:   make(chan models.MovementRequest),
-		DeadChan:   make(chan models.DeadRequest),
-		debug:      false,
-		hardDebug:  false,
+		Map:         GetMap(30, 20),
+		DroneRange:  2,
+		MoveChan:    make(chan models.MovementRequest),
+		DeadChan:    make(chan models.DeadRequest),
+		debug:       false,
+		hardDebug:   false,
+		currentTick: 0, // Add this line
 	}
 	s.Initialize(numDrones, numCrowdMembers, numObstacles)
 	go s.handleMovementRequests()
@@ -218,43 +221,20 @@ func (s *Simulation) createDrones(n int) {
 
 func (s *Simulation) Update() {
 	fmt.Println("New Tick")
+	s.currentTick++ // Increment tick counter
 	var wg sync.WaitGroup
 
-	updatedPersons := make(map[int]struct{})
+	// Update drones every tick
 	updatedDrones := make(map[int]struct{})
-
-	// Create indexes slice and shuffle it
-	indexes := make([]int, len(s.Persons))
-	for i := range indexes {
-		indexes[i] = i
+	droneIndexes := make([]int, len(s.Drones))
+	for i := range droneIndexes {
+		droneIndexes[i] = i
 	}
-	rand.Shuffle(len(indexes), func(i, j int) {
-		indexes[i], indexes[j] = indexes[j], indexes[i]
+	rand.Shuffle(len(droneIndexes), func(i, j int) {
+		droneIndexes[i], droneIndexes[j] = droneIndexes[j], droneIndexes[i]
 	})
 
-	// Update persons in random order
-	for _, idx := range indexes {
-		if _, exists := updatedPersons[s.Persons[idx].ID]; !exists {
-			updatedPersons[s.Persons[idx].ID] = struct{}{}
-			wg.Add(1)
-			go func(p *persons.Person) {
-				defer wg.Done()
-				p.Myturn()
-			}(&s.Persons[idx])
-		}
-	}
-	wg.Wait()
-
-	// Shuffle and update drones
-	indexes = make([]int, len(s.Drones))
-	for i := range indexes {
-		indexes[i] = i
-	}
-	rand.Shuffle(len(indexes), func(i, j int) {
-		indexes[i], indexes[j] = indexes[j], indexes[i]
-	})
-
-	for _, idx := range indexes {
+	for _, idx := range droneIndexes {
 		if _, exists := updatedDrones[s.Drones[idx].ID]; !exists {
 			wg.Add(1)
 			updatedDrones[s.Drones[idx].ID] = struct{}{}
@@ -264,11 +244,36 @@ func (s *Simulation) Update() {
 			}(&s.Drones[idx])
 		}
 	}
+
+	// Update persons every 10 ticks
+	if s.currentTick%10 == 0 {
+		updatedPersons := make(map[int]struct{})
+		personIndexes := make([]int, len(s.Persons))
+		for i := range personIndexes {
+			personIndexes[i] = i
+		}
+		rand.Shuffle(len(personIndexes), func(i, j int) {
+			personIndexes[i], personIndexes[j] = personIndexes[j], personIndexes[i]
+		})
+
+		for _, idx := range personIndexes {
+			if _, exists := updatedPersons[s.Persons[idx].ID]; !exists {
+				updatedPersons[s.Persons[idx].ID] = struct{}{}
+				wg.Add(1)
+				go func(p *persons.Person) {
+					defer wg.Done()
+					p.Myturn()
+				}(&s.Persons[idx])
+			}
+		}
+	}
+
 	wg.Wait()
 
 	for index, cell := range s.Map.Cells {
 		for _, member := range cell.Persons {
-			fmt.Printf("%v - Person %d is at position (%.2f, %.2f) -- Current Cell = (%.2f, %.2f) \n", index, member.ID, member.Position.X, member.Position.Y, cell.Position.X, cell.Position.Y)
+			fmt.Printf("%v - Person %d is at position (%.2f, %.2f) -- Current Cell = (%.2f, %.2f) \n",
+				index, member.ID, member.Position.X, member.Position.Y, cell.Position.X, cell.Position.Y)
 		}
 	}
 

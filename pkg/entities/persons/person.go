@@ -3,11 +3,11 @@ package persons
 import (
 	"UTC_IA04/pkg/models"
 	"fmt"
+	"math"
 	"math/rand"
 	"time"
 )
 
-// Person represents a person in the simulation
 type Person struct {
 	ID                      int
 	Position                models.Position
@@ -19,13 +19,16 @@ type Person struct {
 	height                  int
 	MoveChan                chan models.MovementRequest
 	DeadChan                chan models.DeadRequest
-	Profile                 PersonProfile // From profile.go
-	State                   StateData     // From state.go
+	Profile                 PersonProfile
+	State                   StateData
+	MovementPattern         MovementPattern
+	ZonePreference          ZonePreference
 }
 
-// NewCrowdMember creates a new instance of a Person
 func NewCrowdMember(id int, position models.Position, distressProbability float64, lifespan int, width int, height int, moveChan chan models.MovementRequest, deadChan chan models.DeadRequest) Person {
 	profileType := ProfileType(rand.Intn(4))
+	movementPattern := MovementPattern(rand.Intn(5))
+	zonePreference := GetZonePreference(movementPattern)
 
 	return Person{
 		ID:                      id,
@@ -40,55 +43,40 @@ func NewCrowdMember(id int, position models.Position, distressProbability float6
 		DeadChan:                deadChan,
 		Profile:                 NewPersonProfile(profileType),
 		State:                   NewStateData(),
+		MovementPattern:         movementPattern,
+		ZonePreference:          zonePreference,
 	}
 }
 
-// Move randomly updates the Person's position
 func (c *Person) MoveRandom() {
-	for {
-		if c.Position.X == -1 && c.Position.Y == -1 {
-			return
-		}
+	if c.Position.X == -1 && c.Position.Y == -1 || c.InDistress {
+		return
+	}
 
-		rand.Seed(time.Now().UnixNano())
+	rand.Seed(time.Now().UnixNano())
 
-		newX := c.Position.X + float64(rand.Intn(3)-1)
-		newY := c.Position.Y + float64(rand.Intn(3)-1)
+	currentZone := c.determineCurrentZone()
+	newPosition := c.calculateNextPosition(currentZone)
 
-		if newX < 0 {
-			newX = 0
-		}
-		if newY < 0 {
-			newY = 0
-		}
-		if newX > float64(c.width) {
-			newX = float64(c.width)
-		}
-		if newY > float64(c.height) {
-			newY = float64(c.height)
-		}
+	if c.Position.X == newPosition.X && c.Position.Y == newPosition.Y {
+		return
+	}
 
-		newPosition := models.Position{X: newX, Y: newY}
-		fmt.Printf("Trying to move person %d to %v\n", c.ID, newPosition)
+	responseChan := make(chan models.MovementResponse)
+	c.MoveChan <- models.MovementRequest{
+		MemberID:     c.ID,
+		MemberType:   "persons",
+		NewPosition:  newPosition,
+		ResponseChan: responseChan,
+	}
 
-		if c.Position.X == newPosition.X && c.Position.Y == newPosition.Y {
-			return
-		}
-
-		responseChan := make(chan models.MovementResponse)
-		c.MoveChan <- models.MovementRequest{MemberID: c.ID, MemberType: "persons", NewPosition: newPosition, ResponseChan: responseChan}
-		response := <-responseChan
-
-		if response.Authorized {
-			c.Position.X = newPosition.X
-			c.Position.Y = newPosition.Y
-			fmt.Printf("Person %d moved to %v\n", c.ID, c.Position)
-			break
-		}
+	response := <-responseChan
+	if response.Authorized {
+		c.Position = newPosition
+		fmt.Printf("Person %d moved to %v (Zone: %s)\n", c.ID, c.Position, currentZone)
 	}
 }
 
-// MoveTo updates the Person's position towards a target position
 func (c *Person) MoveTo(target models.Position) {
 	if c.Position.X == -1 && c.Position.Y == -1 {
 		return
@@ -114,7 +102,6 @@ func (c *Person) MoveTo(target models.Position) {
 	}
 }
 
-// HasReachedPOI checks if person has reached their target POI
 func (c *Person) HasReachedPOI() bool {
 	if c.State.TargetPOI == nil {
 		return false
@@ -122,21 +109,18 @@ func (c *Person) HasReachedPOI() bool {
 	return false // Placeholder until POI tracking is implemented
 }
 
-// UpdateHealth updates the health state of the Person
 func (c *Person) UpdateHealth() {
 	if c.State.CurrentState == Resting {
 		c.Profile.StaminaLevel += 0.01
 		return
 	}
 
-	// Reduce stamina based on current state and movement
 	staminaReduction := 0.001
 	if c.State.CurrentState == SeekingPOI {
-		staminaReduction = 0.002 // Moving with purpose uses more energy
+		staminaReduction = 0.002
 	}
 	c.Profile.StaminaLevel -= staminaReduction
 
-	// Calculate malaise probability based on profile and current conditions
 	effectiveProbability := c.DistressProbability *
 		(1.0 - c.Profile.MalaiseResistance) *
 		(1.0 - c.Profile.StaminaLevel)
@@ -155,7 +139,6 @@ func (c *Person) UpdateHealth() {
 	}
 }
 
-// Die handles the death of a Person
 func (c *Person) Die() {
 	c.InDistress = false
 	c.CurrentDistressDuration = 0
@@ -178,33 +161,80 @@ func (c *Person) Die() {
 	fmt.Printf("Person %d died :c\n", c.ID)
 }
 
-// IsAlive checks if the Person is still alive
 func (c *Person) IsAlive() bool {
 	return c.Position.X >= 0 && c.Position.Y >= 0
 }
 
-// Myturn handles the person's turn in the simulation
 func (c *Person) Myturn() {
-	// Update state
-	c.State.UpdateState(c)
+	if c.InDistress {
+		c.UpdateHealth()
+		return
+	}
 
-	// Update health with new profile-based calculations
+	c.State.UpdateState(c)
 	c.UpdateHealth()
 
-	// Movement based on current state
 	switch c.State.CurrentState {
 	case Exploring:
-		c.MoveRandom() // Will be replaced with intelligent movement later
+		c.MoveRandom()
 	case SeekingPOI:
 		c.MoveRandom() // Will implement POI seeking movement later
 	case Resting:
 		// Don't move while resting
 	case InQueue:
 		// Minimal movement in queue
-	case InDistress:
-		// Limited movement during distress
-		if rand.Float64() < 0.3 {
-			c.MoveRandom()
-		}
 	}
+}
+
+func (c *Person) determineCurrentZone() string {
+	zoneWidth := float64(c.width) / 3
+	if c.Position.X < zoneWidth {
+		return "entrance"
+	} else if c.Position.X < zoneWidth*2 {
+		return "main"
+	}
+	return "exit"
+}
+
+func (c *Person) calculateNextPosition(currentZone string) models.Position {
+	var deltaX, deltaY float64
+
+	deltaY = float64(rand.Intn(3) - 1)
+
+	if c.ZonePreference.ShouldMoveToZone(currentZone) {
+		switch c.MovementPattern {
+		case EarlyExiter:
+			deltaX = 1
+		case LateArrival:
+			if currentZone == "entrance" {
+				deltaX = 0
+			} else {
+				deltaX = float64(rand.Intn(3) - 1)
+			}
+		case MainEventFocused:
+			if currentZone == "entrance" {
+				deltaX = 1
+			} else if currentZone == "exit" {
+				deltaX = -1
+			}
+		case FoodEnthusiast:
+			deltaX = c.moveTowardsNearestPOI(models.FoodStand)
+		default:
+			deltaX = float64(rand.Intn(3) - 1)
+		}
+	} else {
+		deltaX = float64(rand.Intn(3) - 1)
+	}
+
+	newX := math.Max(0, math.Min(float64(c.width), c.Position.X+deltaX))
+	newY := math.Max(0, math.Min(float64(c.height), c.Position.Y+deltaY))
+
+	return models.Position{X: newX, Y: newY}
+}
+
+func (c *Person) moveTowardsNearestPOI(poiType models.POIType) float64 {
+	if rand.Float64() < c.ZonePreference.GetPOIPreference(poiType) {
+		return float64(rand.Intn(3) - 1)
+	}
+	return 0
 }

@@ -1,88 +1,72 @@
 {
-    "mapWidth": 30,
-    "mapHeight": 20,
+    "mapWidth": 5,
+    "mapHeight": 5,
     "zones": [
         {
             "type": 0,
             "startX": 0,
             "startY": 0,
-            "endX": 10,
-            "endY": 20,
+            "endX": 2,
+            "endY": 2,
             "minPOIs": {
-                "0": 1,  
-                "2": 2   
+                "0": 1
             }
         },
         {
             "type": 1,
-            "startX": 10,
+            "startX": 2,
             "startY": 0,
-            "endX": 20,
-            "endY": 20,
+            "endX": 5,
+            "endY": 2,
             "minPOIs": {
-                "0": 2,  
-                "1": 2,  
-                "2": 4,  
-                "3": 3,  
-                "4": 3,   
-                "5": 1   
+                "1": 1
             }
         },
         {
             "type": 2,
-            "startX": 20,
-            "startY": 0,
-            "endX": 30,
-            "endY": 20,
+            "startX": 0,
+            "startY": 2,
+            "endX": 2,
+            "endY": 5,
             "minPOIs": {
-                "0": 1,  
-                "2": 2,  
-                "7": 2   
+                "2": 1
+            }
+        },
+        {
+            "type": 3,
+            "startX": 2,
+            "startY": 2,
+            "endX": 5,
+            "endY": 5,
+            "minPOIs": {
+                "3": 1
             }
         }
     ],
     "poiLocations": [
         {
             "type": 0,
-            "position": {"x": 5, "y": 5},
+            "position": {"x": 1, "y": 1},
             "capacity": 10,
             "name": "Main Medical Center"
         },
         {
             "type": 1,
-            "position": {"x": 15, "y": 5},
+            "position": {"x": 3, "y": 1},
             "capacity": 5,
             "name": "Drone Station Alpha"
         },
         {
             "type": 2,
-            "position": {"x": 8, "y": 8},
+            "position": {"x": 1, "y": 3},
             "capacity": 8,
             "name": "North Toilets"
         },
         {
             "type": 3,
-            "position": {"x": 12, "y": 12},
+            "position": {"x": 3, "y": 3},
             "capacity": 15,
             "name": "Central Refreshments"
-        },
-        {
-            "type": 4,
-            "position": {"x": 18, "y": 18},
-            "capacity": 20,
-            "name": "Food Court"
-        },
-        {
-            "type": 5,
-            "position": {"x": 25, "y": 10},
-            "capacity": 100,
-            "name": "Main Stage"
-        },
-        {
-            "type": 7,
-            "position": {"x": 28, "y": 15},
-            "capacity": 50,
-            "name": "Chill Zone"
         }
     ]
 }

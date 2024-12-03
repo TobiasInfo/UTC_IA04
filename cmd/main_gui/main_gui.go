@@ -53,12 +53,12 @@ var (
 	numDrones               = 5
 	numCrowdMembers         = 2
 	numObstacles            = 3
-	cellSize        float32 = 40.0
+	cellSize        float32 = 10.0
 )
 
 const (
-	mapWidth  = 30
-	mapHeight = 20
+	mapWidth  = 5
+	mapHeight = 5
 )
 
 type SimulationGUI struct {
