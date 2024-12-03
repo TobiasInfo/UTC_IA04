@@ -118,29 +118,42 @@ func (d *Drone) ReceiveInfo() {
 }
 
 func (d *Drone) Think() models.Position {
-	//Traite les informations reçues, les compare à ses objectifs, trouve son nouveau but et retourne la case adjacente vers laquelle il veut aller
+    directions := []models.Position{
+        {X: 0, Y: -1}, // Up
+        {X: 0, Y: 1},  // Down
+        {X: -1, Y: 0}, // Left
+        {X: 1, Y: 0},  // Right
+    }
 
-	// @TODO: Implémenter la logique de réflexion du drones - Selon les protocoles.
+    rand.Shuffle(len(directions), func(i, j int) {
+        directions[i], directions[j] = directions[j], directions[i]
+    })
 
-	return d.Position
+    for _, dir := range directions {
+        target := models.Position{
+            X: d.Position.X + dir.X,
+            Y: d.Position.Y + dir.Y,
+        }
+        if target.X >= 0 && target.Y >= 0 && target.X < 30 && target.Y < 20 {
+            fmt.Printf("Drone %d Thinks Target: (%f, %f)\n", d.ID, target.X, target.Y)
+            return target
+        }
+    }
+    fmt.Printf("Drone %d has no valid moves, staying at (%f, %f)\n", d.ID, d.Position.X, d.Position.Y)
+    return d.Position
 }
 
+
 func (d *Drone) Myturn() {
+	// Get the next position to move to
+	target := d.Think()
 
-	d.ReceiveInfo()
+	// Try to move to the calculated target
+	moved := d.Move(target)
 
-	nouvelleCase := d.Think()
-
-	moved := d.Move(nouvelleCase)
-
-	if !moved && d.Position != nouvelleCase {
-		fmt.Printf("Drone %d could not move to %v\n", d.ID, nouvelleCase)
+	if !moved {
+		fmt.Printf("Drone %d could not move to %v\n", d.ID, target)
 	}
-
-	//observation := d.DetectIncident()
-
-	return
-
 }
 
 //ICI METHODE DE CALCUL, on cherche le centre selon des poids qu'on peut fixer, d'intéret
