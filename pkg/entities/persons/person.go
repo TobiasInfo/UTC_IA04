@@ -7,22 +7,26 @@ import (
 	"time"
 )
 
-// CrowdMember represents a persons in the simulation
+// Person represents a person in the simulation
 type Person struct {
 	ID                      int
 	Position                models.Position
 	InDistress              bool
 	DistressProbability     float64
-	Lifespan                int // Maximum duration in distress before "death"
+	Lifespan                int
 	CurrentDistressDuration int
 	width                   int
 	height                  int
 	MoveChan                chan models.MovementRequest
 	DeadChan                chan models.DeadRequest
+	Profile                 PersonProfile // From profile.go
+	State                   StateData     // From state.go
 }
 
-// NewCrowdMember creates a new instance of a CrowdMember
+// NewCrowdMember creates a new instance of a Person
 func NewCrowdMember(id int, position models.Position, distressProbability float64, lifespan int, width int, height int, moveChan chan models.MovementRequest, deadChan chan models.DeadRequest) Person {
+	profileType := ProfileType(rand.Intn(4))
+
 	return Person{
 		ID:                      id,
 		Position:                position,
@@ -34,10 +38,12 @@ func NewCrowdMember(id int, position models.Position, distressProbability float6
 		CurrentDistressDuration: 0,
 		MoveChan:                moveChan,
 		DeadChan:                deadChan,
+		Profile:                 NewPersonProfile(profileType),
+		State:                   NewStateData(),
 	}
 }
 
-// Move randomly updates the CrowdMember's position
+// Move randomly updates the Person's position
 func (c *Person) MoveRandom() {
 	for {
 		if c.Position.X == -1 && c.Position.Y == -1 {
@@ -82,7 +88,7 @@ func (c *Person) MoveRandom() {
 	}
 }
 
-// MoveTo updates the CrowdMember's position towards a target position, at random speed
+// MoveTo updates the Person's position towards a target position
 func (c *Person) MoveTo(target models.Position) {
 	if c.Position.X == -1 && c.Position.Y == -1 {
 		return
@@ -108,64 +114,58 @@ func (c *Person) MoveTo(target models.Position) {
 	}
 }
 
-// UpdateHealth updates the health state of the CrowdMember
+// HasReachedPOI checks if person has reached their target POI
+func (c *Person) HasReachedPOI() bool {
+	if c.State.TargetPOI == nil {
+		return false
+	}
+	return false // Placeholder until POI tracking is implemented
+}
+
+// UpdateHealth updates the health state of the Person
 func (c *Person) UpdateHealth() {
+	if c.State.CurrentState == Resting {
+		c.Profile.StaminaLevel += 0.01
+		return
+	}
 
-	//TODO use a function to communicate with the global map to know how many people are around our crowdMember
-	neighborCount := 3
+	// Reduce stamina based on current state and movement
+	staminaReduction := 0.001
+	if c.State.CurrentState == SeekingPOI {
+		staminaReduction = 0.002 // Moving with purpose uses more energy
+	}
+	c.Profile.StaminaLevel -= staminaReduction
 
-	effectiveDistressProbability := c.DistressProbability * float64(neighborCount)
+	// Calculate malaise probability based on profile and current conditions
+	effectiveProbability := c.DistressProbability *
+		(1.0 - c.Profile.MalaiseResistance) *
+		(1.0 - c.Profile.StaminaLevel)
 
-	if rand.Float64() < effectiveDistressProbability {
+	if rand.Float64() < effectiveProbability {
 		c.InDistress = true
 	}
 
-	// Update distress duration or reset if no distress
 	if c.InDistress {
 		c.CurrentDistressDuration++
 		if c.CurrentDistressDuration >= c.Lifespan {
 			c.Die()
-			// Add a new CrowdMember to the map with random values
-			// TODO : Change the parameters to be more realistic
-			//simulation.Map.AddCrowdMember(NewCrowdMember(rand.Intn(1000), models.Position{X: rand.Float64() * float64(simulation.Map.Width), Y: rand.Float64() * float64(simulation.Map.Height)}, 0.1, 10))
 		}
 	} else {
 		c.CurrentDistressDuration = 0
 	}
 }
 
-// CountNeighbors counts the number of neighboring CrowdMembers in the threshold distance
-func (c *Person) CountNeighbors(crowd []*Person, threshold float64) int {
-	count := 0
-	for _, neighbor := range crowd {
-		if c != neighbor && c.Position.CalculateDistance(neighbor.Position) <= threshold { // Neighbor threshold
-			count++
-		}
-	}
-	return count
-}
-
-// Die handles the death of a CrowdMember
+// Die handles the death of a Person
 func (c *Person) Die() {
-
-	// TODO : Check how to recover the map size properly
 	c.InDistress = false
 	c.CurrentDistressDuration = 0
-	// Descroy the curent crowd member
 
-	// For now, I just set the position to -1 to indicate that the crowd member is dead
-	// I Kept the position in (-1, -1) to comply with the old code, but now it is done in simulation and it is not necessary anymore
-	//c.Position.X = -1
-	//c.Position.Y = -1
-
-	// Send a message to the simulation to remove the dead persons from the map
 	responseChan := make(chan models.DeadResponse)
-	var response models.DeadResponse
 	c.DeadChan <- models.DeadRequest{MemberID: c.ID, MemberType: "persons", ResponseChan: responseChan}
 
-	fmt.Printf("Trying to remove persons %d from the map\n", c.ID)
+	fmt.Printf("Trying to remove person %d from the map\n", c.ID)
 
-	response = <-responseChan
+	response := <-responseChan
 
 	if !response.Authorized {
 		fmt.Printf("Person %d could not be removed from the map\n", c.ID)
@@ -176,28 +176,35 @@ func (c *Person) Die() {
 	c.Position.Y = -1
 
 	fmt.Printf("Person %d died :c\n", c.ID)
-
 }
 
-// IsAlive checks if the CrowdMember is still alive
+// IsAlive checks if the Person is still alive
 func (c *Person) IsAlive() bool {
 	return c.Position.X >= 0 && c.Position.Y >= 0
 }
 
+// Myturn handles the person's turn in the simulation
 func (c *Person) Myturn() {
-	c.MoveRandom()
+	// Update state
+	c.State.UpdateState(c)
+
+	// Update health with new profile-based calculations
 	c.UpdateHealth()
 
-	return
-
-	//alternative :
-	//TODO si on veut que les humains se dirigent vers des points d'intérêts on aura besoin d'un attribut objectif en plus
-	//TODO trouver le bon facteur de taille de carte
-
-	//TODO implémenter les colisions avec les obstacles et les bords de map
-
-	//sizeofmap := 20.
-	//but := models.Position{rand.Float64()*sizeofmap, rand.Float64()*sizeofmap}
-	//c.MoveTo(but)
-	//return
+	// Movement based on current state
+	switch c.State.CurrentState {
+	case Exploring:
+		c.MoveRandom() // Will be replaced with intelligent movement later
+	case SeekingPOI:
+		c.MoveRandom() // Will implement POI seeking movement later
+	case Resting:
+		// Don't move while resting
+	case InQueue:
+		// Minimal movement in queue
+	case InDistress:
+		// Limited movement during distress
+		if rand.Float64() < 0.3 {
+			c.MoveRandom()
+		}
+	}
 }
