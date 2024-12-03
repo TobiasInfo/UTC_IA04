@@ -11,18 +11,16 @@ import (
 )
 
 type Simulation struct {
-	Map        *Map
-	DroneRange int
-	MoveChan   chan models.MovementRequest
-	DeadChan   chan models.DeadRequest
-
-	Persons   []persons.Person
-	Drones    []drones.Drone
-	Obstacles []obstacles.Obstacle
-
-	//Debug vars
-	debug     bool
-	hardDebug bool
+	Map            *Map
+	DroneRange     int
+	MoveChan       chan models.MovementRequest
+	DeadChan       chan models.DeadRequest
+	Persons        []persons.Person
+	Drones         []drones.Drone
+	Obstacles      []obstacles.Obstacle
+	FestivalConfig *models.FestivalConfig
+	debug          bool
+	hardDebug      bool
 }
 
 // Initialize the simulation with the given number of drones, crowd members, and obstacles
@@ -99,29 +97,59 @@ func (s *Simulation) handleDeadPerson() {
 }
 
 func (s *Simulation) Initialize(nDrones int, nCrowd int, nObstacles int) {
+	// Try to load festival configuration
+	configPath := "configs/festival_layout.json"
+	config, err := LoadFestivalConfig(configPath)
+	if err != nil {
+		fmt.Printf("Warning: Could not load festival config from %s: %v\n", configPath, err)
+		fmt.Println("Using default obstacle initialization...")
+		// Create default obstacles if no config is available
+		for i := 0; i < nObstacles; i++ {
+			randomPOIType := models.POIType(rand.Intn(8))
+			defaultCapacity := 10
+			switch randomPOIType {
+			case models.MedicalTent:
+				defaultCapacity = 15
+			case models.ChargingStation:
+				defaultCapacity = 5
+			case models.MainStage:
+				defaultCapacity = 100
+			}
 
+			obstacle := obstacles.NewObstacle(
+				i,
+				models.Position{
+					X: float64(rand.Intn(s.Map.Width)),
+					Y: float64(rand.Intn(s.Map.Height)),
+				},
+				randomPOIType,
+				defaultCapacity,
+			)
+			s.Obstacles = append(s.Obstacles, obstacle)
+			s.Map.AddObstacle(&s.Obstacles[len(s.Obstacles)-1])
+		}
+	} else {
+		fmt.Println("Successfully loaded festival configuration!")
+		fmt.Printf("Found %d POI locations in config\n", len(config.POILocations))
+		s.FestivalConfig = config
+		fmt.Println("Applying festival configuration...")
+		err = s.Map.ApplyFestivalConfig(config)
+		if err != nil {
+			fmt.Printf("Error applying festival config: %v\nFalling back to default initialization\n", err)
+			// Fall back to default initialization
+			s.Initialize(nDrones, nCrowd, nObstacles)
+			return
+		}
+		fmt.Println("Successfully applied festival configuration")
+	}
+
+	// Initialize drones and crowd members
 	s.createDrones(nDrones)
 
 	for i := 0; i < nCrowd; i++ {
 		member := persons.NewCrowdMember(i, models.Position{X: 0, Y: 0}, 0.001, 20, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan)
 		s.Persons = append(s.Persons, member)
 		s.Map.AddCrowdMember(&s.Persons[len(s.Persons)-1])
-		//for _, p := range s.Persons {
-		//	if p.ID == member.ID {
-		//		s.Map.AddCrowdMember(&p)
-		//	}
-		//}
-	}
-
-	for i := 0; i < nObstacles; i++ {
-		obstacle := obstacles.NewObstacle(i, models.Position{X: 0, Y: 0})
-		s.Obstacles = append(s.Obstacles, obstacle)
-		s.Map.AddObstacle(&s.Obstacles[len(s.Obstacles)-1])
-		//for _, o := range s.Obstacles {
-		//	if o.GetUid() == obstacle.GetUid() {
-		//		s.Map.AddObstacle(&o)
-		//	}
-		//}
 	}
 }
 
@@ -172,7 +200,6 @@ func (s *Simulation) createDrones(n int) {
 							fmt.Printf("ATTENTION -- ACCES MEMBRE (%d) ET CELLULE NON MEMBRE --- MEMBRE : %.2f, %.2f --- CELLEULE %.2f, %.2f \n", member.ID, member.Position.X, member.Position.Y, position.X, position.Y)
 						}
 						if rand.Float64() < probs[int(distance)] {
-							//fmt.Printf("Drone %d (%.2f, %.2f) sees crowd member %d (%.2f, %.2f) at distance %.2f\n", d.ID, d.Position.X, d.Position.Y, member.ID, member.Position.X, member.Position.Y, distance)
 							droneInformations = append(droneInformations, member)
 						}
 					}
@@ -189,7 +216,6 @@ func (s *Simulation) createDrones(n int) {
 	}
 }
 
-// Update the simulation state
 func (s *Simulation) Update() {
 	fmt.Println("New Tick")
 	var wg sync.WaitGroup
