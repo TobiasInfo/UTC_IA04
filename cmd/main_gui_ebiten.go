@@ -16,9 +16,9 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	g := game.NewGame(
-		5,   // default drone count
-		100, // default people count
-		5,   // default obstacle count
+		5,  // default drone count
+		10, // default people count
+		5,  // default obstacle count
 	)
 
 	// Centering and making the UI look nicer
@@ -76,7 +76,7 @@ func main() {
 				g.PauseButton.Text = "Pause"
 			}
 		},
-	}	
+	}
 
 	ebiten.SetWindowSize(800, 600)
 	ebiten.SetWindowTitle("Simulation with Vision Circles")
