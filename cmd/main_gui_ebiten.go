@@ -2,6 +2,7 @@ package main
 
 import (
 	"math/rand"
+	"strconv"
 	"time"
 
 	game "UTC_IA04/cmd/simu"
@@ -43,6 +44,18 @@ func main() {
 	g.StartButton = ui.Button{
 		X: 300, Y: 350, Width: 200, Height: 50, Text: "Start Simulation",
 		OnClick: func() {
+			// Parse current values from the text fields to ensure they are up-to-date
+			if val, err := strconv.Atoi(g.DroneField.Text); err == nil {
+				g.DroneCount = val
+			}
+			if val, err := strconv.Atoi(g.PeopleField.Text); err == nil {
+				g.PeopleCount = val
+			}
+			if val, err := strconv.Atoi(g.ObstacleField.Text); err == nil {
+				g.ObstacleCount = val
+			}
+
+			// Now start the simulation with the updated values
 			g.Sim = simulation.NewSimulation(g.DroneCount, g.PeopleCount, g.ObstacleCount)
 			g.Mode = game.Simulation
 		},

@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"image/color"
 
+	"UTC_IA04/cmd/ui"
+	"UTC_IA04/pkg/simulation"
+
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
-	"UTC_IA04/pkg/simulation"
-	"UTC_IA04/cmd/ui"
 )
 
 type Mode int
@@ -41,6 +42,7 @@ func NewGame(droneCount, peopleCount, obstacleCount int) *Game {
 		ObstacleCount: obstacleCount,
 		StaticLayer:   ebiten.NewImage(800, 600),
 		DynamicLayer:  ebiten.NewImage(800, 600),
+		Sim:           simulation.NewSimulation(droneCount, peopleCount, obstacleCount),
 	}
 }
 
