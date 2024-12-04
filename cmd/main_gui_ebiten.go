@@ -13,14 +13,49 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
-type Game struct {
-	StaticLayer  *ebiten.Image // Static layer for background and obstacles
-	DynamicLayer *ebiten.Image // Dynamic layer for drones and persons
+type Button struct {
+	X, Y, Width, Height float64
+	Text                string
+	OnClick             func()
+	lastClicked         time.Time // Tracks the last click time
+}
 
+func (b *Button) Draw(screen *ebiten.Image) {
+	buttonImage := ebiten.NewImage(int(b.Width), int(b.Height))
+	buttonImage.Fill(color.RGBA{0, 128, 255, 255}) // Blue background
+	opts := &ebiten.DrawImageOptions{}
+	opts.GeoM.Translate(b.X, b.Y)
+	screen.DrawImage(buttonImage, opts)
+
+	// Draw button text
+	textX := int(b.X + b.Width/4)
+	textY := int(b.Y + b.Height/3)
+	ebitenutil.DebugPrintAt(screen, b.Text, textX, textY)
+}
+func (b *Button) Update(mx, my float64, pressed bool) bool {
+	if time.Since(b.lastClicked) < 500*time.Millisecond { // 0.5-second delay
+		return false
+	}
+
+	if pressed && mx >= b.X && mx <= b.X+b.Width && my >= b.Y && my <= b.Y+b.Height {
+		b.lastClicked = time.Now() // Update the last clicked time
+		if b.OnClick != nil {
+			b.OnClick()
+		}
+		return true
+	}
+	return false
+}
+
+type Game struct {
+	StaticLayer   *ebiten.Image
+	DynamicLayer  *ebiten.Image
 	Sim           *simulation.Simulation
 	DroneImage    *ebiten.Image
 	ObstacleImage *ebiten.Image
 	Sliders       []Slider
+	PauseButton   Button
+	Paused        bool
 }
 
 type Slider struct {
@@ -72,13 +107,21 @@ func (g *Game) Update() error {
 	mx, my := ebiten.CursorPosition()
 	mousePressed := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
 
+	// Update Pause button
+	g.PauseButton.Update(float64(mx), float64(my), mousePressed)
+
+	// If the game is paused, stop simulation updates
+	if g.Paused {
+		return nil
+	}
+
+	// Update sliders
 	for _, slider := range g.Sliders {
 		slider.Update(float64(mx), float64(my), mousePressed)
 	}
 
-	// Update the simulation, triggering entity updates
+	// Update the simulation
 	g.Sim.Update()
-
 	return nil
 }
 
@@ -91,6 +134,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	g.drawMetricsWindow(screen)
 	g.drawSliders(screen)
+
+	// Draw the Pause button
+	g.PauseButton.Draw(screen)
 }
 
 func (g *Game) drawStaticLayer() {
@@ -104,15 +150,10 @@ func (g *Game) drawDynamicLayer() {
 	g.DynamicLayer.Clear()
 	for _, person := range g.Sim.Persons {
 		color := color.RGBA{255, 0, 0, 255} // Red for normal
-		if person.InDistress {
-			//color = color.RGBA{255, 255, 0, 255} // Yellow for distress
-		}
 		drawPerson(g.DynamicLayer, person.Position.X*30, person.Position.Y*30, 10, color)
 	}
 	for _, drone := range g.Sim.Drones {
-		// Draw drone vision circle
 		drawVisionCircle(g.DynamicLayer, drone.Position.X*30, drone.Position.Y*30, 60)
-		// Draw the drone itself
 		drawDrone(g.DynamicLayer, drone.Position.X*30, drone.Position.Y*30, 20, g.DroneImage)
 	}
 }
@@ -212,16 +253,30 @@ func main() {
 		Sim:           simulation.NewSimulation(5, 20, 10),
 		DroneImage:    loadImage("img/drone.png"),
 		ObstacleImage: loadImage("img/chapiteau.png"),
+		Paused:        false,
+	}
+
+	// Initialize the Pause button
+	game.PauseButton = Button{
+		X: 830, Y: 450, Width: 150, Height: 40,
+		Text: "Pause",
+		OnClick: func() {
+			game.Paused = !game.Paused
+			if game.Paused {
+				game.PauseButton.Text = "Resume"
+			} else {
+				game.PauseButton.Text = "Pause"
+			}
+		},
 	}
 
 	game.Sliders = []Slider{
-		//{830, 320, 150, 20, 0, 20, 5, "Obstacles", func(value int) { game.Sim.UpdateObstacleSize(value) }},
 		{830, 360, 150, 20, 0, 20, 3, "People", func(value int) { game.Sim.UpdateCrowdSize(value) }},
 		{830, 400, 150, 20, 0, 20, 2, "Drones", func(value int) { game.Sim.UpdateDroneSize(value) }},
 	}
 
 	ebiten.SetWindowSize(1050, 600)
-	ebiten.SetWindowTitle("Simulation with Sliders")
+	ebiten.SetWindowTitle("Simulation with Pause and Sliders")
 	if err := ebiten.RunGame(game); err != nil {
 		panic(err)
 	}
