@@ -17,16 +17,32 @@ type TextField struct {
 
 func (tf *TextField) Draw(screen *ebiten.Image) {
 	field := ebiten.NewImage(int(tf.Width), int(tf.Height))
+
+	// Different color when active
+	bgColor := color.RGBA{255, 255, 255, 255}
 	if tf.IsActive {
-		field.Fill(color.RGBA{200, 200, 255, 255}) // Light blue when active
-	} else {
-		field.Fill(color.RGBA{255, 255, 255, 255}) // White otherwise
+		bgColor = color.RGBA{230, 230, 255, 255} // Slightly tinted when active
 	}
+	field.Fill(bgColor)
+
 	opts := &ebiten.DrawImageOptions{}
 	opts.GeoM.Translate(tf.X, tf.Y)
 	screen.DrawImage(field, opts)
 
 	ebitenutil.DebugPrintAt(screen, tf.Text, int(tf.X+5), int(tf.Y+5))
+
+	// Draw a small border around the field to make it stand out
+	border := ebiten.NewImage(int(tf.Width), int(tf.Height))
+	borderColor := color.RGBA{0, 0, 0, 255}
+	for i := 0; i < int(tf.Width); i++ {
+		border.Set(i, 0, borderColor)
+		border.Set(i, int(tf.Height)-1, borderColor)
+	}
+	for j := 0; j < int(tf.Height); j++ {
+		border.Set(0, j, borderColor)
+		border.Set(int(tf.Width)-1, j, borderColor)
+	}
+	screen.DrawImage(border, opts)
 }
 
 func (tf *TextField) Update(mx, my float64, pressed bool, inputChars []rune, enterPressed bool) {

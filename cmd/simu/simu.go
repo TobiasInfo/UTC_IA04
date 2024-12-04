@@ -75,30 +75,53 @@ func (g *Game) Update() error {
 func (g *Game) Draw(screen *ebiten.Image) {
 	switch g.Mode {
 	case Menu:
-		screen.Fill(color.RGBA{0, 0, 0, 255})
-		ebitenutil.DebugPrint(screen, "Welcome to the Simulation!\nSet parameters and press Start.")
-
-		g.StartButton.Draw(screen)
-
-		ebitenutil.DebugPrintAt(screen, "Drones:", 50, 150)
-		g.DroneField.Draw(screen)
-
-		ebitenutil.DebugPrintAt(screen, "People:", 50, 200)
-		g.PeopleField.Draw(screen)
-
-		ebitenutil.DebugPrintAt(screen, "Obstacles:", 50, 250)
-		g.ObstacleField.Draw(screen)
-
+		g.drawMenu(screen)
 	case Simulation:
-		g.drawStaticLayer()
-		screen.DrawImage(g.StaticLayer, nil)
-
-		g.drawDynamicLayer()
-		screen.DrawImage(g.DynamicLayer, nil)
-
-		g.drawMetricsWindow(screen)
-		g.PauseButton.Draw(screen)
+		g.drawSimulation(screen)
 	}
+}
+
+func (g *Game) drawMenu(screen *ebiten.Image) {
+	// Fill background with a calming color
+	screen.Fill(color.RGBA{30, 30, 50, 255})
+
+	// Add a title
+	title := "Welcome to the Simulation!"
+	ebitenutil.DebugPrintAt(screen, title, 250, 50)
+
+	// Instructions
+	instructions := "Use the fields below to set parameters.\n" +
+		"Click on a field, type the number, and press Enter.\n" +
+		"Then click 'Start Simulation' to begin."
+	ebitenutil.DebugPrintAt(screen, instructions, 200, 100)
+
+	// Labels and fields
+	ebitenutil.DebugPrintAt(screen, "Number of Drones:", 200, 200)
+	g.DroneField.Draw(screen)
+
+	ebitenutil.DebugPrintAt(screen, "Number of People:", 200, 250)
+	g.PeopleField.Draw(screen)
+
+	ebitenutil.DebugPrintAt(screen, "Number of Obstacles:", 200, 300)
+	g.ObstacleField.Draw(screen)
+
+	g.StartButton.Draw(screen)
+}
+
+func (g *Game) drawSimulation(screen *ebiten.Image) {
+	// Draw the environment
+	g.drawStaticLayer()
+	screen.DrawImage(g.StaticLayer, nil)
+
+	// Draw moving entities
+	g.drawDynamicLayer()
+	screen.DrawImage(g.DynamicLayer, nil)
+
+	// Draw the metrics window
+	g.drawMetricsWindow(screen)
+
+	// Draw the pause/resume button
+	g.PauseButton.Draw(screen)
 }
 
 func (g *Game) drawStaticLayer() {
@@ -124,12 +147,22 @@ func (g *Game) drawDynamicLayer() {
 }
 
 func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
-	metrics := ebiten.NewImage(200, 200)
-	metrics.Fill(color.RGBA{0, 0, 0, 200})
-	text := fmt.Sprintf("Metrics:\nDrones: %d\nPeople: %d\nObstacles: %d",
-		len(g.Sim.Drones), len(g.Sim.Persons), len(g.Sim.Obstacles))
-	ebitenutil.DebugPrint(metrics, text)
+	metricsWidth, metricsHeight := 200, 120
+	metrics := ebiten.NewImage(metricsWidth, metricsHeight)
+	metrics.Fill(color.RGBA{30, 30, 30, 200}) // Semi-transparent dark background for metrics
+
+	// Add a nice title and spacing
+	title := "Simulation Metrics"
+	ebitenutil.DebugPrintAt(metrics, title, 10, 10)
+	// Use formatted strings to make metrics more readable
+	text := fmt.Sprintf(
+		"Drones: %d\nPeople: %d\nObstacles: %d",
+		len(g.Sim.Drones), len(g.Sim.Persons), len(g.Sim.Obstacles),
+	)
+	ebitenutil.DebugPrintAt(metrics, text, 10, 30)
+
 	opts := &ebiten.DrawImageOptions{}
-	opts.GeoM.Translate(600, 50)
+	// Place it in the top-right corner, below the control panel
+	opts.GeoM.Translate(580, 50)
 	screen.DrawImage(metrics, opts)
 }

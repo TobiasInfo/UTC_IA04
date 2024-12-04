@@ -16,33 +16,38 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	g := game.NewGame(
-		5,  // default drone count
-		10, // default people count
-		5,  // default obstacle count
+		5,   // default drone count
+		100, // default people count
+		5,   // default obstacle count
 	)
 
-	// Initialize UI fields
+	// Centering and making the UI look nicer
+	fieldWidth := 200.0
+	fieldHeight := 30.0
+	fieldX := 400.0 - fieldWidth/2
+
 	g.DroneField = ui.TextField{
-		X: 150, Y: 150, Width: 200, Height: 30, Text: "5",
+		X: fieldX, Y: 200, Width: fieldWidth, Height: fieldHeight, Text: "5",
 		OnEnter: func(value int) {
 			g.DroneCount = value
 		},
 	}
 	g.PeopleField = ui.TextField{
-		X: 150, Y: 200, Width: 200, Height: 30, Text: "10",
+		X: fieldX, Y: 250, Width: fieldWidth, Height: fieldHeight, Text: "10",
 		OnEnter: func(value int) {
+			g.Sim.UpdateCrowdSize(value)
 			g.PeopleCount = value
 		},
 	}
 	g.ObstacleField = ui.TextField{
-		X: 150, Y: 250, Width: 200, Height: 30, Text: "5",
+		X: fieldX, Y: 300, Width: fieldWidth, Height: fieldHeight, Text: "5",
 		OnEnter: func(value int) {
 			g.ObstacleCount = value
 		},
 	}
 
 	g.StartButton = ui.Button{
-		X: 300, Y: 350, Width: 200, Height: 50, Text: "Start Simulation",
+		X: 400 - 100, Y: 380, Width: 200, Height: 50, Text: "Start Simulation",
 		OnClick: func() {
 			// Parse current values from the text fields to ensure they are up-to-date
 			if val, err := strconv.Atoi(g.DroneField.Text); err == nil {
@@ -62,7 +67,7 @@ func main() {
 	}
 
 	g.PauseButton = ui.Button{
-		X: 300, Y: 400, Width: 150, Height: 40, Text: "Pause",
+		X: 600, Y: 180, Width: 150, Height: 40, Text: "Pause",
 		OnClick: func() {
 			g.Paused = !g.Paused
 			if g.Paused {
@@ -71,7 +76,7 @@ func main() {
 				g.PauseButton.Text = "Pause"
 			}
 		},
-	}
+	}	
 
 	ebiten.SetWindowSize(800, 600)
 	ebiten.SetWindowTitle("Simulation with Vision Circles")
