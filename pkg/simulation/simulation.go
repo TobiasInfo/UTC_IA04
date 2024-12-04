@@ -322,14 +322,16 @@ func (s *Simulation) Update() {
 				wg.Add(1)
 				go func(p *persons.Person) {
 					defer wg.Done()
-					if p.CurrentPOI != nil && p.TargetPOIPosition == nil {
-						if pos := s.getNearestPOI(p.Position, *p.CurrentPOI); pos != nil {
-							p.SetTargetPOI(*p.CurrentPOI, *pos)
-						} else {
-							p.CurrentPOI = nil
+					if p.IsAlive() {
+						if p.CurrentPOI != nil && p.TargetPOIPosition == nil {
+							if pos := s.getNearestPOI(p.Position, *p.CurrentPOI); pos != nil {
+								p.SetTargetPOI(*p.CurrentPOI, *pos)
+							} else {
+								p.CurrentPOI = nil
+							}
 						}
+						p.Myturn()
 					}
-					p.Myturn()
 				}(&s.Persons[idx])
 			}
 		}

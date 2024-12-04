@@ -12,6 +12,7 @@ type Person struct {
 	ID                      int
 	Position                models.Position
 	InDistress              bool
+	Dead                    bool
 	DistressProbability     float64
 	Lifespan                int
 	CurrentDistressDuration int
@@ -41,6 +42,7 @@ func NewCrowdMember(id int, position models.Position, distressProbability float6
 		ID:                      id,
 		Position:                position,
 		InDistress:              false,
+		Dead:                    false,
 		DistressProbability:     distressProbability,
 		Lifespan:                lifespan,
 		width:                   width,
@@ -382,6 +384,7 @@ func (c *Person) Die() {
 	}
 
 	c.InDistress = false
+	c.Dead = true
 	c.CurrentDistressDuration = 0
 
 	responseChan := make(chan models.DeadResponse)
@@ -405,7 +408,7 @@ func (c *Person) Die() {
 }
 
 func (c *Person) IsAlive() bool {
-	return c.Position.X >= 0 && c.Position.Y >= 0
+	return c.Dead == false
 }
 
 func (c *Person) Myturn() {
