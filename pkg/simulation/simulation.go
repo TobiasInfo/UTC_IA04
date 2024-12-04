@@ -19,6 +19,7 @@ type Simulation struct {
 	DroneRange     int
 	MoveChan       chan models.MovementRequest
 	DeadChan       chan models.DeadRequest
+	ExitChan       chan models.ExitRequest
 	Persons        []persons.Person
 	Drones         []drones.Drone
 	Obstacles      []obstacles.Obstacle
@@ -37,6 +38,7 @@ func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 		DroneRange:   2,
 		MoveChan:     make(chan models.MovementRequest),
 		DeadChan:     make(chan models.DeadRequest),
+		ExitChan:     make(chan models.ExitRequest),
 		debug:        false,
 		hardDebug:    false,
 		currentTick:  0,
@@ -46,6 +48,7 @@ func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 	s.Initialize(numDrones, numCrowdMembers, numObstacles)
 	go s.handleMovementRequests()
 	go s.handleDeadPerson()
+	go s.handleExitRequest()
 	return s
 }
 
@@ -117,6 +120,34 @@ func (s *Simulation) handleDeadPerson() {
 			req.ResponseChan <- models.DeadResponse{Authorized: true}
 		} else {
 			req.ResponseChan <- models.DeadResponse{Authorized: false}
+		}
+	}
+}
+
+func (s *Simulation) handleExitRequest() {
+	for req := range s.ExitChan {
+		if req.MemberType != "persons" {
+			req.ResponseChan <- models.ExitResponse{Authorized: false}
+			continue
+		}
+
+		var entity interface{}
+		s.mu.RLock()
+		for _, person := range s.Map.Persons {
+			if person.ID == req.MemberID {
+				entity = person
+				break
+			}
+		}
+		s.mu.RUnlock()
+
+		if entity != nil {
+			s.mu.Lock()
+			s.Map.RemoveEntity(entity)
+			s.mu.Unlock()
+			req.ResponseChan <- models.ExitResponse{Authorized: true}
+		} else {
+			req.ResponseChan <- models.ExitResponse{Authorized: false}
 		}
 	}
 }
@@ -268,7 +299,7 @@ func (s *Simulation) createInitialCrowd(n int) {
 	for i := 0; i < n; i++ {
 		member := persons.NewCrowdMember(i,
 			models.Position{X: 0, Y: float64(rand.Intn(s.Map.Height))},
-			0.001, 20, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan)
+			0.001, 20, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan, s.ExitChan)
 		s.Persons = append(s.Persons, member)
 		s.Map.AddCrowdMember(&s.Persons[len(s.Persons)-1])
 	}
@@ -322,7 +353,7 @@ func (s *Simulation) Update() {
 				wg.Add(1)
 				go func(p *persons.Person) {
 					defer wg.Done()
-					if p.IsAlive() {
+					if p.IsAlive() && p.StillInSim {
 						if p.CurrentPOI != nil && p.TargetPOIPosition == nil {
 							if pos := s.getNearestPOI(p.Position, *p.CurrentPOI); pos != nil {
 								p.SetTargetPOI(*p.CurrentPOI, *pos)
@@ -364,7 +395,7 @@ func (s *Simulation) UpdateCrowdSize(newSize int) {
 		for i := currentSize; i < newSize; i++ {
 			member := persons.NewCrowdMember(i,
 				models.Position{X: 0, Y: float64(rand.Intn(s.Map.Height))},
-				0.001, 20, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan)
+				0.001, 20, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan, s.ExitChan)
 			s.Persons = append(s.Persons, member)
 			s.Map.AddCrowdMember(&s.Persons[len(s.Persons)-1])
 		}

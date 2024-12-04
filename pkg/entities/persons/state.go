@@ -85,6 +85,8 @@ func (s *StateData) UpdateState(person *Person) {
 	case InQueue:
 		// After using POI, return to exploring
 		if s.TimeInState > 20 {
+			person.Profile.StaminaLevel = 0.8
+
 			s.CurrentState = Exploring
 			s.TimeInState = 0
 			s.TargetPOI = nil
