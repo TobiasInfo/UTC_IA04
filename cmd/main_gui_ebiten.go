@@ -1,9 +1,7 @@
 package main
 
 import (
-	"math/rand"
 	"strconv"
-	"time"
 
 	game "UTC_IA04/cmd/simu"
 	"UTC_IA04/cmd/ui"
@@ -13,8 +11,6 @@ import (
 )
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
-
 	g := game.NewGame(
 		5,  // default drone count
 		10, // default people count

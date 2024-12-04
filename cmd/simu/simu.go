@@ -54,12 +54,16 @@ func (g *Game) Update() error {
 	mx, my := ebiten.CursorPosition()
 	mousePressed := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
 
+	// Create a slice to hold input runes
+	var inputRunes []rune
+	inputRunes = ebiten.AppendInputChars(inputRunes)
+
 	switch g.Mode {
 	case Menu:
 		g.StartButton.Update(float64(mx), float64(my), mousePressed)
-		g.DroneField.Update(float64(mx), float64(my), mousePressed, ebiten.InputChars(), ebiten.IsKeyPressed(ebiten.KeyEnter))
-		g.PeopleField.Update(float64(mx), float64(my), mousePressed, ebiten.InputChars(), ebiten.IsKeyPressed(ebiten.KeyEnter))
-		g.ObstacleField.Update(float64(mx), float64(my), mousePressed, ebiten.InputChars(), ebiten.IsKeyPressed(ebiten.KeyEnter))
+		g.DroneField.Update(float64(mx), float64(my), mousePressed, inputRunes, ebiten.IsKeyPressed(ebiten.KeyEnter))
+		g.PeopleField.Update(float64(mx), float64(my), mousePressed, inputRunes, ebiten.IsKeyPressed(ebiten.KeyEnter))
+		g.ObstacleField.Update(float64(mx), float64(my), mousePressed, inputRunes, ebiten.IsKeyPressed(ebiten.KeyEnter))
 
 	case Simulation:
 		g.PauseButton.Update(float64(mx), float64(my), mousePressed)
