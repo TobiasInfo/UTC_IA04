@@ -1,3 +1,6 @@
+// main_gui.go
+// Replace entire file contents in cmd/gui/main_gui.go
+
 package main
 
 import (
@@ -17,11 +20,16 @@ import (
 
 var (
 	// Basic colors
-	colorEmpty  = color.NRGBA{R: 200, G: 200, B: 200, A: 255}
-	colorDrone  = color.NRGBA{R: 0, G: 0, B: 255, A: 255}
-	colorCrowd  = color.NRGBA{R: 255, G: 0, B: 0, A: 255}
-	colorBorder = color.NRGBA{R: 100, G: 100, B: 100, A: 255}
-	colorSeen   = color.NRGBA{R: 80, G: 255, B: 20, A: 255}
+	colorEmpty    = color.NRGBA{R: 200, G: 200, B: 200, A: 255}
+	colorDrone    = color.NRGBA{R: 0, G: 0, B: 255, A: 255}
+	colorCrowd    = color.NRGBA{R: 255, G: 0, B: 0, A: 255}
+	colorDistress = color.NRGBA{R: 255, G: 165, B: 0, A: 255} // Orange for distress
+	colorBorder   = color.NRGBA{R: 100, G: 100, B: 100, A: 255}
+
+	// Zone colors
+	colorEntrance = color.NRGBA{R: 220, G: 240, B: 220, A: 255} // Light green
+	colorMain     = color.NRGBA{R: 240, G: 220, B: 220, A: 255} // Light red
+	colorExit     = color.NRGBA{R: 220, G: 220, B: 240, A: 255} // Light blue
 
 	// POI Colors map
 	poiColors = map[models.POIType]color.NRGBA{
@@ -34,61 +42,54 @@ var (
 		models.SecondaryStage:  {R: 219, G: 112, B: 147, A: 255}, // PaleVioletRed
 		models.RestArea:        {R: 34, G: 139, B: 34, A: 255},   // ForestGreen
 	}
-
-	// POI Names map
-	poiNames = map[models.POIType]string{
-		models.MedicalTent:     "Medical Tent",
-		models.ChargingStation: "Charging Station",
-		models.Toilet:          "Toilet",
-		models.DrinkStand:      "Drink Stand",
-		models.FoodStand:       "Food Stand",
-		models.MainStage:       "Main Stage",
-		models.SecondaryStage:  "Secondary Stage",
-		models.RestArea:        "Rest Area",
-	}
-)
-
-// Simulation parameters
-var (
-	numDrones               = 5
-	numCrowdMembers         = 2
-	numObstacles            = 3
-	cellSize        float32 = 10.0
 )
 
 const (
-	mapWidth  = 5
-	mapHeight = 5
+	cellSize      float32 = 25.0
+	defaultWidth          = 30
+	defaultHeight         = 20
+	initialDrones         = 5
+	initialCrowd          = 20
 )
 
 type SimulationGUI struct {
-	sim           *simulation.Simulation
-	grid          *fyne.Container
-	isRunning     bool
-	stopChannel   chan bool
-	mutex         sync.Mutex
-	distressLabel *widget.Label
-	statsLabel    *widget.Label
+	sim            *simulation.Simulation
+	grid           *fyne.Container
+	isRunning      bool
+	stopChannel    chan bool
+	mutex          sync.Mutex
+	timeLabel      *widget.Label
+	phaseLabel     *widget.Label
+	statsLabel     *widget.Label
+	zoneStatsLabel *widget.Label
+	timeScale      float64
 }
 
-func normalizeCoordinates(x, y float64) (int, int) {
-	normX := ((int(x) % mapWidth) + mapWidth) % mapWidth
-	normY := ((int(y) % mapHeight) + mapHeight) % mapHeight
-	return normX, normY
-}
-
-func createCell() *canvas.Rectangle {
-	cell := canvas.NewRectangle(colorEmpty)
+func createCell(bgColor color.Color) *canvas.Rectangle {
+	cell := canvas.NewRectangle(bgColor)
 	cell.Resize(fyne.NewSize(cellSize, cellSize))
-	cell.StrokeWidth = 1
+	cell.StrokeWidth = 0.5
 	cell.StrokeColor = colorBorder
 	return cell
 }
 
-func initGrid(grid *fyne.Container) {
-	for y := 0; y < mapHeight; y++ {
-		for x := 0; x < mapWidth; x++ {
-			cell := createCell()
+func initGrid(grid *fyne.Container, width, height int) {
+	zoneWidth := width / 3
+
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			var bgColor color.Color
+
+			// Set zone background colors
+			if x < zoneWidth {
+				bgColor = colorEntrance
+			} else if x < zoneWidth*2 {
+				bgColor = colorMain
+			} else {
+				bgColor = colorExit
+			}
+
+			cell := createCell(bgColor)
 			grid.Add(cell)
 		}
 	}
@@ -96,18 +97,30 @@ func initGrid(grid *fyne.Container) {
 }
 
 func updateGridFromSimulation(sim *simulation.Simulation, grid *fyne.Container) {
-	// Reset all cells
-	for i := range grid.Objects {
-		if cell, ok := grid.Objects[i].(*canvas.Rectangle); ok {
-			cell.FillColor = colorEmpty
+	width, height := defaultWidth, defaultHeight
+	zoneWidth := width / 3
+
+	// First, reset all cells to their zone colors
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			idx := y*width + x
+			if cell, ok := grid.Objects[idx].(*canvas.Rectangle); ok {
+				if x < zoneWidth {
+					cell.FillColor = colorEntrance
+				} else if x < zoneWidth*2 {
+					cell.FillColor = colorMain
+				} else {
+					cell.FillColor = colorExit
+				}
+			}
 		}
 	}
 
-	// Draw POIs first (background)
+	// Draw POIs
 	for _, cell := range sim.Map.Cells {
 		for _, obstacle := range cell.Obstacles {
-			x, y := normalizeCoordinates(obstacle.Position.X, obstacle.Position.Y)
-			idx := y*mapWidth + x
+			x, y := int(obstacle.Position.X), int(obstacle.Position.Y)
+			idx := y*width + x
 			if idx >= 0 && idx < len(grid.Objects) {
 				if cell, ok := grid.Objects[idx].(*canvas.Rectangle); ok {
 					if color, exists := poiColors[obstacle.POIType]; exists {
@@ -121,12 +134,12 @@ func updateGridFromSimulation(sim *simulation.Simulation, grid *fyne.Container) 
 	// Draw people
 	for _, cell := range sim.Map.Cells {
 		for _, person := range cell.Persons {
-			x, y := normalizeCoordinates(person.Position.X, person.Position.Y)
-			idx := y*mapWidth + x
+			x, y := int(person.Position.X), int(person.Position.Y)
+			idx := y*width + x
 			if idx >= 0 && idx < len(grid.Objects) {
 				if cell, ok := grid.Objects[idx].(*canvas.Rectangle); ok {
 					if person.InDistress {
-						cell.FillColor = colorSeen
+						cell.FillColor = colorDistress
 					} else {
 						cell.FillColor = colorCrowd
 					}
@@ -135,11 +148,11 @@ func updateGridFromSimulation(sim *simulation.Simulation, grid *fyne.Container) 
 		}
 	}
 
-	// Draw drones (top layer)
+	// Draw drones
 	for _, cell := range sim.Map.Cells {
-		for _, drone := range cell.Drones {
-			x, y := normalizeCoordinates(drone.Position.X, drone.Position.Y)
-			idx := y*mapWidth + x
+		for range cell.Drones {
+			x, y := int(cell.Position.X), int(cell.Position.Y)
+			idx := y*width + x
 			if idx >= 0 && idx < len(grid.Objects) {
 				if cell, ok := grid.Objects[idx].(*canvas.Rectangle); ok {
 					cell.FillColor = colorDrone
@@ -151,24 +164,18 @@ func updateGridFromSimulation(sim *simulation.Simulation, grid *fyne.Container) 
 	grid.Refresh()
 }
 
-func createInfoPanel() *widget.Label {
-	info := "Festival Simulation\n\n" +
-		"Entities:\n" +
-		"■ Drone (Blue): Surveillance units\n" +
-		"■ Person (Red): Festival attendee\n" +
-		"■ Distress (Green): Person needing assistance\n\n" +
-		"Facilities:\n"
+func createControlPanel(sim *SimulationGUI) *fyne.Container {
+	// Time scale control
+	timeScaleSlider := widget.NewSlider(1, 120)
+	timeScaleSlider.Value = sim.timeScale
+	timeScaleLabel := widget.NewLabel(fmt.Sprintf("Time Scale: %.0fx", sim.timeScale))
 
-	for poiType, name := range poiNames {
-		if color, exists := poiColors[poiType]; exists {
-			info += fmt.Sprintf("■ %s (RGB: %d,%d,%d)\n", name, color.R, color.G, color.B)
-		}
+	timeScaleSlider.OnChanged = func(value float64) {
+		sim.timeScale = value
+		timeScaleLabel.SetText(fmt.Sprintf("Time Scale: %.0fx", value))
+		sim.sim.GetFestivalTime().SetTimeScale(value)
 	}
 
-	return widget.NewLabel(info)
-}
-
-func createControlPanel(sim *SimulationGUI) *fyne.Container {
 	// Crowd control
 	crowdSlider := widget.NewSlider(1, 500)
 	crowdSlider.Value = float64(sim.sim.Map.CountCrowdMembers())
@@ -193,15 +200,17 @@ func createControlPanel(sim *SimulationGUI) *fyne.Container {
 		sim.mutex.Unlock()
 	}
 
-	// Statistics
-	sim.distressLabel = widget.NewLabel(fmt.Sprintf("People in distress: %d", sim.sim.CountCrowdMembersInDistress()))
+	// Statistics labels
+	sim.timeLabel = widget.NewLabel("Time: 00:00:00")
+	sim.phaseLabel = widget.NewLabel("Phase: Setup")
 	sim.statsLabel = widget.NewLabel("Simulation Statistics")
-
-	// Info panel
-	infoPanel := createInfoPanel()
+	sim.zoneStatsLabel = widget.NewLabel("Zone Statistics")
 
 	return container.NewVBox(
 		widget.NewLabel("Control Panel"),
+		widget.NewSeparator(),
+		timeScaleLabel,
+		timeScaleSlider,
 		widget.NewSeparator(),
 		crowdLabel,
 		crowdSlider,
@@ -209,11 +218,50 @@ func createControlPanel(sim *SimulationGUI) *fyne.Container {
 		droneLabel,
 		droneSlider,
 		widget.NewSeparator(),
-		sim.distressLabel,
+		sim.timeLabel,
+		sim.phaseLabel,
+		widget.NewSeparator(),
 		sim.statsLabel,
 		widget.NewSeparator(),
-		container.NewHScroll(infoPanel),
+		sim.zoneStatsLabel,
 	)
+}
+
+func (s *SimulationGUI) updateStatistics() {
+	stats := s.sim.GetStatistics()
+	festivalTime := s.sim.GetFestivalTime()
+
+	currentTime := time.Now().Add(festivalTime.GetElapsedTime())
+	s.timeLabel.SetText(fmt.Sprintf("Time: %02d:%02d:%02d",
+		currentTime.Hour(), currentTime.Minute(), currentTime.Second()))
+
+	s.phaseLabel.SetText(fmt.Sprintf("Phase: %s", stats.CurrentPhase))
+
+	s.statsLabel.SetText(fmt.Sprintf(
+		"Statistics:\n"+
+			"Total People: %d\n"+
+			"People in Distress: %d (%.1f%%)\n"+
+			"Active Drones: %d\n"+
+			"Time Remaining: %v",
+		stats.TotalPeople,
+		stats.PeopleInDistress,
+		float64(stats.PeopleInDistress)/float64(stats.TotalPeople)*100,
+		stats.ActiveDrones,
+		stats.RemainingTime.Round(time.Second),
+	))
+
+	s.zoneStatsLabel.SetText(fmt.Sprintf(
+		"Zone Distribution:\n"+
+			"Entrance: %d (%.1f%%)\n"+
+			"Main: %d (%.1f%%)\n"+
+			"Exit: %d (%.1f%%)",
+		stats.ZoneStatistics["entrance"],
+		float64(stats.ZoneStatistics["entrance"])/float64(stats.TotalPeople)*100,
+		stats.ZoneStatistics["main"],
+		float64(stats.ZoneStatistics["main"])/float64(stats.TotalPeople)*100,
+		stats.ZoneStatistics["exit"],
+		float64(stats.ZoneStatistics["exit"])/float64(stats.TotalPeople)*100,
+	))
 }
 
 func (s *SimulationGUI) runSimulation() {
@@ -228,35 +276,17 @@ func (s *SimulationGUI) runSimulation() {
 				return
 			}
 			s.sim.Update()
+			s.updateStatistics()
 			s.mutex.Unlock()
 
 			if window := fyne.CurrentApp().Driver().CanvasForObject(s.grid); window != nil {
 				s.mutex.Lock()
-				distressCount := s.sim.CountCrowdMembersInDistress()
-				s.distressLabel.SetText(fmt.Sprintf("People in distress: %d", distressCount))
-
-				totalPeople := s.sim.Map.CountCrowdMembers()
-				distressRate := 0.0
-				if totalPeople > 0 {
-					distressRate = float64(distressCount) / float64(totalPeople) * 100
-				}
-
-				s.statsLabel.SetText(fmt.Sprintf(
-					"Statistics:\n"+
-						"Total People: %d\n"+
-						"Active Drones: %d\n"+
-						"Distress Rate: %.1f%%",
-					totalPeople,
-					s.sim.Map.CountDrones(),
-					distressRate,
-				))
-
 				updateGridFromSimulation(s.sim, s.grid)
 				window.Refresh(s.grid)
 				s.mutex.Unlock()
 			}
 
-			time.Sleep(2000 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond)
 		}
 	}
 }
@@ -265,22 +295,26 @@ func main() {
 	myApp := app.New()
 	myWindow := myApp.NewWindow("Festival Safety Simulation")
 
-	grid := container.NewGridWithColumns(mapWidth)
-	initGrid(grid)
+	grid := container.NewGridWithColumns(defaultWidth)
+	initGrid(grid, defaultWidth, defaultHeight)
 
 	simGUI := &SimulationGUI{
-		sim:         simulation.NewSimulation(numDrones, numCrowdMembers, numObstacles),
+		sim:         simulation.NewSimulation(initialDrones, initialCrowd, 0), // Using POIs from config
 		grid:        grid,
 		isRunning:   false,
 		stopChannel: make(chan bool),
+		timeScale:   1.0,
 	}
 
 	controlPanel := createControlPanel(simGUI)
 
+	// Create toolbar with buttons
 	controls := container.NewHBox(
 		widget.NewButton("Start", func() {
 			if !simGUI.isRunning {
+				simGUI.mutex.Lock()
 				simGUI.isRunning = true
+				simGUI.mutex.Unlock()
 				go simGUI.runSimulation()
 			}
 		}),
@@ -290,13 +324,49 @@ func main() {
 			simGUI.mutex.Unlock()
 			simGUI.stopChannel <- true
 		}),
+		widget.NewButton("Reset", func() {
+			simGUI.mutex.Lock()
+			wasRunning := simGUI.isRunning
+			if wasRunning {
+				simGUI.isRunning = false
+				simGUI.stopChannel <- true
+			}
+			simGUI.sim = simulation.NewSimulation(initialDrones, initialCrowd, 0)
+			if wasRunning {
+				simGUI.isRunning = true
+				go simGUI.runSimulation()
+			}
+			simGUI.mutex.Unlock()
+		}),
 	)
 
+	// Create legend for colors
+	legend := widget.NewTextGrid()
+	legendText := "Legend:\n" +
+		"■ Crowd (Red)\n" +
+		"■ Distress (Orange)\n" +
+		"■ Drone (Blue)\n" +
+		"■ Medical (White)\n" +
+		"■ Charging (Yellow)\n" +
+		"■ Toilets (Purple)\n" +
+		"■ Drinks (Cyan)\n" +
+		"■ Food (Orange)\n" +
+		"■ Main Stage (Pink)\n" +
+		"■ Secondary (Rose)\n" +
+		"■ Rest Area (Green)\n\n" +
+		"Zones:\n" +
+		"■ Entrance (Light Green)\n" +
+		"■ Main (Light Red)\n" +
+		"■ Exit (Light Blue)"
+	legend.SetText(legendText)
+
+	// Layout setup
+	rightPanel := container.NewVBox(controlPanel, widget.NewSeparator(), legend)
 	content := container.NewBorder(
 		nil,
 		controls,
 		nil,
-		controlPanel,
+		rightPanel,
 		container.NewPadded(grid),
 	)
 
