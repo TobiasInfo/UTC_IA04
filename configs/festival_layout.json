@@ -9,8 +9,9 @@
             "endX": 10,
             "endY": 20,
             "minPOIs": {
-                "0": 1,  
-                "2": 2   
+                "0": 1,
+                "2": 2,
+                "3": 1
             }
         },
         {
@@ -20,12 +21,10 @@
             "endX": 20,
             "endY": 20,
             "minPOIs": {
-                "0": 2,  
-                "1": 2,  
-                "2": 4,  
-                "3": 3,  
-                "4": 3,   
-                "5": 1   
+                "5": 1,
+                "6": 1,
+                "4": 2,
+                "3": 2
             }
         },
         {
@@ -35,54 +34,90 @@
             "endX": 30,
             "endY": 20,
             "minPOIs": {
-                "0": 1,  
-                "2": 2,  
-                "7": 2   
+                "2": 1,
+                "3": 1,
+                "7": 2
             }
         }
     ],
     "poiLocations": [
         {
             "type": 0,
-            "position": {"x": 5, "y": 5},
-            "capacity": 10,
+            "position": {"x": 5, "y": 10},
+            "capacity": 15,
             "name": "Main Medical Center"
         },
         {
             "type": 1,
-            "position": {"x": 15, "y": 5},
+            "position": {"x": 2, "y": 2},
             "capacity": 5,
-            "name": "Drone Station Alpha"
+            "name": "Charging Station Alpha"
         },
         {
             "type": 2,
-            "position": {"x": 8, "y": 8},
+            "position": {"x": 8, "y": 5},
             "capacity": 8,
-            "name": "North Toilets"
+            "name": "Entrance Toilets"
+        },
+        {
+            "type": 2,
+            "position": {"x": 25, "y": 15},
+            "capacity": 8,
+            "name": "Exit Toilets"
         },
         {
             "type": 3,
-            "position": {"x": 12, "y": 12},
+            "position": {"x": 7, "y": 15},
             "capacity": 15,
-            "name": "Central Refreshments"
+            "name": "Entrance Refreshments"
+        },
+        {
+            "type": 3,
+            "position": {"x": 15, "y": 5},
+            "capacity": 15,
+            "name": "Main Area Drinks North"
+        },
+        {
+            "type": 3,
+            "position": {"x": 15, "y": 15},
+            "capacity": 15,
+            "name": "Main Area Drinks South"
         },
         {
             "type": 4,
-            "position": {"x": 18, "y": 18},
+            "position": {"x": 12, "y": 7},
             "capacity": 20,
-            "name": "Food Court"
+            "name": "Food Court North"
+        },
+        {
+            "type": 4,
+            "position": {"x": 12, "y": 13},
+            "capacity": 20,
+            "name": "Food Court South"
         },
         {
             "type": 5,
-            "position": {"x": 25, "y": 10},
+            "position": {"x": 15, "y": 10},
             "capacity": 100,
             "name": "Main Stage"
         },
         {
-            "type": 7,
-            "position": {"x": 28, "y": 15},
+            "type": 6,
+            "position": {"x": 18, "y": 5},
             "capacity": 50,
-            "name": "Chill Zone"
+            "name": "Secondary Stage"
+        },
+        {
+            "type": 7,
+            "position": {"x": 22, "y": 7},
+            "capacity": 30,
+            "name": "Exit Rest Area North"
+        },
+        {
+            "type": 7,
+            "position": {"x": 22, "y": 13},
+            "capacity": 30,
+            "name": "Exit Rest Area South"
         }
     ]
 }

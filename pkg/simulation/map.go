@@ -40,13 +40,17 @@ func newMap(width, height int) *Map {
 
 	for x := 0; x < width; x++ {
 		for y := 0; y < height; y++ {
-			pos := models.Position{X: float64(x), Y: float64(y)}
-			cells[pos] = &MapCell{
-				Position:  pos,
-				Obstacles: []*obstacles.Obstacle{},
-				Persons:   []*persons.Person{},
-				Drones:    []*drones.Drone{},
-				mu:        sync.RWMutex{},
+			for i := 0; i < 10; i++ {
+				for j := 0; j < 10; j++ {
+					pos := models.Position{X: float64(x) + (float64(i) / 10), Y: float64(y) + (float64(j) / 10)}
+					cells[pos] = &MapCell{
+						Position:  pos,
+						Obstacles: []*obstacles.Obstacle{},
+						Persons:   []*persons.Person{},
+						Drones:    []*drones.Drone{},
+						mu:        sync.RWMutex{},
+					}
+				}
 			}
 		}
 	}
@@ -159,6 +163,8 @@ func (m *Map) MoveEntity(entity interface{}, newPosition models.Position) {
 	case *persons.Person:
 		currentCell = m.Cells[e.Position]
 		newCell = m.Cells[newPosition]
+
+		fmt.Printf("Moving person %d from %v to %v\n", e.ID, e.Position, newPosition)
 
 		// Lock cells in order to prevent deadlock
 		if currentCell.Position.X < newCell.Position.X ||

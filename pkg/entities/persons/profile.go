@@ -42,6 +42,7 @@ func NewPersonProfile(profileType ProfileType) PersonProfile {
 		profile.POIInterestRates[models.MainStage] = 0.9
 		profile.POIInterestRates[models.SecondaryStage] = 0.8
 		profile.POIInterestRates[models.FoodStand] = 0.6
+		profile.POIInterestRates[models.DrinkStand] = 0.7
 
 	case Cautious:
 		profile.BaseMovementSpeed = 0.8
@@ -51,8 +52,9 @@ func NewPersonProfile(profileType ProfileType) PersonProfile {
 		profile.MalaiseResistance = 0.6
 		// Higher interest in rest areas
 		profile.POIInterestRates[models.RestArea] = 0.9
-		profile.POIInterestRates[models.MedicalTent] = 0.7
 		profile.POIInterestRates[models.Toilet] = 0.8
+		profile.POIInterestRates[models.DrinkStand] = 0.7
+		profile.POIInterestRates[models.FoodStand] = 0.6
 
 	case Social:
 		profile.BaseMovementSpeed = 1.0
@@ -64,6 +66,7 @@ func NewPersonProfile(profileType ProfileType) PersonProfile {
 		profile.POIInterestRates[models.FoodStand] = 0.9
 		profile.POIInterestRates[models.DrinkStand] = 0.9
 		profile.POIInterestRates[models.MainStage] = 0.7
+		profile.POIInterestRates[models.SecondaryStage] = 0.6
 
 	case Independent:
 		profile.BaseMovementSpeed = 1.1
@@ -75,14 +78,15 @@ func NewPersonProfile(profileType ProfileType) PersonProfile {
 		profile.POIInterestRates[models.RestArea] = 0.6
 		profile.POIInterestRates[models.FoodStand] = 0.6
 		profile.POIInterestRates[models.MainStage] = 0.6
+		profile.POIInterestRates[models.DrinkStand] = 0.6
+		profile.POIInterestRates[models.SecondaryStage] = 0.6
 	}
 
-	// Set default values for common POIs
+	// Set default values for common POIs if not already set
 	for _, poiType := range []models.POIType{
 		models.Toilet,
 		models.DrinkStand,
 		models.RestArea,
-		models.MedicalTent,
 	} {
 		if _, exists := profile.POIInterestRates[poiType]; !exists {
 			profile.POIInterestRates[poiType] = 0.5
