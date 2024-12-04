@@ -116,35 +116,107 @@ func (c *Person) UpdatePosition(obstacles map[models.Position]bool) bool {
 	return false
 }
 
-func (c *Person) tryMove(newPos models.Position) bool {
-	fmt.Printf("Person %d attempting move from {%.2f, %.2f} to {%.2f, %.2f}\n",
-		c.ID, c.Position.X, c.Position.Y, newPos.X, newPos.Y)
-
-	responseChan := make(chan models.MovementResponse)
-	c.MoveChan <- models.MovementRequest{
-		MemberID:     c.ID,
-		MemberType:   "persons",
-		NewPosition:  newPos,
-		ResponseChan: responseChan,
-	}
-	fmt.Printf("Person %d waiting for movement response\n", c.ID)
-
-	response := <-responseChan
-	if response.Authorized {
-		prevZone := c.determineCurrentZone()
-		c.Position = newPos
-		newZone := c.determineCurrentZone()
-
-		if prevZone != newZone {
-			c.LastZoneChange = time.Now()
+// Move randomly updates the Person's position
+func (c *Person) MoveRandom() {
+	for {
+		if c.Position.X == -1 && c.Position.Y == -1 {
+			return
 		}
-		fmt.Printf("Person %d movement authorized, now at {%.2f, %.2f}\n",
-			c.ID, c.Position.X, c.Position.Y)
-		return true
+
+		rand.Seed(time.Now().UnixNano())
+
+		newX := c.Position.X + float64(rand.Intn(3)-1)
+		newY := c.Position.Y + float64(rand.Intn(3)-1)
+
+		if newX < 0 {
+			newX = 0
+		}
+		if newY < 0 {
+			newY = 0
+		}
+		if newX > float64(c.width) {
+			newX = float64(c.width)
+		}
+		if newY > float64(c.height) {
+			newY = float64(c.height)
+		}
+
+		newPosition := models.Position{X: newX, Y: newY}
+		fmt.Printf("Trying to move person %d to %v\n", c.ID, newPosition)
+
+		if c.Position.X == newPosition.X && c.Position.Y == newPosition.Y {
+			return
+		}
+
+		responseChan := make(chan models.MovementResponse)
+		c.MoveChan <- models.MovementRequest{MemberID: c.ID, MemberType: "persons", NewPosition: newPosition, ResponseChan: responseChan}
+		response := <-responseChan
+
+		if response.Authorized {
+			c.Position.X = newPosition.X
+			c.Position.Y = newPosition.Y
+			fmt.Printf("Person %d moved to %v\n", c.ID, c.Position)
+			break
+		}
 	}
-	fmt.Printf("Person %d movement denied\n", c.ID)
-	return false
 }
+
+// MoveTo updates the Person's position towards a target position
+func (c *Person) tryMove(target models.Position) bool {
+	if c.Position.X == -1 && c.Position.Y == -1 {
+		return false
+	}
+
+	for {
+		//fmt.Printf("Trying to move person %d to %v\n", c.ID, target)
+
+		if c.Position.X == target.X && c.Position.Y == target.Y {
+			return false
+		}
+
+		responseChan := make(chan models.MovementResponse)
+		c.MoveChan <- models.MovementRequest{MemberID: c.ID, MemberType: "persons", NewPosition: target, ResponseChan: responseChan}
+		response := <-responseChan
+
+		if response.Authorized {
+			c.Position.X = target.X
+			c.Position.Y = target.Y
+			fmt.Printf("Person %d moved to %v\n", c.ID, c.Position)
+			return true
+		}
+	}
+}
+
+//func (c *Person) tryMove(newPos models.Position) bool {
+//	fmt.Printf("Person %d attempting move from {%.2f, %.2f} to {%.2f, %.2f}\n",
+//		c.ID, c.Position.X, c.Position.Y, newPos.X, newPos.Y)
+//	return true
+//
+//	//responseChan := make(chan models.MovementResponse)
+//	//c.MoveChan <- models.MovementRequest{
+//	//	MemberID:     c.ID,
+//	//	MemberType:   "persons",
+//	//	NewPosition:  newPos,
+//	//	ResponseChan: responseChan,
+//	//}
+//	//fmt.Printf("Person %d waiting for movement response\n", c.ID)
+//	//
+//	//response := <-responseChan
+//	//if response.Authorized {
+//	//	prevZone := c.determineCurrentZone()
+//	//	c.Position = newPos
+//	//	newZone := c.determineCurrentZone()
+//	//
+//	//	if prevZone != newZone {
+//	//		c.LastZoneChange = time.Now()
+//	//	}
+//	//	fmt.Printf("Person %d movement authorized, now at {%.2f, %.2f}\n",
+//	//		c.ID, c.Position.X, c.Position.Y)
+//	//	return true
+//	//}
+//	//fmt.Printf("Person %d movement denied\n", c.ID)
+//	//return false
+//}
 
 func (c *Person) shouldLeavePOI() bool {
 	minTime := 30 * time.Second

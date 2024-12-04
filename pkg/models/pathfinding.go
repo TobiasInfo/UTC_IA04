@@ -100,6 +100,8 @@ func ConvertPathToFloat(intPath []Position) []Position {
 			X: pos.X + offsetX,
 			Y: pos.Y + offsetY,
 		}
+
+		floatPath[i] = floatPath[i].Round()
 	}
 	return floatPath
 }

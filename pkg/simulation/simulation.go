@@ -84,6 +84,7 @@ func (s *Simulation) handleMovementRequests() {
 				s.mu.Unlock()
 				req.ResponseChan <- models.MovementResponse{Authorized: true}
 			} else {
+
 				req.ResponseChan <- models.MovementResponse{Authorized: false}
 			}
 		} else {
@@ -304,7 +305,7 @@ func (s *Simulation) Update() {
 	}
 
 	// Update persons every 10 ticks
-	if s.currentTick%10 == 0 {
+	if s.currentTick%1 == 0 {
 		fmt.Printf("\n=== TICK %d: PEOPLE SHOULD MOVE ===\n", s.currentTick)
 		updatedPersons := make(map[int]struct{})
 		personIndexes := make([]int, len(s.Persons))

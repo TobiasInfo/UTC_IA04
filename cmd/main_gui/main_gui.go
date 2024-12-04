@@ -286,7 +286,7 @@ func (s *SimulationGUI) runSimulation() {
 				s.mutex.Unlock()
 			}
 
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(1000 * time.Millisecond)
 		}
 	}
 }
