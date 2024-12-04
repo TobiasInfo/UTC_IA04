@@ -305,6 +305,7 @@ func (s *Simulation) Update() {
 
 	// Update persons every 10 ticks
 	if s.currentTick%10 == 0 {
+		fmt.Printf("\n=== TICK %d: PEOPLE SHOULD MOVE ===\n", s.currentTick)
 		updatedPersons := make(map[int]struct{})
 		personIndexes := make([]int, len(s.Persons))
 		for i := range personIndexes {
