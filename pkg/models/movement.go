@@ -9,4 +9,5 @@ type MovementRequest struct {
 
 type MovementResponse struct {
 	Authorized bool
+	Reason     string
 }

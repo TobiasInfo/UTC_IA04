@@ -51,9 +51,10 @@ func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 
 func (s *Simulation) handleMovementRequests() {
 	for req := range s.MoveChan {
+		//fmt.Printf("Received movement request for %s %d to position (%.2f, %.2f)\n")
 		if !s.Map.IsBlocked(req.NewPosition) {
 			if req.MemberType != "persons" && req.MemberType != "drone" {
-				req.ResponseChan <- models.MovementResponse{Authorized: false}
+				req.ResponseChan <- models.MovementResponse{Authorized: false, Reason: "Invalid member type"}
 				continue
 			}
 
@@ -82,13 +83,12 @@ func (s *Simulation) handleMovementRequests() {
 				s.mu.Lock()
 				s.Map.MoveEntity(entity, req.NewPosition)
 				s.mu.Unlock()
-				req.ResponseChan <- models.MovementResponse{Authorized: true}
+				req.ResponseChan <- models.MovementResponse{Authorized: true, Reason: "OK"}
 			} else {
-
-				req.ResponseChan <- models.MovementResponse{Authorized: false}
+				req.ResponseChan <- models.MovementResponse{Authorized: false, Reason: "Member not found"}
 			}
 		} else {
-			req.ResponseChan <- models.MovementResponse{Authorized: false}
+			req.ResponseChan <- models.MovementResponse{Authorized: false, Reason: "Position is blocked"}
 		}
 	}
 }
@@ -337,10 +337,12 @@ func (s *Simulation) Update() {
 
 	wg.Wait()
 
-	for index, cell := range s.Map.Cells {
-		for _, member := range cell.Persons {
-			fmt.Printf("%v - Person %d is at position (%.2f, %.2f) -- Current Cell = (%.2f, %.2f) \n",
-				index, member.ID, member.Position.X, member.Position.Y, cell.Position.X, cell.Position.Y)
+	if s.debug {
+		for index, cell := range s.Map.Cells {
+			for _, member := range cell.Persons {
+				fmt.Printf("%v - Person %d is at position (%.2f, %.2f) -- Current Cell = (%.2f, %.2f) \n",
+					index, member.ID, member.Position.X, member.Position.Y, cell.Position.X, cell.Position.Y)
+			}
 		}
 	}
 

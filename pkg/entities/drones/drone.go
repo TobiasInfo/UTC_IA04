@@ -118,31 +118,30 @@ func (d *Drone) ReceiveInfo() {
 }
 
 func (d *Drone) Think() models.Position {
-    directions := []models.Position{
-        {X: 0, Y: -1}, // Up
-        {X: 0, Y: 1},  // Down
-        {X: -1, Y: 0}, // Left
-        {X: 1, Y: 0},  // Right
-    }
+	directions := []models.Position{
+		{X: 0, Y: -1}, // Up
+		{X: 0, Y: 1},  // Down
+		{X: -1, Y: 0}, // Left
+		{X: 1, Y: 0},  // Right
+	}
 
-    rand.Shuffle(len(directions), func(i, j int) {
-        directions[i], directions[j] = directions[j], directions[i]
-    })
+	rand.Shuffle(len(directions), func(i, j int) {
+		directions[i], directions[j] = directions[j], directions[i]
+	})
 
-    for _, dir := range directions {
-        target := models.Position{
-            X: d.Position.X + dir.X,
-            Y: d.Position.Y + dir.Y,
-        }
-        if target.X >= 0 && target.Y >= 0 && target.X < 30 && target.Y < 20 {
-            fmt.Printf("Drone %d Thinks Target: (%f, %f)\n", d.ID, target.X, target.Y)
-            return target
-        }
-    }
-    fmt.Printf("Drone %d has no valid moves, staying at (%f, %f)\n", d.ID, d.Position.X, d.Position.Y)
-    return d.Position
+	for _, dir := range directions {
+		target := models.Position{
+			X: d.Position.X + dir.X,
+			Y: d.Position.Y + dir.Y,
+		}
+		if target.X >= 0 && target.Y >= 0 && target.X < 30 && target.Y < 20 {
+			fmt.Printf("Drone %d Thinks Target: (%f, %f)\n", d.ID, target.X, target.Y)
+			return target
+		}
+	}
+	fmt.Printf("Drone %d has no valid moves, staying at (%f, %f)\n", d.ID, d.Position.X, d.Position.Y)
+	return d.Position
 }
-
 
 func (d *Drone) Myturn() {
 	// Get the next position to move to

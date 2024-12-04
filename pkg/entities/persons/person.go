@@ -184,6 +184,10 @@ func (c *Person) tryMove(target models.Position) bool {
 			fmt.Printf("Person %d moved to %v\n", c.ID, c.Position)
 			return true
 		}
+
+		if response.Reason == "Position is blocked" {
+			return false
+		}
 	}
 }
 

@@ -138,8 +138,9 @@ func updateGridFromSimulation(sim *simulation.Simulation, grid *fyne.Container) 
 			idx := y*width + x
 			if idx >= 0 && idx < len(grid.Objects) {
 				if cell, ok := grid.Objects[idx].(*canvas.Rectangle); ok {
-					if person.InDistress {
+					if person.InDistress || person.Position.X == -1 {
 						cell.FillColor = colorDistress
+						//fmt.Println("Person is dead")
 					} else {
 						cell.FillColor = colorCrowd
 					}
@@ -286,7 +287,7 @@ func (s *SimulationGUI) runSimulation() {
 				s.mutex.Unlock()
 			}
 
-			time.Sleep(1000 * time.Millisecond)
+			time.Sleep(1 * time.Millisecond)
 		}
 	}
 }

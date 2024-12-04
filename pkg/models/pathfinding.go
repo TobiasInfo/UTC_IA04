@@ -80,7 +80,7 @@ func getNeighbors(pos Position, width, height int, obstacles map[Position]bool) 
 			}
 			if !obstacles[intPos] {
 				neighbors = append(neighbors, newPos)
-				fmt.Printf("Valid neighbor found: {%.2f, %.2f}\n", newPos.X, newPos.Y)
+				//fmt.Printf("Valid neighbor found: {%.2f, %.2f}\n", newPos.X, newPos.Y)
 			}
 		}
 	}
