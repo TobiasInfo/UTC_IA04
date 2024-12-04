@@ -13,11 +13,18 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
+type Mode int
+
+const (
+	Menu Mode = iota
+	Simulation
+)
+
 type Button struct {
 	X, Y, Width, Height float64
 	Text                string
 	OnClick             func()
-	lastClicked         time.Time // Tracks the last click time
+	lastClicked         time.Time
 }
 
 func (b *Button) Draw(screen *ebiten.Image) {
@@ -27,18 +34,18 @@ func (b *Button) Draw(screen *ebiten.Image) {
 	opts.GeoM.Translate(b.X, b.Y)
 	screen.DrawImage(buttonImage, opts)
 
-	// Draw button text
 	textX := int(b.X + b.Width/4)
 	textY := int(b.Y + b.Height/3)
 	ebitenutil.DebugPrintAt(screen, b.Text, textX, textY)
 }
+
 func (b *Button) Update(mx, my float64, pressed bool) bool {
-	if time.Since(b.lastClicked) < 500*time.Millisecond { // 0.5-second delay
+	if time.Since(b.lastClicked) < 500*time.Millisecond {
 		return false
 	}
 
 	if pressed && mx >= b.X && mx <= b.X+b.Width && my >= b.Y && my <= b.Y+b.Height {
-		b.lastClicked = time.Now() // Update the last clicked time
+		b.lastClicked = time.Now()
 		if b.OnClick != nil {
 			b.OnClick()
 		}
@@ -55,7 +62,9 @@ type Game struct {
 	ObstacleImage *ebiten.Image
 	Sliders       []Slider
 	PauseButton   Button
+	StartButton   Button
 	Paused        bool
+	Mode          Mode
 }
 
 type Slider struct {
@@ -107,40 +116,48 @@ func (g *Game) Update() error {
 	mx, my := ebiten.CursorPosition()
 	mousePressed := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
 
-	// Update Pause button
-	g.PauseButton.Update(float64(mx), float64(my), mousePressed)
+	switch g.Mode {
+	case Menu:
+		g.StartButton.Update(float64(mx), float64(my), mousePressed)
+	case Simulation:
+		g.PauseButton.Update(float64(mx), float64(my), mousePressed)
 
-	// If the game is paused, stop simulation updates
-	if g.Paused {
-		return nil
+		if g.Paused {
+			return nil
+		}
+
+		for _, slider := range g.Sliders {
+			slider.Update(float64(mx), float64(my), mousePressed)
+		}
+
+		g.Sim.Update()
 	}
 
-	// Update sliders
-	for _, slider := range g.Sliders {
-		slider.Update(float64(mx), float64(my), mousePressed)
-	}
-
-	// Update the simulation
-	g.Sim.Update()
 	return nil
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	g.drawStaticLayer()
-	screen.DrawImage(g.StaticLayer, nil)
+	switch g.Mode {
+	case Menu:
+		screen.Fill(color.RGBA{0, 0, 0, 255}) // Black background
+		g.StartButton.Draw(screen)
+		ebitenutil.DebugPrint(screen, "Welcome to the Simulation!\nPress Start to begin.")
+	case Simulation:
+		g.drawStaticLayer()
+		screen.DrawImage(g.StaticLayer, nil)
 
-	g.drawDynamicLayer()
-	screen.DrawImage(g.DynamicLayer, nil)
+		g.drawDynamicLayer()
+		screen.DrawImage(g.DynamicLayer, nil)
 
-	g.drawMetricsWindow(screen)
-	g.drawSliders(screen)
+		g.drawMetricsWindow(screen)
+		g.drawSliders(screen)
 
-	// Draw the Pause button
-	g.PauseButton.Draw(screen)
+		g.PauseButton.Draw(screen)
+	}
 }
 
 func (g *Game) drawStaticLayer() {
-	g.StaticLayer.Fill(color.RGBA{34, 139, 34, 255}) // Green background
+	g.StaticLayer.Fill(color.RGBA{34, 139, 34, 255})
 	for _, obstacle := range g.Sim.Obstacles {
 		drawObstacle(g.StaticLayer, obstacle.Position.X*30, obstacle.Position.Y*30, 30, 30, g.ObstacleImage)
 	}
@@ -149,7 +166,7 @@ func (g *Game) drawStaticLayer() {
 func (g *Game) drawDynamicLayer() {
 	g.DynamicLayer.Clear()
 	for _, person := range g.Sim.Persons {
-		color := color.RGBA{255, 0, 0, 255} // Red for normal
+		color := color.RGBA{255, 0, 0, 255}
 		drawPerson(g.DynamicLayer, person.Position.X*30, person.Position.Y*30, 10, color)
 	}
 	for _, drone := range g.Sim.Drones {
@@ -160,7 +177,7 @@ func (g *Game) drawDynamicLayer() {
 
 func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
 	metrics := ebiten.NewImage(200, 200)
-	metrics.Fill(color.RGBA{0, 0, 0, 200}) // Semi-transparent black background
+	metrics.Fill(color.RGBA{0, 0, 0, 200})
 	text := fmt.Sprintf("Metrics:\n- Drones: %d\n- People: %d\n- Obstacles: %d",
 		len(g.Sim.Drones), len(g.Sim.Persons), len(g.Sim.Obstacles))
 	ebitenutil.DebugPrint(metrics, text)
@@ -209,7 +226,7 @@ func drawDrone(img *ebiten.Image, x, y, size float64, droneImg *ebiten.Image) {
 
 func drawVisionCircle(img *ebiten.Image, x, y, radius float64) {
 	circle := ebiten.NewImage(int(2*radius), int(2*radius))
-	drawFilledCircle(circle, color.RGBA{0, 255, 0, 64}) // Green translucent
+	drawFilledCircle(circle, color.RGBA{0, 255, 0, 64})
 	opts := &ebiten.DrawImageOptions{}
 	opts.GeoM.Translate(x-radius, y-radius)
 	img.DrawImage(circle, opts)
@@ -254,6 +271,16 @@ func main() {
 		DroneImage:    loadImage("img/drone.png"),
 		ObstacleImage: loadImage("img/chapiteau.png"),
 		Paused:        false,
+		Mode:          Menu,
+	}
+
+	// Initialize the Start button
+	game.StartButton = Button{
+		X: 400, Y: 300, Width: 200, Height: 50,
+		Text: "Start Simulation",
+		OnClick: func() {
+			game.Mode = Simulation
+		},
 	}
 
 	// Initialize the Pause button
@@ -276,7 +303,7 @@ func main() {
 	}
 
 	ebiten.SetWindowSize(1050, 600)
-	ebiten.SetWindowTitle("Simulation with Pause and Sliders")
+	ebiten.SetWindowTitle("Simulation with Menu and Pause")
 	if err := ebiten.RunGame(game); err != nil {
 		panic(err)
 	}
