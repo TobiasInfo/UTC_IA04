@@ -299,7 +299,7 @@ func (s *Simulation) createInitialCrowd(n int) {
 	for i := 0; i < n; i++ {
 		member := persons.NewCrowdMember(i,
 			models.Position{X: 0, Y: float64(rand.Intn(s.Map.Height))},
-			0.001, 20, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan, s.ExitChan)
+			0.9, 20, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan, s.ExitChan)
 		s.Persons = append(s.Persons, member)
 		s.Map.AddCrowdMember(&s.Persons[len(s.Persons)-1])
 	}
@@ -309,7 +309,7 @@ func (s *Simulation) Update() {
 	if s.festivalTime.IsEventEnded() {
 		return
 	}
-
+	time.Sleep(100 * time.Millisecond)
 	fmt.Println("New Tick")
 	s.currentTick++
 	var wg sync.WaitGroup
@@ -397,12 +397,25 @@ func (s *Simulation) UpdateCrowdSize(newSize int) {
 				models.Position{X: 0, Y: float64(rand.Intn(s.Map.Height))},
 				0.001, 20, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan, s.ExitChan)
 			s.Persons = append(s.Persons, member)
+			// fmt.Println("Illegale call to AddCrowdMember")
 			s.Map.AddCrowdMember(&s.Persons[len(s.Persons)-1])
 		}
 	} else if newSize < currentSize {
 		for _, cell := range s.Map.Cells {
 			for len(cell.Persons) > 0 && currentSize > newSize {
-				cell.Persons = cell.Persons[:len(cell.Persons)-1]
+				tmpPers := cell.Persons[len(cell.Persons)-1]
+				for i, pers := range s.Persons {
+					if pers.ID == tmpPers.ID {
+						s.Persons = append(s.Persons[:i], s.Persons[i+1:]...)
+						s.Map.RemoveEntity(*tmpPers)
+					}
+				}
+				for i, pers := range s.Map.Persons {
+					if pers.ID == tmpPers.ID {
+						s.Map.Persons = append(s.Map.Persons[:i], s.Map.Persons[i+1:]...)
+					}
+				}
+				// cell.Persons = cell.Persons[:len(cell.Persons)-1]
 				currentSize--
 			}
 		}

@@ -2,7 +2,7 @@ package main
 
 import (
 	"strconv"
-
+	"fmt"
 	game "UTC_IA04/cmd/simu"
 	"UTC_IA04/cmd/ui"
 	"UTC_IA04/pkg/simulation"
@@ -16,6 +16,11 @@ func main() {
 		10, // default people count
 		5,  // default obstacle count
 	)
+	println("Debut simu dans GUI")
+	fmt.Printf("Simulation Details: %+v\n", g.Sim.GetAvailablePOIs())
+
+	
+
 
 	// Centering and making the UI look nicer
 	fieldWidth := 200.0
@@ -75,7 +80,8 @@ func main() {
 	}
 
 	ebiten.SetWindowSize(800, 600)
-	ebiten.SetWindowTitle("Simulation with Vision Circles")
+    ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
+	ebiten.SetWindowTitle("Simulation Drones")
 	if err := ebiten.RunGame(g); err != nil {
 		panic(err)
 	}

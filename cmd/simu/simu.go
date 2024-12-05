@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"math"
 	"os"
 
 	"UTC_IA04/cmd/ui"
+	"UTC_IA04/pkg/models"
 	"UTC_IA04/pkg/simulation"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -34,8 +36,26 @@ type Game struct {
 	DroneCount    int
 	PeopleCount   int
 	ObstacleCount int
-	DroneImage    *ebiten.Image // Added field to store the drone image
+	DroneImage    *ebiten.Image
+	hoveredPos    *models.Position
 }
+
+// Zone colors
+var (
+	EntranceZoneColor = color.RGBA{135, 206, 235, 180} // Light blue
+	MainZoneColor     = color.RGBA{144, 238, 144, 180} // Light green
+	ExitZoneColor     = color.RGBA{255, 182, 193, 180} // Light pink
+
+	// POI colors
+	MedicalColor   = color.RGBA{255, 0, 0, 255}     // Red
+	ChargingColor  = color.RGBA{255, 255, 0, 255}   // Yellow
+	ToiletColor    = color.RGBA{128, 128, 128, 255} // Gray
+	DrinkColor     = color.RGBA{0, 191, 255, 255}   // Deep sky blue
+	FoodColor      = color.RGBA{255, 165, 0, 255}   // Orange
+	MainStageColor = color.RGBA{148, 0, 211, 255}   // Purple
+	SecondaryColor = color.RGBA{186, 85, 211, 255}  // Medium purple
+	RestAreaColor  = color.RGBA{46, 139, 87, 255}   // Sea green
+)
 
 func NewGame(droneCount, peopleCount, obstacleCount int) *Game {
 	g := &Game{
@@ -75,6 +95,7 @@ func (g *Game) Update() error {
 
 	case Simulation:
 		g.PauseButton.Update(float64(mx), float64(my), mousePressed)
+		g.updatePOIHover(float64(mx), float64(my))
 		if g.Paused {
 			return nil
 		}
@@ -82,6 +103,27 @@ func (g *Game) Update() error {
 	}
 
 	return nil
+}
+
+func (g *Game) updatePOIHover(mx, my float64) {
+	g.hoveredPos = nil
+
+	// Convert mouse coordinates to game coordinates
+	gameX := mx / 30
+	gameY := my / 30
+
+	// Get current POI map
+	poiMap := g.Sim.GetAvailablePOIs()
+
+	// Check each POI position
+	for _, positions := range poiMap {
+		for _, pos := range positions {
+			if math.Abs(gameX-pos.X) <= 1 && math.Abs(gameY-pos.Y) <= 1 {
+				g.hoveredPos = &pos
+				return
+			}
+		}
+	}
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
@@ -94,20 +136,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 }
 
 func (g *Game) drawMenu(screen *ebiten.Image) {
-	// Fill background with a calming color
 	screen.Fill(color.RGBA{30, 30, 50, 255})
-
-	// Add a title
-	title := "Welcome to the Simulation!"
+	title := "Festival Surveillance Simulation"
 	ebitenutil.DebugPrintAt(screen, title, 250, 50)
 
-	// Instructions
-	instructions := "Use the fields below to set parameters.\n" +
-		"Click on a field, type the number, and press Enter.\n" +
-		"Then click 'Start Simulation' to begin."
+	instructions := "Configure simulation parameters:\n" +
+		"Click fields to edit, press Enter to confirm."
 	ebitenutil.DebugPrintAt(screen, instructions, 200, 100)
 
-	// Labels and fields
 	ebitenutil.DebugPrintAt(screen, "Number of Drones:", 200, 200)
 	g.DroneField.Draw(screen)
 
@@ -121,28 +157,148 @@ func (g *Game) drawMenu(screen *ebiten.Image) {
 }
 
 func (g *Game) drawSimulation(screen *ebiten.Image) {
-	// Draw the environment
 	g.drawStaticLayer()
 	screen.DrawImage(g.StaticLayer, nil)
 
-	// Draw moving entities
 	g.drawDynamicLayer()
 	screen.DrawImage(g.DynamicLayer, nil)
 
-	// Draw the metrics window
 	g.drawMetricsWindow(screen)
-
-	// Draw the pause/resume button
 	g.PauseButton.Draw(screen)
+
+	// If there's a hovered POI, draw information
+	if g.hoveredPos != nil {
+		mx, my := ebiten.CursorPosition()
+		personsAtPOI := 0
+		for _, person := range g.Sim.Persons {
+			if person.HasReachedPOI() &&
+				person.TargetPOIPosition != nil &&
+				*person.TargetPOIPosition == *g.hoveredPos {
+				personsAtPOI++
+			}
+		}
+		info := fmt.Sprintf("Visitors: %d", personsAtPOI)
+		ebitenutil.DebugPrintAt(screen, info, mx+10, my+10)
+	}
 }
 
 func (g *Game) drawStaticLayer() {
-	g.StaticLayer.Fill(color.RGBA{34, 139, 34, 255}) // Green background
-	for _, obstacle := range g.Sim.Obstacles {
+	g.StaticLayer.Clear()
+	width := g.StaticLayer.Bounds().Dx()
+	height := g.StaticLayer.Bounds().Dy()
 
-		// TODO : draw image instead of rectangle
-		drawRectangle(g.StaticLayer, obstacle.Position.X*30, obstacle.Position.Y*30, 30, 30, color.RGBA{0, 0, 0, 255})
+	// Draw zones with new proportions (20-60-20 split)
+	entranceWidth := int(float64(width) * 0.2)
+	mainWidth := int(float64(width) * 0.6)
+	exitWidth := width - entranceWidth - mainWidth
+
+	drawRectangle(g.StaticLayer, 0, 0, float64(entranceWidth), float64(height), EntranceZoneColor)
+	drawRectangle(g.StaticLayer, float64(entranceWidth), 0, float64(mainWidth), float64(height), MainZoneColor)
+	drawRectangle(g.StaticLayer, float64(entranceWidth+mainWidth), 0, float64(exitWidth), float64(height), ExitZoneColor)
+
+	// Draw POIs
+	poiMap := g.Sim.GetAvailablePOIs()
+	for poiType, positions := range poiMap {
+		for _, pos := range positions {
+			var poiColor color.Color
+			size := 30.0
+
+			switch poiType {
+			case models.MedicalTent:
+				poiColor = MedicalColor
+				size = 35.0
+			case models.ChargingStation:
+				poiColor = ChargingColor
+			case models.Toilet:
+				poiColor = ToiletColor
+				size = 25.0
+			case models.DrinkStand:
+				poiColor = DrinkColor
+			case models.FoodStand:
+				poiColor = FoodColor
+			case models.MainStage:
+				poiColor = MainStageColor
+				size = 40.0
+			case models.SecondaryStage:
+				poiColor = SecondaryColor
+				size = 35.0
+			case models.RestArea:
+				poiColor = RestAreaColor
+			default:
+				poiColor = color.Black
+			}
+
+			drawRectangle(g.StaticLayer, pos.X*30, pos.Y*30, size, size, poiColor)
+		}
 	}
+}
+
+func (g *Game) drawDynamicLayer() {
+	g.DynamicLayer.Clear()
+
+	// Draw people
+	for _, person := range g.Sim.Map.Persons {
+		if person.Position.X == 0 {
+			println("Person at entrance")
+			fmt.Printf("Simulation Details: %+v\n", person)
+
+			//println(person)
+		}
+		couleur := color.RGBA{255, 0, 0, 255}
+		if person.HasReachedPOI() {
+			couleur = color.RGBA{0, 255, 0, 255} // Green for resting people
+		}
+		if person.InDistress {
+			couleur = color.RGBA{0, 0, 0, 255} // Black for people in distress
+		}
+		drawCircle(g.DynamicLayer, person.Position.X*30, person.Position.Y*30, 10, couleur)
+	}
+
+	// Draw drones
+	for _, drone := range g.Sim.Drones {
+		drawTranslucentCircle(g.DynamicLayer, drone.Position.X*30, drone.Position.Y*30, 60, color.RGBA{0, 255, 0, 64})
+
+		if g.DroneImage != nil {
+			bounds := g.DroneImage.Bounds()
+			w, h := bounds.Dx(), bounds.Dy()
+
+			op := &ebiten.DrawImageOptions{}
+			scale := 0.07
+			op.GeoM.Scale(scale, scale)
+			op.GeoM.Translate(-float64(w)*scale/2, -float64(h)*scale/2)
+			op.GeoM.Translate(drone.Position.X*30, drone.Position.Y*30)
+
+			g.DynamicLayer.DrawImage(g.DroneImage, op)
+		} else {
+			drawCircle(g.DynamicLayer, drone.Position.X*30, drone.Position.Y*30, 10, color.RGBA{0, 0, 255, 255})
+		}
+	}
+}
+
+func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
+	stats := g.Sim.GetStatistics()
+	metricsWidth, metricsHeight := 200, 150
+	metrics := ebiten.NewImage(metricsWidth, metricsHeight)
+	metrics.Fill(color.RGBA{30, 30, 30, 200})
+
+	text := fmt.Sprintf(
+		"Simulation Metrics\n"+
+			"Drones: %d\n"+
+			"People: %d\n"+
+			"In Distress: %d\n"+
+			"Phase: %s\n"+
+			"Time Left: %.0fm",
+		stats.ActiveDrones,
+		stats.TotalPeople,
+		stats.PeopleInDistress,
+		stats.CurrentPhase,
+		stats.RemainingTime.Minutes(),
+	)
+	ebitenutil.DebugPrintAt(metrics, text, 10, 10)
+
+	opts := &ebiten.DrawImageOptions{}
+	opts.GeoM.Translate(580, 50)
+	screen.DrawImage(metrics, opts)
 }
 
 func loadImage(path string) *ebiten.Image {
@@ -158,63 +314,4 @@ func loadImage(path string) *ebiten.Image {
 		return nil
 	}
 	return ebiten.NewImageFromImage(img)
-}
-
-func (g *Game) drawDynamicLayer() {
-	g.DynamicLayer.Clear()
-
-	// Draw people
-	for _, person := range g.Sim.Persons {
-		drawCircle(g.DynamicLayer, person.Position.X*30, person.Position.Y*30, 10, color.RGBA{255, 0, 0, 255})
-	}
-
-	// Assuming this code is inside drawDynamicLayer() where we draw the drones:
-
-	for _, drone := range g.Sim.Drones {
-		// Draw the vision radius first
-		drawTranslucentCircle(g.DynamicLayer, drone.Position.X*30, drone.Position.Y*30, 60, color.RGBA{0, 255, 0, 64})
-
-		if g.DroneImage != nil {
-			// Get the width and height from Bounds
-			bounds := g.DroneImage.Bounds()
-			w, h := bounds.Dx(), bounds.Dy()
-
-			op := &ebiten.DrawImageOptions{}
-
-			// Scale the image down
-			scale := 0.07 // Adjust this factor as needed
-			op.GeoM.Scale(scale, scale)
-
-			// Translate so that the image is centered at the drone position
-			op.GeoM.Translate(-float64(w)*scale/2, -float64(h)*scale/2)
-			op.GeoM.Translate(drone.Position.X*30, drone.Position.Y*30)
-
-			g.DynamicLayer.DrawImage(g.DroneImage, op)
-		} else {
-			// Fallback if the image couldn't be loaded
-			drawCircle(g.DynamicLayer, drone.Position.X*30, drone.Position.Y*30, 10, color.RGBA{0, 0, 255, 255})
-		}
-	}
-
-}
-
-func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
-	metricsWidth, metricsHeight := 200, 120
-	metrics := ebiten.NewImage(metricsWidth, metricsHeight)
-	metrics.Fill(color.RGBA{30, 30, 30, 200}) // Semi-transparent dark background for metrics
-
-	// Add a nice title and spacing
-	title := "Simulation Metrics"
-	ebitenutil.DebugPrintAt(metrics, title, 10, 10)
-	// Use formatted strings to make metrics more readable
-	text := fmt.Sprintf(
-		"Drones: %d\nPeople: %d\nObstacles: %d",
-		len(g.Sim.Drones), len(g.Sim.Persons), len(g.Sim.Obstacles),
-	)
-	ebitenutil.DebugPrintAt(metrics, text, 10, 30)
-
-	opts := &ebiten.DrawImageOptions{}
-	// Place it in the top-right corner, below the control panel
-	opts.GeoM.Translate(580, 50)
-	screen.DrawImage(metrics, opts)
 }
