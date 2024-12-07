@@ -296,7 +296,7 @@ func (g *Game) drawDynamicLayer() {
 			w, h := bounds.Dx(), bounds.Dy()
 
 			op := &ebiten.DrawImageOptions{}
-			scale := 0.07
+			scale := 0.04
 			op.GeoM.Scale(scale, scale)
 			op.GeoM.Translate(-float64(w)*scale/2, -float64(h)*scale/2)
 			op.GeoM.Translate(drone.Position.X*30, drone.Position.Y*30)
