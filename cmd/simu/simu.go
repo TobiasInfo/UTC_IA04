@@ -284,12 +284,12 @@ func (g *Game) drawDynamicLayer() {
 		if person.IsInDistress() {
 			couleur = color.RGBA{0, 0, 0, 255} // Black for people in distress
 		}
-		drawCircle(g.DynamicLayer, person.Position.X*30, person.Position.Y*30, 10, couleur)
+		drawCircle(g.DynamicLayer, person.Position.X*30, person.Position.Y*30, 3, couleur)
 	}
 
 	// Draw drones
 	for _, drone := range g.Sim.Drones {
-		drawTranslucentCircle(g.DynamicLayer, drone.Position.X*30, drone.Position.Y*30, 60, color.RGBA{0, 255, 0, 64})
+		drawTranslucentCircle(g.DynamicLayer, drone.Position.X*30, drone.Position.Y*30, 60, color.RGBA{0, 0, 0, 32})
 
 		if g.DroneImage != nil {
 			bounds := g.DroneImage.Bounds()
