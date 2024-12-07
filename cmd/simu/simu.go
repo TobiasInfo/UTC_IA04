@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"UTC_IA04/cmd/ui"
+	"UTC_IA04/cmd/ui/assets"
 	"UTC_IA04/pkg/models"
 	"UTC_IA04/pkg/simulation"
 
@@ -37,6 +38,7 @@ type Game struct {
 	PeopleCount   int
 	ObstacleCount int
 	DroneImage    *ebiten.Image
+	PoiImages     map[models.POIType]*ebiten.Image
 	hoveredPos    *models.Position
 }
 
@@ -70,6 +72,16 @@ func NewGame(droneCount, peopleCount, obstacleCount int) *Game {
 
 	// Load the drone image once
 	g.DroneImage = loadImage("img/drone.png")
+	g.PoiImages = map[models.POIType]*ebiten.Image{
+		0: loadImage(assets.POIIcon(0)),
+		1: loadImage(assets.POIIcon(1)),
+		2: loadImage(assets.POIIcon(2)),
+		3: loadImage(assets.POIIcon(3)),
+		4: loadImage(assets.POIIcon(4)),
+		5: loadImage(assets.POIIcon(5)),
+		6: loadImage(assets.POIIcon(6)),
+		7: loadImage(assets.POIIcon(7)),
+	}
 
 	return g
 }
@@ -200,35 +212,20 @@ func (g *Game) drawStaticLayer() {
 	poiMap := g.Sim.GetAvailablePOIs()
 	for poiType, positions := range poiMap {
 		for _, pos := range positions {
-			var poiColor color.Color
-			size := 30.0
 
-			switch poiType {
-			case models.MedicalTent:
-				poiColor = MedicalColor
-				size = 35.0
-			case models.ChargingStation:
-				poiColor = ChargingColor
-			case models.Toilet:
-				poiColor = ToiletColor
-				size = 25.0
-			case models.DrinkStand:
-				poiColor = DrinkColor
-			case models.FoodStand:
-				poiColor = FoodColor
-			case models.MainStage:
-				poiColor = MainStageColor
-				size = 40.0
-			case models.SecondaryStage:
-				poiColor = SecondaryColor
-				size = 35.0
-			case models.RestArea:
-				poiColor = RestAreaColor
-			default:
-				poiColor = color.Black
+			if g.PoiImages[poiType] != nil {
+				bounds := g.PoiImages[poiType].Bounds()
+				w, h := bounds.Dx(), bounds.Dy()
+
+				op := &ebiten.DrawImageOptions{}
+				scale := 0.07
+				op.GeoM.Scale(scale, scale)
+				op.GeoM.Translate(-float64(w)*scale/2, -float64(h)*scale/2)
+				op.GeoM.Translate(pos.X*30, pos.Y*30)
+
+				g.StaticLayer.DrawImage(g.PoiImages[poiType], op)
 			}
 
-			drawRectangle(g.StaticLayer, pos.X*30, pos.Y*30, size, size, poiColor)
 		}
 	}
 }
