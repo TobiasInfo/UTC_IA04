@@ -6,22 +6,22 @@ import "UTC_IA04/pkg/models"
 func POIIcon(poiType models.POIType) string {
 	switch poiType {
 	case 0: // MedicalTent
-		return "img/premiersecours.png"
+		return "img/secoursBW.png"
 	case 1: // ChargingStation
-		return "img/premiersecours.png"
+		return "img/station chargement.png"
 	case 2: // Toilet
-		return "img/premiersecours.png"
+		return "img/toilettes.png"
 	case 3: // DrinkStand
-		return "img/premiersecours.png"
+		return "img/bar.png"
 	case 4: // FoodStand
-		return "img/premiersecours.png"
+		return "img/fast-food.png"
 	case 5: // MainStage
-		return "img/premiersecours.png"
+		return "img/mainstage.png"
 	case 6: // SecondaryStage
-		return "img/premiersecours.png"
+		return "img/secondarystage.png"
 	case 7: // RestArea
-		return "img/premiersecours.png"
-	default:
-		return ""
+		return "img/aire-de-repos.png"
+	default: //POI pas défini
+		return "img/bugs.png"
 	}
 }
