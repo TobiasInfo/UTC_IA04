@@ -32,6 +32,8 @@ type Person struct {
 	TargetPOIPosition       *models.Position
 	TimeAtPOI               time.Duration
 	LastZoneChange          time.Time
+	debug                   bool
+	hardDebug               bool
 }
 
 func NewCrowdMember(id int, position models.Position, distressProbability float64, lifespan int, width int, height int, moveChan chan models.MovementRequest, deadChan chan models.DeadRequest, exitChan chan models.ExitRequest) Person {
@@ -64,14 +66,20 @@ func NewCrowdMember(id int, position models.Position, distressProbability float6
 		TargetPOIPosition:       nil,
 		TimeAtPOI:               0,
 		LastZoneChange:          now,
+		debug:                   false,
+		hardDebug:               false,
 	}
 }
 
 func (c *Person) Myturn() {
-	fmt.Printf("Person %d executing turn - Current State: %v, Position: %v\n",
-		c.ID, c.State.CurrentState, c.Position)
+	if c.hardDebug {
+		fmt.Printf("Person %d executing turn - Current State: %v, Position: %v\n",
+			c.ID, c.State.CurrentState, c.Position)
+	}
 	if c.InDistress {
-		fmt.Printf("Person %d is in distress, not moving\n", c.ID)
+		if c.hardDebug {
+			fmt.Printf("Person %d is in distress, not moving\n", c.ID)
+		}
 		c.UpdateHealth()
 		return
 	}
