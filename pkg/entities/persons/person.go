@@ -371,8 +371,8 @@ func (c *Person) Die() {
 		return
 	}
 
-	c.Position.X = -1
-	c.Position.Y = -1
+	c.Position.X = -10
+	c.Position.Y = -10
 	fmt.Printf("Person %d has been removed from simulation\n", c.ID)
 }
 
@@ -412,6 +412,10 @@ func (c *Person) SetTargetPOI(poiType models.POIType, position models.Position) 
 	c.CurrentPOI = &poiType
 	c.TargetPOIPosition = &position
 	c.TimeAtPOI = 0
+}
+
+func (c *Person) IsDead() bool {
+	return c.Dead
 }
 
 func (c *Person) IsAlive() bool {

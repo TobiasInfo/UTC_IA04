@@ -14,23 +14,28 @@ import (
 	"time"
 )
 
+//const ( DEFAULT_DISTRESS_PROBABILITY = 0.9 )
+
 type Simulation struct {
-	Map            *Map
-	DroneRange     int
-	MoveChan       chan models.MovementRequest
-	DeadChan       chan models.DeadRequest
-	ExitChan       chan models.ExitRequest
-	Persons        []persons.Person
-	Drones         []drones.Drone
-	Obstacles      []obstacles.Obstacle
-	FestivalConfig *models.FestivalConfig
-	debug          bool
-	hardDebug      bool
-	currentTick    int
-	festivalTime   *FestivalTime
-	poiMap         map[models.POIType][]models.Position
-	mu             sync.RWMutex
+	Map                        *Map
+	DroneRange                 int
+	MoveChan                   chan models.MovementRequest
+	DeadChan                   chan models.DeadRequest
+	ExitChan                   chan models.ExitRequest
+	Persons                    []persons.Person
+	Drones                     []drones.Drone
+	Obstacles                  []obstacles.Obstacle
+	FestivalConfig             *models.FestivalConfig
+	debug                      bool
+	hardDebug                  bool
+	currentTick                int
+	DefaultDistressProbability float64
+	festivalTime               *FestivalTime
+	poiMap                     map[models.POIType][]models.Position
+	mu                         sync.RWMutex
 }
+
+// CIMITIERE DES PERSONNES MORTES EN (-10, -10)
 
 func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 	s := &Simulation{
@@ -64,18 +69,18 @@ func (s *Simulation) handleMovementRequests() {
 			var entity interface{}
 			s.mu.RLock()
 			if req.MemberType == "drone" {
-				for _, drone := range s.Map.Drones {
+				for _, drone := range s.Drones {
 					if drone.ID == req.MemberID {
-						entity = drone
+						entity = &drone
 						break
 					}
 				}
 			}
 
 			if req.MemberType == "persons" {
-				for _, person := range s.Map.Persons {
+				for _, person := range s.Persons {
 					if person.ID == req.MemberID {
-						entity = person
+						entity = &person
 						break
 					}
 				}
@@ -105,9 +110,9 @@ func (s *Simulation) handleDeadPerson() {
 
 		var entity interface{}
 		s.mu.RLock()
-		for _, person := range s.Map.Persons {
+		for _, person := range s.Persons {
 			if person.ID == req.MemberID {
-				entity = person
+				entity = &person
 				break
 			}
 		}
@@ -115,7 +120,7 @@ func (s *Simulation) handleDeadPerson() {
 
 		if entity != nil {
 			s.mu.Lock()
-			s.Map.RemoveEntity(entity)
+			s.Map.MoveEntity(entity, models.Position{X: -10, Y: -10})
 			s.mu.Unlock()
 			req.ResponseChan <- models.DeadResponse{Authorized: true}
 		} else {
@@ -133,9 +138,9 @@ func (s *Simulation) handleExitRequest() {
 
 		var entity interface{}
 		s.mu.RLock()
-		for _, person := range s.Map.Persons {
+		for _, person := range s.Persons {
 			if person.ID == req.MemberID {
-				entity = person
+				entity = &person
 				break
 			}
 		}
@@ -153,6 +158,10 @@ func (s *Simulation) handleExitRequest() {
 }
 
 func (s *Simulation) Initialize(nDrones int, nCrowd int, nObstacles int) {
+	fmt.Println("Initializing simulation")
+	// @TODO : Récupérer la distress depuis la config.
+	s.DefaultDistressProbability = 0.9
+
 	configPath := "configs/festival_layout.json"
 	config, err := LoadFestivalConfig(configPath)
 	if err != nil {
@@ -296,10 +305,11 @@ func (s *Simulation) createDrones(n int) {
 }
 
 func (s *Simulation) createInitialCrowd(n int) {
+	fmt.Println("Creating initial crowd")
 	for i := 0; i < n; i++ {
 		member := persons.NewCrowdMember(i,
 			models.Position{X: 0, Y: float64(rand.Intn(s.Map.Height))},
-			0.001, 20, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan, s.ExitChan)
+			s.DefaultDistressProbability, 20, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan, s.ExitChan)
 		s.Persons = append(s.Persons, member)
 		s.Map.AddCrowdMember(&s.Persons[len(s.Persons)-1])
 	}
@@ -309,7 +319,7 @@ func (s *Simulation) Update() {
 	if s.festivalTime.IsEventEnded() {
 		return
 	}
-
+	time.Sleep(100 * time.Millisecond)
 	fmt.Println("New Tick")
 	s.currentTick++
 	var wg sync.WaitGroup
@@ -382,52 +392,78 @@ func (s *Simulation) Update() {
 	fmt.Println("End of the tick")
 }
 
+func (s *Simulation) UpdateDroneSize(newSize int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if newSize == len(s.Drones) {
+		fmt.Println("[DRONES] - No change needed, current size is equal to new size")
+		return
+	}
+
+	currentSize := len(s.Drones)
+
+	if newSize > currentSize {
+		// Ajout des nouveaux drones
+		s.createDrones(newSize - currentSize)
+	} else if newSize < currentSize {
+		dronesToRemove := currentSize - newSize
+		for i := 0; i < dronesToRemove; i++ {
+			if len(s.Drones) == 0 {
+				break
+			}
+
+			// On prend la dernière personne de la liste
+			droneToRemove := s.Drones[len(s.Drones)-1]
+
+			// On la retire de la carte
+			s.Map.RemoveEntity(droneToRemove)
+			//s.Map.DeleteEntity(droneToRemove)
+
+			// On la retire de la liste des personnes
+			s.Drones = s.Drones[:len(s.Drones)-1]
+		}
+	}
+}
+
 func (s *Simulation) UpdateCrowdSize(newSize int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	currentSize := 0
-	for _, cell := range s.Map.Cells {
-		currentSize += len(cell.Persons)
+	if newSize == len(s.Persons) {
+		fmt.Println("[CrowMember] - No change needed, current size is equal to new size")
+		return
 	}
+
+	currentSize := len(s.Persons)
 
 	if newSize > currentSize {
 		for i := currentSize; i < newSize; i++ {
 			member := persons.NewCrowdMember(i,
 				models.Position{X: 0, Y: float64(rand.Intn(s.Map.Height))},
-				0.001, 20, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan, s.ExitChan)
+				s.DefaultDistressProbability, 20, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan, s.ExitChan)
 			s.Persons = append(s.Persons, member)
 			s.Map.AddCrowdMember(&s.Persons[len(s.Persons)-1])
 		}
 	} else if newSize < currentSize {
-		for _, cell := range s.Map.Cells {
-			for len(cell.Persons) > 0 && currentSize > newSize {
-				cell.Persons = cell.Persons[:len(cell.Persons)-1]
-				currentSize--
+		// Retrait des personnes en excès
+		personsToRemove := currentSize - newSize
+
+		// On commence par la fin de la liste pour éviter les problèmes d'index
+		for i := 0; i < personsToRemove; i++ {
+			if len(s.Persons) == 0 {
+				break
 			}
-		}
-	}
-}
 
-func (s *Simulation) UpdateDroneSize(newSize int) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+			// On prend la dernière personne de la liste
+			personToRemove := s.Persons[len(s.Persons)-1]
 
-	currentSize := 0
-	for _, cell := range s.Map.Cells {
-		currentSize += len(cell.Drones)
-	}
+			// On la retire de la carte
+			s.Map.RemoveEntity(personToRemove)
+			//s.Map.DeleteEntity(personToRemove)
 
-	if newSize > currentSize {
-		for i := currentSize; i < newSize; i++ {
-			s.createDrones(1)
-		}
-	} else if newSize < currentSize {
-		for _, cell := range s.Map.Cells {
-			for len(cell.Drones) > 0 && currentSize > newSize {
-				cell.Drones = cell.Drones[:len(cell.Drones)-1]
-				currentSize--
-			}
+			// On la retire de la liste des personnes
+			s.Persons = s.Persons[:len(s.Persons)-1]
 		}
 	}
 }

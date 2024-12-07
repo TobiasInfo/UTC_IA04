@@ -20,10 +20,10 @@ type MapCell struct {
 
 // Map represents the entire simulation environment
 type Map struct {
-	Width     int
-	Height    int
-	Persons   []*persons.Person
-	Drones    []*drones.Drone
+	Width  int
+	Height int
+	//Persons   []*persons.Person
+	//Drones    []*drones.Drone
 	Obstacles []*obstacles.Obstacle
 	Cells     map[models.Position]*MapCell
 	mu        sync.RWMutex
@@ -55,13 +55,23 @@ func newMap(width, height int) *Map {
 		}
 	}
 
+	// CIMITIERE DES PERSONNES MORTES EN (-10, -10)
+	cimitierePos := models.Position{X: -10, Y: -10}
+	cells[cimitierePos] = &MapCell{
+		Position:  cimitierePos,
+		Obstacles: []*obstacles.Obstacle{},
+		Persons:   []*persons.Person{},
+		Drones:    []*drones.Drone{},
+		mu:        sync.RWMutex{},
+	}
+
 	return &Map{
-		Width:   width,
-		Height:  height,
-		Cells:   cells,
-		Persons: []*persons.Person{},
-		Drones:  []*drones.Drone{},
-		mu:      sync.RWMutex{},
+		Width:  width,
+		Height: height,
+		Cells:  cells,
+		//Persons: []*persons.Person{},
+		//Drones:  []*drones.Drone{},
+		mu: sync.RWMutex{},
 	}
 }
 
@@ -117,7 +127,7 @@ func (m *Map) AddCrowdMember(member *persons.Person) {
 	cell.Persons = append(cell.Persons, member)
 	cell.mu.Unlock()
 
-	m.Persons = append(m.Persons, member)
+	//m.Persons = append(m.Persons, member)
 }
 
 // AddDrone adds a drones to a specific position on the map
@@ -130,7 +140,7 @@ func (m *Map) AddDrone(drone *drones.Drone) {
 	cell.Drones = append(cell.Drones, drone)
 	cell.mu.Unlock()
 
-	m.Drones = append(m.Drones, drone)
+	//m.Drones = append(m.Drones, drone)
 }
 
 // MoveEntity updates the position of an entity (e.g., drones, crowd member)
@@ -211,6 +221,31 @@ func (m *Map) RemoveEntity(entity interface{}) {
 		fmt.Println("Unknown entity type")
 	}
 }
+
+//func (m *Map) DeleteEntity(entity interface{}) {
+//	m.mu.Lock()
+//	defer m.mu.Unlock()
+//
+//	switch e := entity.(type) {
+//	case *drones.Drone:
+//		for i, d := range m.Drones {
+//			if d.ID == e.ID {
+//				m.Drones = append(m.Drones[:i], m.Drones[i+1:]...)
+//				break
+//			}
+//		}
+//	case *persons.Person:
+//		for i, d := range m.Persons {
+//			if d.ID == e.ID {
+//				m.Persons = append(m.Persons[:i], m.Persons[i+1:]...)
+//				break
+//			}
+//		}
+//
+//	default:
+//		fmt.Println("Unknown entity type")
+//	}
+//}
 
 // IsBlocked checks if a position is blocked by obstacles
 func (m *Map) IsBlocked(position models.Position) bool {
