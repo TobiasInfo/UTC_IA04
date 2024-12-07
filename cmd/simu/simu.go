@@ -9,6 +9,7 @@ import (
 
 	"UTC_IA04/cmd/ui"
 	"UTC_IA04/cmd/ui/assets"
+	"UTC_IA04/pkg/entities/persons"
 	"UTC_IA04/pkg/models"
 	"UTC_IA04/pkg/simulation"
 
@@ -138,6 +139,21 @@ func (g *Game) updatePOIHover(mx, my float64) {
 	}
 }
 
+func (g *Game) getHoveredPerson(mx, my float64) *persons.Person {
+	// Convert mouse coordinates to game coordinates
+	gameX := mx / 30
+	gameY := my / 30
+
+	// Check each person's position
+	for _, person := range g.Sim.Persons {
+		if math.Abs(gameX-person.Position.X) <= 0.3 && math.Abs(gameY-person.Position.Y) <= 0.3 {
+			return &person
+		}
+	}
+
+	return nil
+}
+
 func (g *Game) Draw(screen *ebiten.Image) {
 	switch g.Mode {
 	case Menu:
@@ -191,6 +207,22 @@ func (g *Game) drawSimulation(screen *ebiten.Image) {
 		}
 		info := fmt.Sprintf("Visitors: %d", personsAtPOI)
 		ebitenutil.DebugPrintAt(screen, info, mx+10, my+10)
+	}
+	mx, my := ebiten.CursorPosition()
+	if hoveredPerson := g.getHoveredPerson(float64(mx), float64(my)); hoveredPerson != nil {
+		personInfo := fmt.Sprintf(
+			"Person Info\n"+
+				"ID: %d\n"+
+				"In Distress: %t\n"+
+				"Has Reached POI: %t\n"+
+				"Position: (%.1f, %.1f)",
+			hoveredPerson.ID,
+			hoveredPerson.InDistress,
+			hoveredPerson.HasReachedPOI(),
+			hoveredPerson.Position.X,
+			hoveredPerson.Position.Y,
+		)
+		ebitenutil.DebugPrintAt(screen, personInfo, mx+10, my+10)
 	}
 }
 
