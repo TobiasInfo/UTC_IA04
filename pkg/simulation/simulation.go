@@ -18,7 +18,8 @@ import (
 
 type Simulation struct {
 	Map                        *Map
-	DroneRange                 int
+	DroneSeeRange              int
+	DroneCommRange             int
 	MoveChan                   chan models.MovementRequest
 	DeadChan                   chan models.DeadRequest
 	ExitChan                   chan models.ExitRequest
@@ -39,16 +40,17 @@ type Simulation struct {
 
 func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 	s := &Simulation{
-		Map:          GetMap(30, 20),
-		DroneRange:   2,
-		MoveChan:     make(chan models.MovementRequest),
-		DeadChan:     make(chan models.DeadRequest),
-		ExitChan:     make(chan models.ExitRequest),
-		debug:        false,
-		hardDebug:    false,
-		currentTick:  0,
-		festivalTime: NewFestivalTime(),
-		poiMap:       make(map[models.POIType][]models.Position),
+		Map:            GetMap(30, 20),
+		DroneSeeRange:  5,
+		DroneCommRange: 5,
+		MoveChan:       make(chan models.MovementRequest),
+		DeadChan:       make(chan models.DeadRequest),
+		ExitChan:       make(chan models.ExitRequest),
+		debug:          false,
+		hardDebug:      false,
+		currentTick:    0,
+		festivalTime:   NewFestivalTime(),
+		poiMap:         make(map[models.POIType][]models.Position),
 	}
 	s.Initialize(numDrones, numCrowdMembers, numObstacles)
 	go s.handleMovementRequests()
@@ -250,46 +252,33 @@ func (s *Simulation) initializeDefaultObstacles(nObstacles int) {
 }
 
 func (s *Simulation) createDrones(n int) {
-	detectionFunc := func() []float64 {
-		pourcentageArray := make([]float64, s.DroneRange+1)
-		for i := 0; i < s.DroneRange+1; i++ {
-			pourcentageArray[i] = 1.0 - float64(i)/float64(s.DroneRange)
-		}
-		return pourcentageArray
-	}
-
 	droneSeeFunction := func(d *drones.Drone) []*persons.Person {
 		currentCell := d.Position
-		rangeDrone := s.DroneRange
+		rangeDrone := s.DroneCommRange
 
 		Vector := models.Vector{X: currentCell.X, Y: currentCell.Y}
-		_, valuesInt := Vector.GenerateCircleValues(rangeDrone)
+		valuesFloat, _ := Vector.GenerateCircleValues(rangeDrone)
 
 		droneInformations := make([]*persons.Person, 0)
-		probs := d.DetectionPrecisionFunc()
+		//probs := d.DetectionPrecisionFunc()
 
-		if s.hardDebug {
-			fmt.Println("Detection probabilities & Int values")
-			fmt.Println(valuesInt)
-			fmt.Println(probs)
-		}
+		nbPersDetected := 0
 
-		for i := 0; i < len(valuesInt); i++ {
-			position := valuesInt[i]
+		for i := 0; i < len(valuesFloat); i++ {
+			position := valuesFloat[i]
+			distance := currentCell.CalculateDistance(position)
 			if cell, exists := s.Map.Cells[position]; exists {
-				distance := currentCell.CalculateDistance(position)
 				if s.debug {
 					fmt.Printf("Distance : %.2f\n", distance)
 				}
-				if !s.Map.IsBlocked(position) {
-					for _, member := range cell.Persons {
-						if member.Position.X != position.X || member.Position.Y != position.Y {
-							fmt.Printf("Warning: Member position mismatch - ID: %d, Position: (%.2f, %.2f), Cell: (%.2f, %.2f)\n",
-								member.ID, member.Position.X, member.Position.Y, position.X, position.Y)
+				for _, member := range cell.Persons {
+					probaDetection := max(0, 1.0-distance/float64(s.DroneSeeRange)-(float64(nbPersDetected)*0.03))
+					if rand.Float64() < probaDetection {
+						if s.debug {
+							fmt.Printf("Drone %d sees person %d\n", d.ID, member.ID)
 						}
-						if rand.Float64() < probs[int(distance)] {
-							droneInformations = append(droneInformations, member)
-						}
+						droneInformations = append(droneInformations, member)
+						nbPersDetected++
 					}
 				}
 			}
@@ -297,8 +286,29 @@ func (s *Simulation) createDrones(n int) {
 		return droneInformations
 	}
 
+	droneInComRange := func(d *drones.Drone) []*drones.Drone {
+		currentCell := d.Position
+		rangeDrone := s.DroneCommRange
+
+		Vector := models.Vector{X: currentCell.X, Y: currentCell.Y}
+		_, valuesInt := Vector.GenerateCircleValues(rangeDrone)
+
+		droneInformations := make([]*drones.Drone, 0)
+
+		for i := 0; i < len(valuesInt); i++ {
+			position := valuesInt[i]
+			if _, exists := s.Map.Cells[position]; exists {
+				for _, drone := range s.Drones {
+					droneInformations = append(droneInformations, &drone)
+
+				}
+			}
+		}
+		return droneInformations
+	}
+
 	for i := 0; i < n; i++ {
-		d := drones.NewSurveillanceDrone(i, models.Position{X: 0, Y: 0}, 100.0, detectionFunc, droneSeeFunction, s.MoveChan)
+		d := drones.NewSurveillanceDrone(i, models.Position{X: 0, Y: 0}, 100.0, s.DroneSeeRange, s.DroneCommRange, droneSeeFunction, droneInComRange, s.MoveChan)
 		s.Drones = append(s.Drones, d)
 		s.Map.AddDrone(&s.Drones[len(s.Drones)-1])
 	}
@@ -319,8 +329,10 @@ func (s *Simulation) Update() {
 	if s.festivalTime.IsEventEnded() {
 		return
 	}
-	time.Sleep(100 * time.Millisecond)
-	fmt.Println("New Tick")
+	//time.Sleep(7 * time.Millisecond)
+	if s.hardDebug {
+		fmt.Println("New Tick")
+	}
 	s.currentTick++
 	var wg sync.WaitGroup
 

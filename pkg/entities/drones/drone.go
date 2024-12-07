@@ -15,25 +15,31 @@ import (
 type Drone struct {
 	ID                      int
 	visionCapacity          int
+	DroneSeeRange           int
+	DroneCommRange          int
 	Position                models.Position
 	Battery                 float64
-	DetectionPrecisionFunc  func() []float64
 	DroneSeeFunction        func(d *Drone) []*persons.Person
+	DroneInComRangeFunc     func(d *Drone) []*Drone
 	ReportedZonesByCentrale []models.Position
 	SeenPeople              []*persons.Person
+	DroneInComRange         []*Drone
 	MoveChan                chan models.MovementRequest
 }
 
 // NewSurveillanceDrone creates a new instance of SurveillanceDrone
-func NewSurveillanceDrone(id int, position models.Position, battery float64, detectionFunc func() []float64, droneSeeFunc func(d *Drone) []*persons.Person, moveChan chan models.MovementRequest) Drone {
+func NewSurveillanceDrone(id int, position models.Position, battery float64, droneSeeRange int, droneCommunicationRange int, droneSeeFunc func(d *Drone) []*persons.Person, DroneInComRange func(d *Drone) []*Drone, moveChan chan models.MovementRequest) Drone {
 	return Drone{
 		ID:                      id,
 		Position:                position,
-		Battery:                 battery,
-		DetectionPrecisionFunc:  detectionFunc,
+		Battery:                 100000000000000,
+		DroneSeeRange:           droneSeeRange,
+		DroneCommRange:          droneCommunicationRange,
 		DroneSeeFunction:        droneSeeFunc,
+		DroneInComRangeFunc:     DroneInComRange,
 		ReportedZonesByCentrale: []models.Position{},
 		SeenPeople:              []*persons.Person{},
+		DroneInComRange:         []*Drone{},
 		MoveChan:                moveChan,
 	}
 }
@@ -125,6 +131,9 @@ func (d *Drone) Think() models.Position {
 		{X: 1, Y: 0},  // Right
 	}
 
+	d.SeenPeople = d.DroneSeeFunction(d)
+	d.DroneInComRange = d.DroneInComRangeFunc(d)
+
 	rand.Shuffle(len(directions), func(i, j int) {
 		directions[i], directions[j] = directions[j], directions[i]
 	})
@@ -145,6 +154,9 @@ func (d *Drone) Think() models.Position {
 
 func (d *Drone) Myturn() {
 	// Get the next position to move to
+	d.SeenPeople = []*persons.Person{}
+	d.DroneInComRange = []*Drone{}
+
 	target := d.Think()
 
 	// Try to move to the calculated target
