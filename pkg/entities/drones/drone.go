@@ -41,11 +41,11 @@ func NewSurveillanceDrone(id int, position models.Position, battery float64, det
 // Move updates the drones's position to the destination
 func (d *Drone) Move(target models.Position) bool {
 	if d.Battery <= 0 {
-		fmt.Printf("Drone %d cannot move. Battery is empty.\n", d.ID)
+		//fmt.Printf("Drone %d cannot move. Battery is empty.\n", d.ID)
 		return false
 	}
 
-	fmt.Printf("Trying to move drones %d to %v\n", d.ID, target)
+	//fmt.Printf("Trying to move drones %d to %v\n", d.ID, target)
 
 	if d.Position.X == target.X && d.Position.Y == target.Y {
 		return false
@@ -59,7 +59,7 @@ func (d *Drone) Move(target models.Position) bool {
 		d.Battery -= 1.0
 		d.Position.X = target.X
 		d.Position.Y = target.Y
-		fmt.Printf("Drone %d moved to %v\n", d.ID, d.Position)
+		//fmt.Printf("Drone %d moved to %v\n", d.ID, d.Position)
 		return true
 	}
 
@@ -135,11 +135,11 @@ func (d *Drone) Think() models.Position {
 			Y: d.Position.Y + dir.Y,
 		}
 		if target.X >= 0 && target.Y >= 0 && target.X < 30 && target.Y < 20 {
-			fmt.Printf("Drone %d Thinks Target: (%f, %f)\n", d.ID, target.X, target.Y)
+			//fmt.Printf("Drone %d Thinks Target: (%f, %f)\n", d.ID, target.X, target.Y)
 			return target
 		}
 	}
-	fmt.Printf("Drone %d has no valid moves, staying at (%f, %f)\n", d.ID, d.Position.X, d.Position.Y)
+	//fmt.Printf("Drone %d has no valid moves, staying at (%f, %f)\n", d.ID, d.Position.X, d.Position.Y)
 	return d.Position
 }
 

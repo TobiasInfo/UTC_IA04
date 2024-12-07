@@ -266,7 +266,11 @@ func (g *Game) drawDynamicLayer() {
 	g.DynamicLayer.Clear()
 
 	// Draw people
-	for _, person := range g.Sim.Map.Persons {
+	for _, person := range g.Sim.Persons {
+		if person.IsDead() {
+			continue
+		}
+
 		if person.Position.X == 0 {
 			println("Person at entrance")
 			fmt.Printf("Simulation Details: %+v\n", person)
@@ -277,7 +281,7 @@ func (g *Game) drawDynamicLayer() {
 		if person.HasReachedPOI() {
 			couleur = color.RGBA{0, 255, 0, 255} // Green for resting people
 		}
-		if person.InDistress {
+		if person.IsInDistress() {
 			couleur = color.RGBA{0, 0, 0, 255} // Black for people in distress
 		}
 		drawCircle(g.DynamicLayer, person.Position.X*30, person.Position.Y*30, 10, couleur)
