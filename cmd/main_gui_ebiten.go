@@ -3,7 +3,6 @@ package main
 import (
 	game "UTC_IA04/cmd/simu"
 	"UTC_IA04/cmd/ui"
-	"fmt"
 	"github.com/hajimehoshi/ebiten/v2"
 	"strconv"
 )
@@ -15,7 +14,7 @@ func main() {
 		5,  // default obstacle count
 	)
 	println("Debut simu dans GUI")
-	fmt.Printf("Simulation Details: %+v\n", g.Sim.GetAvailablePOIs())
+	//fmt.Printf("Simulation Details: %+v\n", g.Sim.GetAvailablePOIs())
 
 	// Centering and making the UI look nicer
 	fieldWidth := 200.0
@@ -77,6 +76,13 @@ func main() {
 			} else {
 				g.PauseButton.Text = "Pause"
 			}
+		},
+	}
+
+	g.SimButton = ui.Button{
+		X: 600, Y: 250, Width: 150, Height: 40, Text: "Update Sim",
+		OnClick: func() {
+			g.Sim.Update()
 		},
 	}
 

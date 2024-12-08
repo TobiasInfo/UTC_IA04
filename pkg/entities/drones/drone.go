@@ -125,14 +125,17 @@ func (d *Drone) ReceiveInfo() {
 
 func (d *Drone) Think() models.Position {
 	directions := []models.Position{
-		{X: 0, Y: -1}, // Up
-		{X: 0, Y: 1},  // Down
-		{X: -1, Y: 0}, // Left
-		{X: 1, Y: 0},  // Right
+		{X: 0, Y: -5}, // Up
+		{X: 0, Y: 5},  // Down
+		{X: -5, Y: 0}, // Left
+		{X: 5, Y: 0},  // Right
 	}
 
-	d.SeenPeople = d.DroneSeeFunction(d)
-	d.DroneInComRange = d.DroneInComRangeFunc(d)
+	seenPeople := d.DroneSeeFunction(d)
+	droneInComRange := d.DroneInComRangeFunc(d)
+
+	d.SeenPeople = seenPeople
+	d.DroneInComRange = droneInComRange
 
 	rand.Shuffle(len(directions), func(i, j int) {
 		directions[i], directions[j] = directions[j], directions[i]
