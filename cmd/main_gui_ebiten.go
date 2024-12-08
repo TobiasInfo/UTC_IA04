@@ -67,6 +67,32 @@ func main() {
 		},
 	}
 
+	g.StartButtonDebug = ui.Button{
+		X: 400 - 100, Y: 450, Width: 300, Height: 50, Text: "Start Simulation (Debug Mode)",
+		OnClick: func() {
+			// Parse current values from the text fields to ensure they are up-to-date
+			if val, err := strconv.Atoi(g.DroneField.Text); err == nil {
+				g.DroneCount = val
+			}
+			if val, err := strconv.Atoi(g.PeopleField.Text); err == nil {
+				g.PeopleCount = val
+			}
+			if val, err := strconv.Atoi(g.ObstacleField.Text); err == nil {
+				g.ObstacleCount = val
+			}
+
+			// Now start the simulation with the updated values
+			// BIG BIG ERREUR DE TOBIAS ICI, POUR LE SHAMER NOUS ALLONS LAISSER LE CODE D'ORIGINE
+			// SHAME ??, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔
+			//g.Sim = simulation.NewSimulation(g.DroneCount, g.PeopleCount, g.ObstacleCount)
+
+			g.Sim.UpdateCrowdSize(g.PeopleCount)
+			g.Sim.UpdateDroneSize(g.DroneCount)
+
+			g.Mode = game.SimulationDebug
+		},
+	}
+
 	g.PauseButton = ui.Button{
 		X: 600, Y: 180, Width: 150, Height: 40, Text: "Pause",
 		OnClick: func() {

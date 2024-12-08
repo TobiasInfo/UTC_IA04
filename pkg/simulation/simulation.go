@@ -41,7 +41,7 @@ type Simulation struct {
 func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 	s := &Simulation{
 		Map:            GetMap(30, 20),
-		DroneSeeRange:  2,
+		DroneSeeRange:  3,
 		DroneCommRange: 5,
 		MoveChan:       make(chan models.MovementRequest),
 		DeadChan:       make(chan models.DeadRequest),
@@ -256,54 +256,29 @@ func (s *Simulation) createDrones(n int) {
 		currentCell := d.Position
 		rangeDrone := s.DroneSeeRange
 
+		//fmt.Printf("RangeDrone : %d\n", rangeDrone)
+
 		Vector := models.Vector{X: currentCell.X, Y: currentCell.Y}
-		_, valuesInt := Vector.GenerateCircleValues(rangeDrone)
+		cercleValuesFloat, _ := Vector.GenerateCircleValues(rangeDrone)
 
 		droneInformations := make([]*persons.Person, 0)
 		nbPersDetected := 0
 
-		//for z := 0; z < len(valuesFloat); z++ {
-		//	positionMaster := valuesFloat[z]
-		//	distance := currentCell.CalculateDistance(positionMaster)
-		//	position := models.Position{X: math.Round((d.Position.X+positionMaster.X)*100) / 100, Y: math.Round((d.Position.Y+positionMaster.Y)*100) / 100}
-		//	if cell, exists := s.Map.Cells[position]; exists {
-		//		if s.debug {
-		//			fmt.Printf("Distance : %.2f\n", distance)
-		//		}
-		//		for _, member := range cell.Persons {
-		//			//probaDetection := max(0, 1.0-distance/float64(s.DroneSeeRange)-(float64(nbPersDetected)*0.03))
-		//			if rand.Float64() < 1.0 {
-		//				//if s.debug {
-		//				//}
-		//				fmt.Printf("Drone %d (%.2f, %.2f) sees person %d (%.2f, %.2f) \n", d.ID, d.Position.X, d.Position.Y, member.ID, member.Position.X, member.Position.Y)
-		//				droneInformations = append(droneInformations, member)
-		//				nbPersDetected++
-		//			}
-		//		}
-		//	}
-		//}
-		for z := 0; z < len(valuesInt); z++ {
-			positionMaster := valuesInt[z]
-			for u := 0; u < 10; u++ {
-				for j := 0; j < 10; j++ {
-					position := models.Position{X: d.Position.X + positionMaster.X + (float64(u) / 10), Y: d.Position.Y + positionMaster.Y + (float64(j) / 10)}
-					distance := currentCell.CalculateDistance(position)
-					if distance <= float64(rangeDrone) {
-						if cell, exists := s.Map.Cells[position]; exists {
-							if s.debug {
-								fmt.Printf("Distance : %.2f\n", distance)
-							}
-							for _, member := range cell.Persons {
-								//probaDetection := max(0, 1.0-distance/float64(s.DroneSeeRange)-(float64(nbPersDetected)*0.03))
-								if rand.Float64() < 1.0 {
-									//if s.debug {
-									//}
-									fmt.Printf("Drone %d (%.2f, %.2f) sees person %d (%.2f, %.2f) \n", d.ID, d.Position.X, d.Position.Y, member.ID, member.Position.X, member.Position.Y)
-									droneInformations = append(droneInformations, member)
-									nbPersDetected++
-								}
-							}
-						}
+		for z := 0; z < len(cercleValuesFloat); z++ {
+			positionInCercle := cercleValuesFloat[z]
+			position := models.Position{X: d.Position.X + positionInCercle.X, Y: d.Position.Y + positionInCercle.Y}
+			distance := currentCell.CalculateDistance(position)
+			if cell, exists := s.Map.Cells[position]; exists {
+				if s.debug {
+					fmt.Printf("Distance : %.2f\n", distance)
+				}
+				//fmt.Println("Position : ", position)
+				for _, member := range cell.Persons {
+					//probaDetection := max(0, 1.0-distance/float64(s.DroneSeeRange)-(float64(nbPersDetected)*0.03))
+					if rand.Float64() < 1.0 {
+						//fmt.Printf("Drone %d (%.2f, %.2f) sees person %d (%.2f, %.2f) \n", d.ID, d.Position.X, d.Position.Y, member.ID, member.Position.X, member.Position.Y)
+						droneInformations = append(droneInformations, member)
+						nbPersDetected++
 					}
 				}
 			}
@@ -354,7 +329,7 @@ func (s *Simulation) Update() {
 	if s.festivalTime.IsEventEnded() {
 		return
 	}
-	time.Sleep(200 * time.Millisecond)
+	//time.Sleep(200 * time.Millisecond)
 	if s.hardDebug {
 		fmt.Println("New Tick")
 	}
@@ -363,7 +338,7 @@ func (s *Simulation) Update() {
 
 	// Update persons every 10 ticks
 	if s.currentTick%1 == 0 {
-		fmt.Printf("\n=== TICK %d: PEOPLE SHOULD MOVE ===\n", s.currentTick)
+		//fmt.Printf("\n=== TICK %d: PEOPLE SHOULD MOVE ===\n", s.currentTick)
 		updatedPersons := make(map[int]struct{})
 		personIndexes := make([]int, len(s.Persons))
 		for i := range personIndexes {
@@ -430,12 +405,12 @@ func (s *Simulation) Update() {
 		}
 	}
 
-	for _, drone := range s.Drones {
-		fmt.Printf("Drone %d at (%.2f, %.2f)\n", drone.ID, drone.Position.X, drone.Position.Y)
+	//for _, drone := range s.Drones {
+	//	fmt.Printf("Drone %d at (%.2f, %.2f)\n", drone.ID, drone.Position.X, drone.Position.Y)
+	//
+	//}
 
-	}
-
-	fmt.Println("End of the tick")
+	//fmt.Println("End of the tick")
 }
 
 func (s *Simulation) UpdateDroneSize(newSize int) {

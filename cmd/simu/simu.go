@@ -23,26 +23,28 @@ type Mode int
 const (
 	Menu Mode = iota
 	Simulation
+	SimulationDebug
 )
 
 type Game struct {
-	Mode          Mode
-	StartButton   ui.Button
-	PauseButton   ui.Button
-	SimButton     ui.Button
-	DroneField    ui.TextField
-	PeopleField   ui.TextField
-	ObstacleField ui.TextField
-	Sim           *simulation.Simulation
-	StaticLayer   *ebiten.Image
-	DynamicLayer  *ebiten.Image
-	Paused        bool
-	DroneCount    int
-	PeopleCount   int
-	ObstacleCount int
-	DroneImage    *ebiten.Image
-	PoiImages     map[models.POIType]*ebiten.Image
-	hoveredPos    *models.Position
+	Mode             Mode
+	StartButton      ui.Button
+	StartButtonDebug ui.Button
+	PauseButton      ui.Button
+	SimButton        ui.Button
+	DroneField       ui.TextField
+	PeopleField      ui.TextField
+	ObstacleField    ui.TextField
+	Sim              *simulation.Simulation
+	StaticLayer      *ebiten.Image
+	DynamicLayer     *ebiten.Image
+	Paused           bool
+	DroneCount       int
+	PeopleCount      int
+	ObstacleCount    int
+	DroneImage       *ebiten.Image
+	PoiImages        map[models.POIType]*ebiten.Image
+	hoveredPos       *models.Position
 }
 
 // Zone colors
@@ -104,6 +106,7 @@ func (g *Game) Update() error {
 	switch g.Mode {
 	case Menu:
 		g.StartButton.Update(float64(mx), float64(my), mousePressed)
+		g.StartButtonDebug.Update(float64(mx), float64(my), mousePressed)
 		g.DroneField.Update(float64(mx), float64(my), mousePressed, inputRunes, ebiten.IsKeyPressed(ebiten.KeyEnter))
 		g.PeopleField.Update(float64(mx), float64(my), mousePressed, inputRunes, ebiten.IsKeyPressed(ebiten.KeyEnter))
 		g.ObstacleField.Update(float64(mx), float64(my), mousePressed, inputRunes, ebiten.IsKeyPressed(ebiten.KeyEnter))
@@ -116,6 +119,13 @@ func (g *Game) Update() error {
 			return nil
 		}
 		g.Sim.Update()
+	case SimulationDebug:
+		g.SimButton.Update(float64(mx), float64(my), mousePressed)
+		g.PauseButton.Update(float64(mx), float64(my), mousePressed)
+		g.updatePOIHover(float64(mx), float64(my))
+		if g.Paused {
+			return nil
+		}
 	}
 
 	return nil
@@ -178,6 +188,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		g.drawMenu(screen)
 	case Simulation:
 		g.drawSimulation(screen)
+	case SimulationDebug:
+		g.drawSimulation(screen)
 	}
 }
 
@@ -200,6 +212,7 @@ func (g *Game) drawMenu(screen *ebiten.Image) {
 	g.ObstacleField.Draw(screen)
 
 	g.StartButton.Draw(screen)
+	g.StartButtonDebug.Draw(screen)
 }
 
 func (g *Game) drawSimulation(screen *ebiten.Image) {
@@ -303,27 +316,7 @@ func (g *Game) drawStaticLayer() {
 func (g *Game) drawDynamicLayer() {
 	g.DynamicLayer.Clear()
 
-	// Draw people
-	for _, person := range g.Sim.Persons {
-		if person.IsDead() {
-			continue
-		}
-
-		//if person.Position.X == 0 {
-		//	println("Person at entrance")
-		//	//fmt.Printf("Simulation Details: %+v\n", person)
-		//
-		//	//println(person)
-		//}
-		couleur := color.RGBA{255, 0, 0, 255}
-		if person.HasReachedPOI() {
-			couleur = color.RGBA{0, 255, 0, 255} // Green for resting people
-		}
-		if person.IsInDistress() {
-			couleur = color.RGBA{0, 0, 0, 255} // Black for people in distress
-		}
-		drawCircle(g.DynamicLayer, person.Position.X*30, person.Position.Y*30, 3, couleur)
-	}
+	seenPeople := make(map[int]bool)
 
 	// Draw drones
 	for _, drone := range g.Sim.Drones {
@@ -342,12 +335,41 @@ func (g *Game) drawDynamicLayer() {
 			g.DynamicLayer.DrawImage(g.DroneImage, op)
 
 			for _, person := range drone.SeenPeople {
+				//
+				//couleur := color.RGBA{255, 0, 0, 255}
+				//if person.HasReachedPOI() {
+				//	couleur = color.RGBA{0, 255, 0, 255} // Green for resting people
+				//}
+				//if person.IsInDistress() {
+				//	couleur = color.RGBA{0, 0, 0, 255} // Black for people in distress
+				//}
 				drawRectangle(g.DynamicLayer, person.Position.X*30, person.Position.Y*30, 5, 5, color.RGBA{255, 255, 0, 255})
+				seenPeople[person.ID] = true
 				//fmt.Println("Drone has seen ", person.ID, person.Position.X, person.Position.Y)
 			}
 		} else {
 			drawCircle(g.DynamicLayer, drone.Position.X*30, drone.Position.Y*30, 10, color.RGBA{0, 0, 255, 255})
 		}
+	}
+
+	// Draw people
+	for _, person := range g.Sim.Persons {
+		if person.IsDead() {
+			continue
+		}
+
+		if _, ok := seenPeople[person.ID]; ok {
+			continue
+		}
+
+		couleur := color.RGBA{255, 0, 0, 255}
+		if person.HasReachedPOI() {
+			couleur = color.RGBA{0, 255, 0, 255} // Green for resting people
+		}
+		if person.IsInDistress() {
+			couleur = color.RGBA{0, 0, 0, 255} // Black for people in distress
+		}
+		drawCircle(g.DynamicLayer, person.Position.X*30, person.Position.Y*30, 3, couleur)
 	}
 }
 
