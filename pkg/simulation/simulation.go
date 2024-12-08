@@ -405,12 +405,6 @@ func (s *Simulation) Update() {
 		}
 	}
 
-	//for _, drone := range s.Drones {
-	//	fmt.Printf("Drone %d at (%.2f, %.2f)\n", drone.ID, drone.Position.X, drone.Position.Y)
-	//
-	//}
-
-	//fmt.Println("End of the tick")
 }
 
 func (s *Simulation) UpdateDroneSize(newSize int) {

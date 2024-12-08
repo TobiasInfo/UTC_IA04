@@ -322,6 +322,12 @@ func (c *Person) UpdateHealth() {
 		if c.Profile.StaminaLevel > 1.0 {
 			c.Profile.StaminaLevel = 1.0
 		}
+		if c.InDistress {
+			c.CurrentDistressDuration++
+			if c.CurrentDistressDuration >= c.Lifespan {
+				c.Die()
+			}
+		}
 		return
 	}
 
