@@ -103,36 +103,20 @@ func (d *Drone) DetectIncident() map[models.Position][2]int {
 }
 
 func (d *Drone) ReceiveInfo() {
-	//Recupère les informations qui lui ont été envoyées lors des tours précédents
-	//J'imagine qu'on fait marcher ça avec un channel associé à chaque drones pour la réception
-
-	//Lire les informations sur le channel jusqu'à ce qu'il soit vide, garder la dernière carte reçue
-	var infoReception []models.Position
-	//infoReception = readChannel()
-
-	infos := d.DroneSeeFunction(d)
-	seenPeople := make([]*persons.Person, 0)
-
-	for _, info := range infos {
-		seenPeople = append(seenPeople, info)
-	}
+	seenPeople := d.DroneSeeFunction(d)
+	droneInComRange := d.DroneInComRangeFunc(d)
 
 	d.SeenPeople = seenPeople
-
-	d.ReportedZonesByCentrale = infoReception
-
+	d.DroneInComRange = droneInComRange
 }
 
 func (d *Drone) Think() models.Position {
 	directions := []models.Position{
-		{X: 0, Y: -1}, // Up
-		{X: 0, Y: 1},  // Down
-		{X: -1, Y: 0}, // Left
-		{X: 1, Y: 0},  // Right
+		{X: 0, Y: -3}, // Up
+		{X: 0, Y: 3},  // Down
+		{X: -3, Y: 0}, // Left
+		{X: 3, Y: 0},  // Right
 	}
-
-	d.SeenPeople = d.DroneSeeFunction(d)
-	d.DroneInComRange = d.DroneInComRangeFunc(d)
 
 	rand.Shuffle(len(directions), func(i, j int) {
 		directions[i], directions[j] = directions[j], directions[i]
@@ -161,6 +145,8 @@ func (d *Drone) Myturn() {
 
 	// Try to move to the calculated target
 	moved := d.Move(target)
+
+	d.ReceiveInfo()
 
 	if !moved {
 		fmt.Printf("Drone %d could not move to %v\n", d.ID, target)

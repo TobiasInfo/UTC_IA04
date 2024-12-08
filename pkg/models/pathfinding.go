@@ -117,8 +117,7 @@ func FindPath(start, goal Position, width, height int, obstacles map[Position]bo
 		Y: math.Floor(goal.Y),
 	}
 
-	fmt.Printf("\nFindPath starting: from {%.2f, %.2f} to {%.2f, %.2f}\n",
-		startInt.X, startInt.Y, goalInt.X, goalInt.Y)
+	//fmt.Printf("\nFindPath starting: from {%.2f, %.2f} to {%.2f, %.2f}\n", startInt.X, startInt.Y, goalInt.X, goalInt.Y)
 
 	openSet := &PriorityQueue{}
 	heap.Init(openSet)
@@ -157,7 +156,7 @@ func FindPath(start, goal Position, width, height int, obstacles map[Position]bo
 				intPath = append([]Position{node.Position}, intPath...)
 			}
 			floatPath := ConvertPathToFloat(intPath)
-			fmt.Printf("Path found! Length: %d\n", len(floatPath))
+			//fmt.Printf("Path found! Length: %d\n", len(floatPath))
 			return floatPath
 		}
 

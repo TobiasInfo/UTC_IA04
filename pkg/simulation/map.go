@@ -298,7 +298,7 @@ func removeDroneFromCell(cell *MapCell, drone *drones.Drone) {
 // removeCrowdMemberFromCell removes a crowd member from a map cell
 func removeCrowdMemberFromCell(cell *MapCell, member *persons.Person) {
 	moved := false
-	fmt.Printf("Removing crowd member %d from cell (%.2f, %.2f) \n", member.ID, cell.Position.X, cell.Position.Y)
+	//fmt.Printf("Removing crowd member %d from cell (%.2f, %.2f) \n", member.ID, cell.Position.X, cell.Position.Y)
 	for i, m := range cell.Persons {
 		if m.ID == member.ID {
 			cell.Persons = append(cell.Persons[:i], cell.Persons[i+1:]...)

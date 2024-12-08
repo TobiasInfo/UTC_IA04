@@ -98,11 +98,11 @@ func (c *Person) Myturn() {
 
 	switch c.State.CurrentState {
 	case Exploring:
-		fmt.Printf("Person %d is exploring\n", c.ID)
-		moved := c.UpdatePosition(obstacles)
-		fmt.Printf("Person %d movement result: %v\n", c.ID, moved)
+		//fmt.Printf("Person %d is exploring\n", c.ID)
+		c.UpdatePosition(obstacles)
+		//fmt.Printf("Person %d movement result: %v\n", c.ID, moved)
 	case SeekingPOI:
-		fmt.Printf("Person %d is seeking POI\n", c.ID)
+		//fmt.Printf("Person %d is seeking POI\n", c.ID)
 		if c.CurrentPOI == nil {
 			for poiType := range c.ZonePreference.POIPreferences {
 				if c.ZonePreference.ShouldVisitPOI(poiType) {
@@ -124,22 +124,21 @@ func (c *Person) Myturn() {
 		}
 
 	case InQueue:
-		fmt.Printf("Person %d is in queue\n", c.ID)
+		//fmt.Printf("Person %d is in queue\n", c.ID)
 
 	}
 }
 
 func (c *Person) UpdatePosition(obstacles map[models.Position]bool) bool {
-	fmt.Printf("Person %d UpdatePosition starting with path length: %d\n",
-		c.ID, len(c.CurrentPath))
+	//fmt.Printf("Person %d UpdatePosition starting with path length: %d\n", c.ID, len(c.CurrentPath))
 
 	if len(c.CurrentPath) == 0 {
-		fmt.Printf("Person %d generating new path\n", c.ID)
+		//fmt.Printf("Person %d generating new path\n", c.ID)
 		c.generateNewPath(obstacles)
 	}
 
 	if c.HasReachedPOI() {
-		fmt.Printf("Person %d at POI, handling hover\n", c.ID)
+		//fmt.Printf("Person %d at POI, handling hover\n", c.ID)
 		c.State.CurrentState = Resting
 		c.State.TimeInState = 0
 		return false
@@ -147,15 +146,14 @@ func (c *Person) UpdatePosition(obstacles map[models.Position]bool) bool {
 
 	if len(c.CurrentPath) > 0 {
 		nextPos := c.CurrentPath[0]
-		fmt.Printf("Person %d attempting to move to {%.2f, %.2f}\n",
-			c.ID, nextPos.X, nextPos.Y)
+		//fmt.Printf("Person %d attempting to move to {%.2f, %.2f}\n", c.ID, nextPos.X, nextPos.Y)
 
 		if c.tryMove(nextPos) {
-			fmt.Printf("Person %d successfully moved\n", c.ID)
+			//fmt.Printf("Person %d successfully moved\n", c.ID)
 			c.CurrentPath = c.CurrentPath[1:]
 			return true
 		} else {
-			fmt.Printf("Person %d movement failed, clearing path\n", c.ID)
+			//fmt.Printf("Person %d movement failed, clearing path\n", c.ID)
 			c.CurrentPath = []models.Position{}
 			return false
 		}
@@ -172,7 +170,7 @@ func (c *Person) tryMove(target models.Position) bool {
 	}
 
 	for {
-		fmt.Printf("Trying to move person %d to %v\n", c.ID, target)
+		//fmt.Printf("Trying to move person %d to %v\n", c.ID, target)
 
 		if c.Position.X == target.X && c.Position.Y == target.Y {
 			return false
@@ -185,7 +183,7 @@ func (c *Person) tryMove(target models.Position) bool {
 		if response.Authorized {
 			c.Position.X = target.X
 			c.Position.Y = target.Y
-			fmt.Printf("Person %d moved to %v\n", c.ID, c.Position)
+			//fmt.Printf("Person %d moved to %v\n", c.ID, c.Position)
 			return true
 		}
 
@@ -254,29 +252,28 @@ func (c *Person) hoverNearPOI(obstacles map[models.Position]bool) bool {
 }
 
 func (c *Person) generateNewPath(obstacles map[models.Position]bool) {
-	fmt.Printf("Person %d generating path - POI: %v, Target POI Pos: %v\n",
-		c.ID, c.CurrentPOI, c.TargetPOIPosition)
+	//fmt.Printf("Person %d generating path - POI: %v, Target POI Pos: %v\n",c.ID, c.CurrentPOI, c.TargetPOIPosition)
 
 	var targetPos models.Position
 
 	if c.CurrentPOI != nil && c.TargetPOIPosition != nil {
 		targetPos = *c.TargetPOIPosition
-		fmt.Printf("Person %d targeting POI at {%.2f, %.2f}\n", c.ID, targetPos.X, targetPos.Y)
+		//fmt.Printf("Person %d targeting POI at {%.2f, %.2f}\n", c.ID, targetPos.X, targetPos.Y)
 	} else {
 		currentZone := c.determineCurrentZone()
 		targetZone := c.ZonePreference.GetNextZone(currentZone, c.EntryTime)
-		fmt.Printf("Person %d in zone %s, targeting zone %s\n", c.ID, currentZone, targetZone)
+		//fmt.Printf("Person %d in zone %s, targeting zone %s\n", c.ID, currentZone, targetZone)
 
 		if targetZone == currentZone {
 			targetPos = c.getRandomZonePosition(targetZone)
 		} else {
 			targetPos = c.getZoneEntryPoint(targetZone)
 		}
-		fmt.Printf("Person %d generated target position {%.2f, %.2f}\n", c.ID, targetPos.X, targetPos.Y)
+		//fmt.Printf("Person %d generated target position {%.2f, %.2f}\n", c.ID, targetPos.X, targetPos.Y)
 	}
 
 	path := models.FindPath(c.Position, targetPos, c.width, c.height, obstacles)
-	fmt.Printf("Person %d path generated with %d steps\n", c.ID, len(path))
+	//fmt.Printf("Person %d path generated with %d steps\n", c.ID, len(path))
 	c.CurrentPath = path
 }
 
@@ -325,6 +322,12 @@ func (c *Person) UpdateHealth() {
 		if c.Profile.StaminaLevel > 1.0 {
 			c.Profile.StaminaLevel = 1.0
 		}
+		if c.InDistress {
+			c.CurrentDistressDuration++
+			if c.CurrentDistressDuration >= c.Lifespan {
+				c.Die()
+			}
+		}
 		return
 	}
 
@@ -371,17 +374,17 @@ func (c *Person) Die() {
 		ResponseChan: responseChan,
 	}
 
-	fmt.Printf("Person %d requesting removal from map\n", c.ID)
+	//fmt.Printf("Person %d requesting removal from map\n", c.ID)
 
 	response := <-responseChan
 	if !response.Authorized {
-		fmt.Printf("Person %d removal not authorized\n", c.ID)
+		//fmt.Printf("Person %d removal not authorized\n", c.ID)
 		return
 	}
 
 	c.Position.X = -10
 	c.Position.Y = -10
-	fmt.Printf("Person %d has been removed from simulation\n", c.ID)
+	//fmt.Printf("Person %d has been removed from simulation\n", c.ID)
 }
 
 func (c *Person) Exit() {
@@ -392,18 +395,18 @@ func (c *Person) Exit() {
 		ResponseChan: responseChan,
 	}
 
-	fmt.Printf("Person %d requesting removal from map\n", c.ID)
+	//fmt.Printf("Person %d requesting removal from map\n", c.ID)
 
 	response := <-responseChan
 	if !response.Authorized {
-		fmt.Printf("Person %d removal not authorized\n", c.ID)
+		//fmt.Printf("Person %d removal not authorized\n", c.ID)
 		return
 	}
 
 	c.Position.X = -1
 	c.Position.Y = -1
 	c.StillInSim = false
-	fmt.Printf("Person %d has been removed from simulation\n", c.ID)
+	//fmt.Printf("Person %d has been removed from simulation\n", c.ID)
 }
 
 func (c *Person) HasReachedPOI() bool {
