@@ -9,6 +9,7 @@ import (
 
 	"UTC_IA04/cmd/ui"
 	"UTC_IA04/cmd/ui/assets"
+	"UTC_IA04/pkg/entities/drones"
 	"UTC_IA04/pkg/entities/persons"
 	"UTC_IA04/pkg/models"
 	"UTC_IA04/pkg/simulation"
@@ -154,6 +155,21 @@ func (g *Game) getHoveredPerson(mx, my float64) *persons.Person {
 	return nil
 }
 
+func (g *Game) getHoveredDrone(mx, my float64) *drones.Drone {
+	// Convert mouse coordinates to game coordinates
+	gameX := mx / 30
+	gameY := my / 30
+
+	// Check each person's position
+	for _, drone := range g.Sim.Drones {
+		if math.Abs(gameX-drone.Position.X) <= 0.3 && math.Abs(gameY-drone.Position.Y) <= 0.3 {
+			return &drone
+		}
+	}
+
+	return nil
+}
+
 func (g *Game) Draw(screen *ebiten.Image) {
 	switch g.Mode {
 	case Menu:
@@ -221,6 +237,17 @@ func (g *Game) drawSimulation(screen *ebiten.Image) {
 			hoveredPerson.HasReachedPOI(),
 			hoveredPerson.Position.X,
 			hoveredPerson.Position.Y,
+		)
+		ebitenutil.DebugPrintAt(screen, personInfo, mx+10, my+10)
+	}
+	if hoveredDrone := g.getHoveredDrone(float64(mx), float64(my)); hoveredDrone != nil {
+		personInfo := fmt.Sprintf(
+			"Drone Info\n"+
+				"ID: %d\n"+
+				"Position: (%.1f, %.1f)",
+			hoveredDrone.ID,
+			hoveredDrone.Position.X,
+			hoveredDrone.Position.Y,
 		)
 		ebitenutil.DebugPrintAt(screen, personInfo, mx+10, my+10)
 	}
