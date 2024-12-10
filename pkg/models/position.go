@@ -19,3 +19,7 @@ func (p Position) Round() Position {
 func (p *Position) CalculateDistance(other Position) float64 {
 	return math.Sqrt(math.Pow(p.X-other.X, 2) + math.Pow(p.Y-other.Y, 2))
 }
+
+func (p *Position) CalculateManhattanDistance(other Position) float64 {
+	return math.Abs(p.X-other.X) + math.Abs(p.Y-other.Y)
+}
