@@ -26,10 +26,12 @@ type Drone struct {
 	DroneInComRange         []*Drone
 	MoveChan                chan models.MovementRequest
 	MapPoi                  map[models.POIType][]models.Position
+	ChargingChan            chan models.ChargingRequest
+	IsCharging              bool
 }
 
 // NewSurveillanceDrone creates a new instance of SurveillanceDrone
-func NewSurveillanceDrone(id int, position models.Position, battery float64, droneSeeRange int, droneCommunicationRange int, droneSeeFunc func(d *Drone) []*persons.Person, DroneInComRange func(d *Drone) []*Drone, moveChan chan models.MovementRequest, mapPoi map[models.POIType][]models.Position) Drone {
+func NewSurveillanceDrone(id int, position models.Position, battery float64, droneSeeRange int, droneCommunicationRange int, droneSeeFunc func(d *Drone) []*persons.Person, DroneInComRange func(d *Drone) []*Drone, moveChan chan models.MovementRequest, mapPoi map[models.POIType][]models.Position, chargingChan chan models.ChargingRequest) Drone {
 	return Drone{
 		ID:                      id,
 		Position:                position,
@@ -43,7 +45,38 @@ func NewSurveillanceDrone(id int, position models.Position, battery float64, dro
 		DroneInComRange:         []*Drone{},
 		MoveChan:                moveChan,
 		MapPoi:                  mapPoi,
+		ChargingChan:            chargingChan,
+		IsCharging:              false,
 	}
+}
+
+// Add charging check method
+func (d *Drone) tryCharging() bool {
+    if d.IsCharging {
+        // Already charging, continue
+        d.Battery += 5
+        if d.Battery >= 80 + rand.Float64()*20 { // Random value between 80 and 100
+            d.IsCharging = false
+            return false
+        }
+        return true
+    }
+
+    // Try to start charging
+    responseChan := make(chan models.ChargingResponse)
+    d.ChargingChan <- models.ChargingRequest{
+        DroneID:      d.ID,
+        Position:     d.Position,
+        ResponseChan: responseChan,
+    }
+    
+    response := <-responseChan
+    if response.Authorized {
+        d.IsCharging = true
+        d.Battery += 5
+        return true
+    }
+    return false
 }
 
 // Move updates the drones's position to the destination
@@ -202,7 +235,13 @@ func (d *Drone) Myturn() {
 	// Get the next position to move to
 	d.SeenPeople = []*persons.Person{}
 	d.DroneInComRange = []*Drone{}
-
+    
+	// Check if we're at a charging station and should charge
+    if d.tryCharging() {
+        d.ReceiveInfo()
+        return // Skip movement if charging
+    }
+	
 	target := d.Think()
 
 	// Try to move to the calculated target

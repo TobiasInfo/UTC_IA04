@@ -23,6 +23,7 @@ type Simulation struct {
 	MoveChan                   chan models.MovementRequest
 	DeadChan                   chan models.DeadRequest
 	ExitChan                   chan models.ExitRequest
+	ChargingChan               chan models.ChargingRequest
 	Persons                    []persons.Person
 	Drones                     []drones.Drone
 	Obstacles                  []obstacles.Obstacle
@@ -46,6 +47,7 @@ func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 		MoveChan:       make(chan models.MovementRequest),
 		DeadChan:       make(chan models.DeadRequest),
 		ExitChan:       make(chan models.ExitRequest),
+		ChargingChan:   make(chan models.ChargingRequest),
 		debug:          false,
 		hardDebug:      false,
 		currentTick:    0,
@@ -56,7 +58,35 @@ func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 	go s.handleMovementRequests()
 	go s.handleDeadPerson()
 	go s.handleExitRequest()
+	go s.handleChargingRequests()
 	return s
+}
+
+func (s *Simulation) handleChargingRequests() {
+	for req := range s.ChargingChan {
+		s.mu.RLock()
+		// Check if position is actually a charging station
+		isChargingStation := false
+		for _, pos := range s.poiMap[models.ChargingStation] {
+			if pos == req.Position {
+				isChargingStation = true
+				break
+			}
+		}
+		s.mu.RUnlock()
+
+		if isChargingStation {
+			req.ResponseChan <- models.ChargingResponse{
+				Authorized: true,
+				Reason:     "Charging station available",
+			}
+		} else {
+			req.ResponseChan <- models.ChargingResponse{
+				Authorized: false,
+				Reason:     "Not at a charging station",
+			}
+		}
+	}
 }
 
 func (s *Simulation) handleMovementRequests() {
@@ -314,7 +344,7 @@ func (s *Simulation) createDrones(n int) {
 	for i := 0; i < n; i++ {
 		// Generate a value between 60 and 100 in float
 		battery := 60 + rand.Float64()*(100-60)
-		d := drones.NewSurveillanceDrone(i, models.Position{X: 0, Y: 0}, battery, s.DroneSeeRange, s.DroneCommRange, droneSeeFunction, droneInComRange, s.MoveChan, s.poiMap)
+		d := drones.NewSurveillanceDrone(i, models.Position{X: 0, Y: 0}, battery, s.DroneSeeRange, s.DroneCommRange, droneSeeFunction, droneInComRange, s.MoveChan, s.poiMap, s.ChargingChan)
 		s.Drones = append(s.Drones, d)
 		s.Map.AddDrone(&s.Drones[len(s.Drones)-1])
 	}
@@ -335,7 +365,7 @@ func (s *Simulation) Update() {
 	if s.festivalTime.IsEventEnded() {
 		return
 	}
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(1 * time.Millisecond)
 	if s.hardDebug {
 		fmt.Println("New Tick")
 	}
