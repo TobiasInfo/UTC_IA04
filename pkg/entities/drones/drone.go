@@ -25,14 +25,17 @@ type Drone struct {
 	SeenPeople              []*persons.Person
 	DroneInComRange         []*Drone
 	MoveChan                chan models.MovementRequest
+	MapPoi                  map[models.POIType][]models.Position
+	ChargingChan            chan models.ChargingRequest
+	IsCharging              bool
 }
 
 // NewSurveillanceDrone creates a new instance of SurveillanceDrone
-func NewSurveillanceDrone(id int, position models.Position, battery float64, droneSeeRange int, droneCommunicationRange int, droneSeeFunc func(d *Drone) []*persons.Person, DroneInComRange func(d *Drone) []*Drone, moveChan chan models.MovementRequest) Drone {
+func NewSurveillanceDrone(id int, position models.Position, battery float64, droneSeeRange int, droneCommunicationRange int, droneSeeFunc func(d *Drone) []*persons.Person, DroneInComRange func(d *Drone) []*Drone, moveChan chan models.MovementRequest, mapPoi map[models.POIType][]models.Position, chargingChan chan models.ChargingRequest) Drone {
 	return Drone{
 		ID:                      id,
 		Position:                position,
-		Battery:                 100000000000000,
+		Battery:                 battery,
 		DroneSeeRange:           droneSeeRange,
 		DroneCommRange:          droneCommunicationRange,
 		DroneSeeFunction:        droneSeeFunc,
@@ -41,7 +44,39 @@ func NewSurveillanceDrone(id int, position models.Position, battery float64, dro
 		SeenPeople:              []*persons.Person{},
 		DroneInComRange:         []*Drone{},
 		MoveChan:                moveChan,
+		MapPoi:                  mapPoi,
+		ChargingChan:            chargingChan,
+		IsCharging:              false,
 	}
+}
+
+// Add charging check method
+func (d *Drone) tryCharging() bool {
+    if d.IsCharging {
+        // Already charging, continue
+        d.Battery += 5
+        if d.Battery >= 80 + rand.Float64()*20 { // Random value between 80 and 100
+            d.IsCharging = false
+            return false
+        }
+        return true
+    }
+
+    // Try to start charging
+    responseChan := make(chan models.ChargingResponse)
+    d.ChargingChan <- models.ChargingRequest{
+        DroneID:      d.ID,
+        Position:     d.Position,
+        ResponseChan: responseChan,
+    }
+    
+    response := <-responseChan
+    if response.Authorized {
+        d.IsCharging = true
+        d.Battery += 5
+        return true
+    }
+    return false
 }
 
 // Move updates the drones's position to the destination
@@ -62,7 +97,12 @@ func (d *Drone) Move(target models.Position) bool {
 	response := <-responseChan
 
 	if response.Authorized {
-		d.Battery -= 1.0
+		if d.Battery >= 1.0 {
+			d.Battery -= 1.0
+		} else {
+			d.Battery = 0.0
+		}
+
 		d.Position.X = target.X
 		d.Position.Y = target.Y
 		//fmt.Printf("Drone %d moved to %v\n", d.ID, d.Position)
@@ -73,34 +113,34 @@ func (d *Drone) Move(target models.Position) bool {
 }
 
 // DetectIncident simulates the detection of incidents in the drones's vicinity
-func (d *Drone) DetectIncident() map[models.Position][2]int {
-	detectedIncidents := make(map[models.Position][2]int)
+// func (d *Drone) DetectIncident() map[models.Position][2]int {
+// 	detectedIncidents := make(map[models.Position][2]int)
 
-	//A voir comment on gère le radius de vision
-	radius := 3
+// 	//A voir comment on gère le radius de vision
+// 	radius := 3
 
-	for x := -radius; x <= radius; x++ {
-		for y := -radius; y <= radius; y++ {
-			position := models.Position{
-				X: d.Position.X + float64(x),
-				Y: d.Position.Y + float64(y),
-			}
+// 	for x := -radius; x <= radius; x++ {
+// 		for y := -radius; y <= radius; y++ {
+// 			position := models.Position{
+// 				X: d.Position.X + float64(x),
+// 				Y: d.Position.Y + float64(y),
+// 			}
 
-			distress := rand.Intn(5) // Random number of people in distress
-			//TODO
-			//distres := CheckMapDistress(position, d.DetectionPrecisionFunc)
+// 			distress := rand.Intn(5) // Random number of people in distress
+// 			//TODO
+// 			//distres := CheckMapDistress(position, d.DetectionPrecisionFunc)
 
-			people := rand.Intn(20) // Random number of people in the zone
-			//TODO
-			//people := CheckMapCrowdMember(position)
+// 			people := rand.Intn(20) // Random number of people in the zone
+// 			//TODO
+// 			//people := CheckMapCrowdMember(position)
 
-			detectedIncidents[position] = [2]int{distress, people}
-		}
-	}
+// 			detectedIncidents[position] = [2]int{distress, people}
+// 		}
+// 	}
 
-	//fmt.Printf("Drone %d detected incidents: %v\n", d.ID, detectedIncidents)
-	return detectedIncidents
-}
+// 	//fmt.Printf("Drone %d detected incidents: %v\n", d.ID, detectedIncidents)
+// 	return detectedIncidents
+// }
 
 func (d *Drone) ReceiveInfo() {
 	seenPeople := d.DroneSeeFunction(d)
@@ -110,14 +150,69 @@ func (d *Drone) ReceiveInfo() {
 	d.DroneInComRange = droneInComRange
 }
 
+func (d *Drone) closestChargingStation() (models.Position, float64) {
+	chargingStations := d.MapPoi[models.ChargingStation]
+	minDistance := math.Inf(1)
+	var closestStation models.Position
+
+	for _, station := range chargingStations {
+		distance := d.Position.CalculateManhattanDistance(station)
+		if distance < minDistance {
+			minDistance = distance
+			closestStation = station
+		}
+	}
+	return closestStation, minDistance
+}
+
 func (d *Drone) Think() models.Position {
 	directions := []models.Position{
-		{X: 0, Y: -3}, // Up
-		{X: 0, Y: 3},  // Down
-		{X: -3, Y: 0}, // Left
-		{X: 3, Y: 0},  // Right
+		{X: 0, Y: -1}, // Up
+		{X: 0, Y: 1},  // Down
+		{X: -1, Y: 0}, // Left
+		{X: 1, Y: 0},  // Right
 	}
 
+	closestStation, minDistance := d.closestChargingStation()
+	fmt.Printf("Drone %d Battery: %.2f Closest Station: (%f, %f) Min Distance: %.2f\n", d.ID, d.Battery, closestStation.X, closestStation.Y, minDistance)
+
+	// If the drone's battery is low enough that it cannot safely move elsewhere, head towards the station.
+	// Instead of returning the station's full coordinates, we return just one step in the right direction.
+	if d.Battery <= minDistance+5 {
+		fmt.Printf("Drone %d is heading towards the closest charging station\n", d.ID)
+
+		// Compute the step direction towards the charging station
+		dx := closestStation.X - d.Position.X
+		dy := closestStation.Y - d.Position.Y
+
+		var step models.Position
+		// Choose the axis along which the difference is greater to make the move
+		if math.Abs(dx) > math.Abs(dy) {
+			// Move along X-axis
+			if dx > 0 {
+				step = models.Position{X: d.Position.X + 1, Y: d.Position.Y} // Move right
+			} else {
+				step = models.Position{X: d.Position.X - 1, Y: d.Position.Y} // Move left
+			}
+		} else {
+			// Move along Y-axis
+			if dy > 0 {
+				step = models.Position{X: d.Position.X, Y: d.Position.Y + 1} // Move down
+			} else {
+				step = models.Position{X: d.Position.X, Y: d.Position.Y - 1} // Move up
+			}
+		}
+
+		// Ensure the step is within map boundaries
+		if step.X >= 0 && step.Y >= 0 && step.X < 30 && step.Y < 20 {
+			return step
+		}
+
+		// If the chosen step is invalid, just don't move
+		return d.Position
+	}
+
+	// If we are not forced to head to a charging station, move randomly (shuffling directions)
 	rand.Shuffle(len(directions), func(i, j int) {
 		directions[i], directions[j] = directions[j], directions[i]
 	})
@@ -128,11 +223,11 @@ func (d *Drone) Think() models.Position {
 			Y: d.Position.Y + dir.Y,
 		}
 		if target.X >= 0 && target.Y >= 0 && target.X < 30 && target.Y < 20 {
-			//fmt.Printf("Drone %d Thinks Target: (%f, %f)\n", d.ID, target.X, target.Y)
 			return target
 		}
 	}
-	//fmt.Printf("Drone %d has no valid moves, staying at (%f, %f)\n", d.ID, d.Position.X, d.Position.Y)
+
+	// If no valid moves found, stay in the same position
 	return d.Position
 }
 
@@ -140,7 +235,13 @@ func (d *Drone) Myturn() {
 	// Get the next position to move to
 	d.SeenPeople = []*persons.Person{}
 	d.DroneInComRange = []*Drone{}
-
+    
+	// Check if we're at a charging station and should charge
+    if d.tryCharging() {
+        d.ReceiveInfo()
+        return // Skip movement if charging
+    }
+	
 	target := d.Think()
 
 	// Try to move to the calculated target
@@ -194,7 +295,7 @@ func (d *Drone) CalculateOptimalPosition(params WeightedParameters) models.Posit
 // calculateZoneWeight calcule le poids d'une zone spécifique
 func calculateZoneWeight(d *Drone, zone models.Position, params WeightedParameters) float64 {
 	// Distance entre le drones et la zones
-	distance := calculateDistance(d.Position, zone)
+	distance := zone.CalculateDistance(d.Position)
 
 	// Facteur de distance inversé (plus proche = plus important)
 	distanceFactor := 1.0 / (1.0 + distance)
@@ -214,20 +315,13 @@ func calculateZoneWeight(d *Drone, zone models.Position, params WeightedParamete
 		(clusterFactor * params.ClusteringWeight)
 }
 
-// calculateDistance calcule la distance euclidienne entre deux positions
-func calculateDistance(pos1, pos2 models.Position) float64 {
-	dx := pos1.X - pos2.X
-	dy := pos1.Y - pos2.Y
-	return math.Sqrt(dx*dx + dy*dy)
-}
-
 // calculateClusterFactor évalue combien de zones sont proches de la zone donnée
 func calculateClusterFactor(d *Drone, targetZone models.Position) float64 {
 	const proximityThreshold = 2.0 // Distance considérée comme "proche"
 	nearbyZones := 0.0
 
 	for _, zone := range d.ReportedZonesByCentrale {
-		if calculateDistance(targetZone, zone) < proximityThreshold {
+		if zone.CalculateDistance(targetZone) < proximityThreshold {
 			nearbyZones += 1.0
 		}
 	}

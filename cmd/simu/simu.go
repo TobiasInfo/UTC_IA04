@@ -266,12 +266,14 @@ func (g *Game) drawSimulation(screen *ebiten.Image) {
 			"Drone Info\n"+
 				"ID: %d\n"+
 				"Position: (%.1f, %.1f) \n"+
-				"Position in Map: (%.1f, %.1f)",
+				"Position in Map: (%.1f, %.1f)\n"+
+				"Battery: %.1f",
 			hoveredDrone.ID,
 			hoveredDrone.Position.X,
 			hoveredDrone.Position.Y,
 			dronePosInMap.X,
 			dronePosInMap.Y,
+			hoveredDrone.Battery,
 		)
 		ebitenutil.DebugPrintAt(screen, personInfo, mx+10, my+10)
 	}
