@@ -25,14 +25,15 @@ type Drone struct {
 	SeenPeople              []*persons.Person
 	DroneInComRange         []*Drone
 	MoveChan                chan models.MovementRequest
+	MapPoi                  map[models.POIType][]models.Position
 }
 
 // NewSurveillanceDrone creates a new instance of SurveillanceDrone
-func NewSurveillanceDrone(id int, position models.Position, battery float64, droneSeeRange int, droneCommunicationRange int, droneSeeFunc func(d *Drone) []*persons.Person, DroneInComRange func(d *Drone) []*Drone, moveChan chan models.MovementRequest) Drone {
+func NewSurveillanceDrone(id int, position models.Position, battery float64, droneSeeRange int, droneCommunicationRange int, droneSeeFunc func(d *Drone) []*persons.Person, DroneInComRange func(d *Drone) []*Drone, moveChan chan models.MovementRequest, mapPoi map[models.POIType][]models.Position) Drone {
 	return Drone{
 		ID:                      id,
 		Position:                position,
-		Battery:                 100000000000000,
+		Battery:                 battery,
 		DroneSeeRange:           droneSeeRange,
 		DroneCommRange:          droneCommunicationRange,
 		DroneSeeFunction:        droneSeeFunc,
@@ -41,6 +42,7 @@ func NewSurveillanceDrone(id int, position models.Position, battery float64, dro
 		SeenPeople:              []*persons.Person{},
 		DroneInComRange:         []*Drone{},
 		MoveChan:                moveChan,
+		MapPoi:                  mapPoi,
 	}
 }
 
@@ -62,7 +64,12 @@ func (d *Drone) Move(target models.Position) bool {
 	response := <-responseChan
 
 	if response.Authorized {
-		d.Battery -= 1.0
+		if d.Battery >= 1.0 {
+			d.Battery -= 1.0
+		} else {
+			d.Battery = 0.0
+		}
+
 		d.Position.X = target.X
 		d.Position.Y = target.Y
 		//fmt.Printf("Drone %d moved to %v\n", d.ID, d.Position)
@@ -73,34 +80,34 @@ func (d *Drone) Move(target models.Position) bool {
 }
 
 // DetectIncident simulates the detection of incidents in the drones's vicinity
-func (d *Drone) DetectIncident() map[models.Position][2]int {
-	detectedIncidents := make(map[models.Position][2]int)
+// func (d *Drone) DetectIncident() map[models.Position][2]int {
+// 	detectedIncidents := make(map[models.Position][2]int)
 
-	//A voir comment on gère le radius de vision
-	radius := 3
+// 	//A voir comment on gère le radius de vision
+// 	radius := 3
 
-	for x := -radius; x <= radius; x++ {
-		for y := -radius; y <= radius; y++ {
-			position := models.Position{
-				X: d.Position.X + float64(x),
-				Y: d.Position.Y + float64(y),
-			}
+// 	for x := -radius; x <= radius; x++ {
+// 		for y := -radius; y <= radius; y++ {
+// 			position := models.Position{
+// 				X: d.Position.X + float64(x),
+// 				Y: d.Position.Y + float64(y),
+// 			}
 
-			distress := rand.Intn(5) // Random number of people in distress
-			//TODO
-			//distres := CheckMapDistress(position, d.DetectionPrecisionFunc)
+// 			distress := rand.Intn(5) // Random number of people in distress
+// 			//TODO
+// 			//distres := CheckMapDistress(position, d.DetectionPrecisionFunc)
 
-			people := rand.Intn(20) // Random number of people in the zone
-			//TODO
-			//people := CheckMapCrowdMember(position)
+// 			people := rand.Intn(20) // Random number of people in the zone
+// 			//TODO
+// 			//people := CheckMapCrowdMember(position)
 
-			detectedIncidents[position] = [2]int{distress, people}
-		}
-	}
+// 			detectedIncidents[position] = [2]int{distress, people}
+// 		}
+// 	}
 
-	//fmt.Printf("Drone %d detected incidents: %v\n", d.ID, detectedIncidents)
-	return detectedIncidents
-}
+// 	//fmt.Printf("Drone %d detected incidents: %v\n", d.ID, detectedIncidents)
+// 	return detectedIncidents
+// }
 
 func (d *Drone) ReceiveInfo() {
 	seenPeople := d.DroneSeeFunction(d)
@@ -110,12 +117,33 @@ func (d *Drone) ReceiveInfo() {
 	d.DroneInComRange = droneInComRange
 }
 
+func (d *Drone) closestChargingStation() (models.Position, float64) {
+	chargingStations := d.MapPoi[models.ChargingStation]
+	minDistance := math.Inf(1)
+	var closestStation models.Position
+
+	for _, station := range chargingStations {
+		distance := d.Position.CalculateDistance(station)
+		if distance < minDistance {
+			minDistance = distance
+			closestStation = station
+		}
+	}
+	return closestStation, minDistance
+}
+
 func (d *Drone) Think() models.Position {
 	directions := []models.Position{
-		{X: 0, Y: -3}, // Up
-		{X: 0, Y: 3},  // Down
-		{X: -3, Y: 0}, // Left
-		{X: 3, Y: 0},  // Right
+		{X: 0, Y: -1}, // Up
+		{X: 0, Y: 1},  // Down
+		{X: -1, Y: 0}, // Left
+		{X: 1, Y: 0},  // Right
+	}
+
+	closestStation, minDistance := d.closestChargingStation()
+
+	if d.Battery <= minDistance+1 {
+		return closestStation
 	}
 
 	rand.Shuffle(len(directions), func(i, j int) {

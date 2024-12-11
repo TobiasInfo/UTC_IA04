@@ -308,7 +308,9 @@ func (s *Simulation) createDrones(n int) {
 	}
 
 	for i := 0; i < n; i++ {
-		d := drones.NewSurveillanceDrone(i, models.Position{X: 0, Y: 0}, 100.0, s.DroneSeeRange, s.DroneCommRange, droneSeeFunction, droneInComRange, s.MoveChan)
+		// Generate a value between 60 and 100 in float
+		battery := 60 + rand.Float64()*(100-60)
+		d := drones.NewSurveillanceDrone(i, models.Position{X: 0, Y: 0}, battery, s.DroneSeeRange, s.DroneCommRange, droneSeeFunction, droneInComRange, s.MoveChan, s.poiMap)
 		s.Drones = append(s.Drones, d)
 		s.Map.AddDrone(&s.Drones[len(s.Drones)-1])
 	}
