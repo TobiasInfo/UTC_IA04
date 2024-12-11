@@ -24,6 +24,7 @@ type Simulation struct {
 	DeadChan                   chan models.DeadRequest
 	ExitChan                   chan models.ExitRequest
 	ChargingChan               chan models.ChargingRequest
+	MedicalDeliveryChan        chan models.MedicalDeliveryRequest
 	Persons                    []persons.Person
 	Drones                     []drones.Drone
 	Obstacles                  []obstacles.Obstacle
@@ -41,27 +42,47 @@ type Simulation struct {
 
 func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 	s := &Simulation{
-		Map:            GetMap(30, 20),
-		DroneSeeRange:  3,
-		DroneCommRange: 5,
-		MoveChan:       make(chan models.MovementRequest),
-		DeadChan:       make(chan models.DeadRequest),
-		ExitChan:       make(chan models.ExitRequest),
-		ChargingChan:   make(chan models.ChargingRequest),
-		debug:          false,
-		hardDebug:      false,
-		currentTick:    0,
-		festivalTime:   NewFestivalTime(),
-		poiMap:         make(map[models.POIType][]models.Position),
+		Map:                 GetMap(30, 20),
+		DroneSeeRange:       3,
+		DroneCommRange:      5,
+		MoveChan:            make(chan models.MovementRequest),
+		DeadChan:            make(chan models.DeadRequest),
+		ExitChan:            make(chan models.ExitRequest),
+		ChargingChan:        make(chan models.ChargingRequest),
+		debug:               false,
+		hardDebug:           false,
+		currentTick:         0,
+		festivalTime:        NewFestivalTime(),
+		poiMap:              make(map[models.POIType][]models.Position),
+		MedicalDeliveryChan: make(chan models.MedicalDeliveryRequest),
 	}
 	s.Initialize(numDrones, numCrowdMembers, numObstacles)
 	go s.handleMovementRequests()
 	go s.handleDeadPerson()
 	go s.handleExitRequest()
 	go s.handleChargingRequests()
+	go s.handleMedicalDelivery()
 	return s
 }
 
+func (s *Simulation) handleMedicalDelivery() {
+	for req := range s.MedicalDeliveryChan {
+		s.mu.Lock()
+		authorized := false
+		for _, person := range s.Persons {
+			if person.ID == req.PersonID && person.InDistress && !person.HasReceivedMedical {
+				person.HasReceivedMedical = true
+				authorized = true
+				break
+			}
+		}
+		s.mu.Unlock()
+		req.ResponseChan <- models.MedicalDeliveryResponse{
+			Authorized: authorized,
+			Reason:     map[bool]string{true: "Medical delivered", false: "Delivery failed"}[authorized],
+		}
+	}
+}
 func (s *Simulation) handleChargingRequests() {
 	for req := range s.ChargingChan {
 		s.mu.RLock()
@@ -308,8 +329,9 @@ func (s *Simulation) createDrones(n int) {
 				}
 				//fmt.Println("Position : ", position)
 				for _, member := range cell.Persons {
+					probaDetection := 1.0
 					//probaDetection := max(0, 1.0-distance/float64(s.DroneSeeRange)-(float64(nbPersDetected)*0.03))
-					if rand.Float64() < 1.0 {
+					if rand.Float64() < probaDetection {
 						//fmt.Printf("Drone %d (%.2f, %.2f) sees person %d (%.2f, %.2f) \n", d.ID, d.Position.X, d.Position.Y, member.ID, member.Position.X, member.Position.Y)
 						droneInformations = append(droneInformations, member)
 						nbPersDetected++
@@ -344,7 +366,7 @@ func (s *Simulation) createDrones(n int) {
 	for i := 0; i < n; i++ {
 		// Generate a value between 60 and 100 in float
 		battery := 60 + rand.Float64()*(100-60)
-		d := drones.NewSurveillanceDrone(i, models.Position{X: 0, Y: 0}, battery, s.DroneSeeRange, s.DroneCommRange, droneSeeFunction, droneInComRange, s.MoveChan, s.poiMap, s.ChargingChan)
+		d := drones.NewSurveillanceDrone(i, models.Position{X: 15, Y: 15}, battery, s.DroneSeeRange, s.DroneCommRange, droneSeeFunction, droneInComRange, s.MoveChan, s.poiMap, s.ChargingChan, s.MedicalDeliveryChan)
 		s.Drones = append(s.Drones, d)
 		s.Map.AddDrone(&s.Drones[len(s.Drones)-1])
 	}
@@ -365,7 +387,7 @@ func (s *Simulation) Update() {
 	if s.festivalTime.IsEventEnded() {
 		return
 	}
-	time.Sleep(1 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 	if s.hardDebug {
 		fmt.Println("New Tick")
 	}

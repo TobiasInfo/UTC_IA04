@@ -66,6 +66,24 @@
             "name": "Charging Station Gamma"
         },
         {
+            "type": 1,
+            "position": {"x": 20, "y": 19},
+            "capacity": 5,
+            "name": "Charging Station A"
+        },
+        {
+            "type": 1,
+            "position": {"x": 10, "y": 10},
+            "capacity": 5,
+            "name": "Charging Station B"
+        },
+        {
+            "type": 1,
+            "position": {"x": 20, "y": 4},
+            "capacity": 5,
+            "name": "Charging Station C"
+        },
+        {
             "type": 2,
             "position": {"x": 8, "y": 5},
             "capacity": 8,

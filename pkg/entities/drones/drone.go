@@ -28,10 +28,22 @@ type Drone struct {
 	MapPoi                  map[models.POIType][]models.Position
 	ChargingChan            chan models.ChargingRequest
 	IsCharging              bool
+	MedicalDeliveryChan     chan models.MedicalDeliveryRequest
+	MedicalTentTimer        int
+	DeploymentTimer         int
 }
 
 // NewSurveillanceDrone creates a new instance of SurveillanceDrone
-func NewSurveillanceDrone(id int, position models.Position, battery float64, droneSeeRange int, droneCommunicationRange int, droneSeeFunc func(d *Drone) []*persons.Person, DroneInComRange func(d *Drone) []*Drone, moveChan chan models.MovementRequest, mapPoi map[models.POIType][]models.Position, chargingChan chan models.ChargingRequest) Drone {
+func NewSurveillanceDrone(id int,
+	position models.Position,
+	battery float64, droneSeeRange int,
+	droneCommunicationRange int,
+	droneSeeFunc func(d *Drone) []*persons.Person,
+	DroneInComRange func(d *Drone) []*Drone,
+	moveChan chan models.MovementRequest,
+	mapPoi map[models.POIType][]models.Position,
+	chargingChan chan models.ChargingRequest,
+	medicalDeliveryChan chan models.MedicalDeliveryRequest) Drone {
 	return Drone{
 		ID:                      id,
 		Position:                position,
@@ -47,36 +59,39 @@ func NewSurveillanceDrone(id int, position models.Position, battery float64, dro
 		MapPoi:                  mapPoi,
 		ChargingChan:            chargingChan,
 		IsCharging:              false,
+		MedicalDeliveryChan:     medicalDeliveryChan,
+		MedicalTentTimer:        0,
+		DeploymentTimer:         1,
 	}
 }
 
 // Add charging check method
 func (d *Drone) tryCharging() bool {
-    if d.IsCharging {
-        // Already charging, continue
-        d.Battery += 5
-        if d.Battery >= 80 + rand.Float64()*20 { // Random value between 80 and 100
-            d.IsCharging = false
-            return false
-        }
-        return true
-    }
+	if d.IsCharging {
+		// Already charging, continue
+		d.Battery += 5
+		if d.Battery >= 80+rand.Float64()*20 { // Random value between 80 and 100
+			d.IsCharging = false
+			return false
+		}
+		return true
+	}
 
-    // Try to start charging
-    responseChan := make(chan models.ChargingResponse)
-    d.ChargingChan <- models.ChargingRequest{
-        DroneID:      d.ID,
-        Position:     d.Position,
-        ResponseChan: responseChan,
-    }
-    
-    response := <-responseChan
-    if response.Authorized {
-        d.IsCharging = true
-        d.Battery += 5
-        return true
-    }
-    return false
+	// Try to start charging
+	responseChan := make(chan models.ChargingResponse)
+	d.ChargingChan <- models.ChargingRequest{
+		DroneID:      d.ID,
+		Position:     d.Position,
+		ResponseChan: responseChan,
+	}
+
+	response := <-responseChan
+	if response.Authorized {
+		d.IsCharging = true
+		d.Battery += 5
+		return true
+	}
+	return false
 }
 
 // Move updates the drones's position to the destination
@@ -97,8 +112,10 @@ func (d *Drone) Move(target models.Position) bool {
 	response := <-responseChan
 
 	if response.Authorized {
-		if d.Battery >= 1.0 {
-			d.Battery -= 1.0
+		// TODO : Adjust this value
+		dechargingStep := 0.0
+		if d.Battery >= dechargingStep {
+			d.Battery -= dechargingStep
 		} else {
 			d.Battery = 0.0
 		}
@@ -150,36 +167,30 @@ func (d *Drone) ReceiveInfo() {
 	d.DroneInComRange = droneInComRange
 }
 
-func (d *Drone) closestChargingStation() (models.Position, float64) {
-	chargingStations := d.MapPoi[models.ChargingStation]
+func (d *Drone) closestPOI(poiType models.POIType) (models.Position, float64) {
+	pois := d.MapPoi[poiType]
 	minDistance := math.Inf(1)
-	var closestStation models.Position
+	var closestPOI models.Position
 
-	for _, station := range chargingStations {
-		distance := d.Position.CalculateManhattanDistance(station)
+	for _, poi := range pois {
+		distance := d.Position.CalculateManhattanDistance(poi)
 		if distance < minDistance {
 			minDistance = distance
-			closestStation = station
+			closestPOI = poi
 		}
 	}
-	return closestStation, minDistance
+	return closestPOI, minDistance
 }
 
 func (d *Drone) Think() models.Position {
-	directions := []models.Position{
-		{X: 0, Y: -1}, // Up
-		{X: 0, Y: 1},  // Down
-		{X: -1, Y: 0}, // Left
-		{X: 1, Y: 0},  // Right
-	}
 
-	closestStation, minDistance := d.closestChargingStation()
-	fmt.Printf("Drone %d Battery: %.2f Closest Station: (%f, %f) Min Distance: %.2f\n", d.ID, d.Battery, closestStation.X, closestStation.Y, minDistance)
+	closestStation, minDistance := d.closestPOI(models.ChargingStation)
+	// fmt.Printf("Drone %d Battery: %.2f Closest Station: (%f, %f) Min Distance: %.2f\n", d.ID, d.Battery, closestStation.X, closestStation.Y, minDistance)
 
 	// If the drone's battery is low enough that it cannot safely move elsewhere, head towards the station.
 	// Instead of returning the station's full coordinates, we return just one step in the right direction.
 	if d.Battery <= minDistance+5 {
-		fmt.Printf("Drone %d is heading towards the closest charging station\n", d.ID)
+		// fmt.Printf("Drone %d is heading towards the closest charging station\n", d.ID)
 
 		// Compute the step direction towards the charging station
 		dx := closestStation.X - d.Position.X
@@ -211,6 +222,73 @@ func (d *Drone) Think() models.Position {
 		// If the chosen step is invalid, just don't move
 		return d.Position
 	}
+	for _, person := range d.SeenPeople {
+		if person.IsInDistress() { //&& !person.HasReceivedMedical {
+			fmt.Println("MEDICAL : Drone", d.ID, "detected person", person.ID, "in distress")
+			medicalTentPos, _ := d.closestPOI(models.MedicalTent)
+			_, distanceToCharging := d.closestPOI(models.ChargingStation)
+
+			// Calculate complete mission battery requirement
+			distanceToTent := d.Position.CalculateDistance(medicalTentPos)
+			distancePersonToTent := person.Position.CalculateDistance(medicalTentPos) * 2
+			totalBatteryNeeded := distanceToTent + distancePersonToTent + distanceToCharging + 2
+
+			if d.Battery > totalBatteryNeeded {
+				fmt.Println("MEDICAL : Drone", d.ID, "has enough battery to complete the mission")
+				// If at medical tent, wait required time
+				if d.Position.X == medicalTentPos.X && d.Position.Y == medicalTentPos.Y {
+					fmt.Println("MEDICAL : Drone", d.ID, "is at medical tent")
+					if d.MedicalTentTimer > 0 {
+						d.MedicalTentTimer--
+						return d.Position
+					}
+					// After waiting, go to person
+					d.MedicalTentTimer = 0
+					return person.GetPosition()
+				}
+
+				// If at person position, deliver medical supplies
+				if d.Position.X == person.GetPosition().X && d.Position.Y == person.GetPosition().Y {
+					if d.DeploymentTimer > 0 {
+						d.DeploymentTimer--
+						return d.Position
+					}
+
+					responseChan := make(chan models.MedicalDeliveryResponse)
+					d.MedicalDeliveryChan <- models.MedicalDeliveryRequest{
+						PersonID:     person.ID,
+						DroneID:      d.ID,
+						ResponseChan: responseChan,
+					}
+					fmt.Println("MEDICAL : Drone", d.ID, "is delivering medical supplies to person", person.ID)
+					response := <-responseChan
+					fmt.Println("MEDICAL : Drone", d.ID, "received response:", response)
+
+					if response.Authorized {
+						d.DeploymentTimer = 1  // Reset for next time
+						d.MedicalTentTimer = 2 // Reset for next time
+					}
+					return d.Position
+				}
+
+				// If not at medical tent yet, go there first
+				if d.MedicalTentTimer == 0 {
+					d.MedicalTentTimer = 2 // Initialize timer for tent stay
+					return medicalTentPos
+				}
+
+				// If between tent and person, continue to person
+				return person.GetPosition()
+			}
+		}
+	}
+
+	directions := []models.Position{
+		{X: 0, Y: -1}, // Up
+		{X: 0, Y: 1},  // Down
+		{X: -1, Y: 0}, // Left
+		{X: 1, Y: 0},  // Right
+	}
 
 	// If we are not forced to head to a charging station, move randomly (shuffling directions)
 	rand.Shuffle(len(directions), func(i, j int) {
@@ -235,13 +313,13 @@ func (d *Drone) Myturn() {
 	// Get the next position to move to
 	d.SeenPeople = []*persons.Person{}
 	d.DroneInComRange = []*Drone{}
-    
+
 	// Check if we're at a charging station and should charge
-    if d.tryCharging() {
-        d.ReceiveInfo()
-        return // Skip movement if charging
-    }
-	
+	if d.tryCharging() {
+		d.ReceiveInfo()
+		return // Skip movement if charging
+	}
+
 	target := d.Think()
 
 	// Try to move to the calculated target

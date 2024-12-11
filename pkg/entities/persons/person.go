@@ -34,6 +34,8 @@ type Person struct {
 	LastZoneChange          time.Time
 	debug                   bool
 	hardDebug               bool
+	HasReceivedMedical      bool
+	TreatmentTime           time.Duration
 }
 
 func NewCrowdMember(id int, position models.Position, distressProbability float64, lifespan int, width int, height int, moveChan chan models.MovementRequest, deadChan chan models.DeadRequest, exitChan chan models.ExitRequest) Person {
@@ -68,6 +70,8 @@ func NewCrowdMember(id int, position models.Position, distressProbability float6
 		LastZoneChange:          now,
 		debug:                   false,
 		hardDebug:               false,
+		HasReceivedMedical:      false,
+		TreatmentTime:           0,
 	}
 }
 
@@ -316,46 +320,93 @@ func (c *Person) determineCurrentZone() string {
 	return "exit"
 }
 
+// func (c *Person) UpdateHealth() {
+// 	if c.State.CurrentState == Resting {
+// 		c.Profile.StaminaLevel += 0.01
+// 		if c.Profile.StaminaLevel > 1.0 {
+// 			c.Profile.StaminaLevel = 1.0
+// 		}
+// 		if c.InDistress {
+// 			c.CurrentDistressDuration++
+// 			if c.CurrentDistressDuration >= c.Lifespan {
+// 				c.Die()
+// 			}
+// 		}
+// 		return
+// 	}
+
+// 	staminaReduction := 0.001
+// 	if c.State.CurrentState == SeekingPOI {
+// 		staminaReduction = 0.002
+// 	}
+// 	c.Profile.StaminaLevel -= staminaReduction
+// 	if c.Profile.StaminaLevel < 0 {
+// 		c.Profile.StaminaLevel = 0
+// 	}
+
+// 	effectiveProbability := c.DistressProbability *
+// 		(1.0 - c.Profile.MalaiseResistance) *
+// 		(1.0 - c.Profile.StaminaLevel)
+
+// 	if rand.Float64() < effectiveProbability {
+// 		c.InDistress = true
+// 	}
+
+// 	if c.InDistress {
+// 		c.CurrentDistressDuration++
+// 		if c.CurrentDistressDuration >= c.Lifespan {
+// 			c.Die()
+// 		}
+// 	} else {
+// 		c.CurrentDistressDuration = 0
+// 	}
+// }
+
+
 func (c *Person) UpdateHealth() {
-	if c.State.CurrentState == Resting {
-		c.Profile.StaminaLevel += 0.01
-		if c.Profile.StaminaLevel > 1.0 {
-			c.Profile.StaminaLevel = 1.0
-		}
-		if c.InDistress {
-			c.CurrentDistressDuration++
-			if c.CurrentDistressDuration >= c.Lifespan {
-				c.Die()
-			}
-		}
-		return
-	}
+    if c.State.CurrentState == Resting {
+        c.Profile.StaminaLevel += 0.01
+        if c.Profile.StaminaLevel > 1.0 {
+            c.Profile.StaminaLevel = 1.0
+        }
+    } else {
+        staminaReduction := 0.001
+        if c.State.CurrentState == SeekingPOI {
+            staminaReduction = 0.002
+        }
+        c.Profile.StaminaLevel -= staminaReduction
+        if c.Profile.StaminaLevel < 0 {
+            c.Profile.StaminaLevel = 0
+        }
+    }
 
-	staminaReduction := 0.001
-	if c.State.CurrentState == SeekingPOI {
-		staminaReduction = 0.002
-	}
-	c.Profile.StaminaLevel -= staminaReduction
-	if c.Profile.StaminaLevel < 0 {
-		c.Profile.StaminaLevel = 0
-	}
+    if c.InDistress {
+        if c.HasReceivedMedical {
+            c.TreatmentTime++
+            // Recovery chance increases with treatment
+            recoveryChance := float64(c.TreatmentTime) * 0.1 // 10% per tick
+            if rand.Float64() < recoveryChance {
+                c.InDistress = false
+                c.HasReceivedMedical = false
+                c.TreatmentTime = 0
+                return
+            }
+        }
+        
+        c.CurrentDistressDuration++
+        if c.CurrentDistressDuration >= c.Lifespan {
+            c.Die()
+        }
+    } else {
+        effectiveProbability := c.DistressProbability *
+            (1.0 - c.Profile.MalaiseResistance) *
+            (1.0 - c.Profile.StaminaLevel)
 
-	effectiveProbability := c.DistressProbability *
-		(1.0 - c.Profile.MalaiseResistance) *
-		(1.0 - c.Profile.StaminaLevel)
-
-	if rand.Float64() < effectiveProbability {
-		c.InDistress = true
-	}
-
-	if c.InDistress {
-		c.CurrentDistressDuration++
-		if c.CurrentDistressDuration >= c.Lifespan {
-			c.Die()
-		}
-	} else {
-		c.CurrentDistressDuration = 0
-	}
+        if rand.Float64() < effectiveProbability {
+            c.InDistress = true
+        }
+        c.CurrentDistressDuration = 0
+    }
 }
 
 func (c *Person) Die() {
