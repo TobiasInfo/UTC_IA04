@@ -123,7 +123,7 @@ func (d *Drone) closestChargingStation() (models.Position, float64) {
 	var closestStation models.Position
 
 	for _, station := range chargingStations {
-		distance := d.Position.CalculateDistance(station)
+		distance := d.Position.CalculateManhattanDistance(station)
 		if distance < minDistance {
 			minDistance = distance
 			closestStation = station
@@ -141,11 +141,45 @@ func (d *Drone) Think() models.Position {
 	}
 
 	closestStation, minDistance := d.closestChargingStation()
+	fmt.Printf("Drone %d Battery: %.2f Closest Station: (%f, %f) Min Distance: %.2f\n", d.ID, d.Battery, closestStation.X, closestStation.Y, minDistance)
 
-	if d.Battery <= minDistance+1 {
-		return closestStation
+	// If the drone's battery is low enough that it cannot safely move elsewhere, head towards the station.
+	// Instead of returning the station's full coordinates, we return just one step in the right direction.
+	if d.Battery <= minDistance+5 {
+		fmt.Printf("Drone %d is heading towards the closest charging station\n", d.ID)
+
+		// Compute the step direction towards the charging station
+		dx := closestStation.X - d.Position.X
+		dy := closestStation.Y - d.Position.Y
+
+		var step models.Position
+		// Choose the axis along which the difference is greater to make the move
+		if math.Abs(dx) > math.Abs(dy) {
+			// Move along X-axis
+			if dx > 0 {
+				step = models.Position{X: d.Position.X + 1, Y: d.Position.Y} // Move right
+			} else {
+				step = models.Position{X: d.Position.X - 1, Y: d.Position.Y} // Move left
+			}
+		} else {
+			// Move along Y-axis
+			if dy > 0 {
+				step = models.Position{X: d.Position.X, Y: d.Position.Y + 1} // Move down
+			} else {
+				step = models.Position{X: d.Position.X, Y: d.Position.Y - 1} // Move up
+			}
+		}
+
+		// Ensure the step is within map boundaries
+		if step.X >= 0 && step.Y >= 0 && step.X < 30 && step.Y < 20 {
+			return step
+		}
+
+		// If the chosen step is invalid, just don't move
+		return d.Position
 	}
 
+	// If we are not forced to head to a charging station, move randomly (shuffling directions)
 	rand.Shuffle(len(directions), func(i, j int) {
 		directions[i], directions[j] = directions[j], directions[i]
 	})
@@ -156,11 +190,11 @@ func (d *Drone) Think() models.Position {
 			Y: d.Position.Y + dir.Y,
 		}
 		if target.X >= 0 && target.Y >= 0 && target.X < 30 && target.Y < 20 {
-			//fmt.Printf("Drone %d Thinks Target: (%f, %f)\n", d.ID, target.X, target.Y)
 			return target
 		}
 	}
-	//fmt.Printf("Drone %d has no valid moves, staying at (%f, %f)\n", d.ID, d.Position.X, d.Position.Y)
+
+	// If no valid moves found, stay in the same position
 	return d.Position
 }
 
@@ -222,7 +256,7 @@ func (d *Drone) CalculateOptimalPosition(params WeightedParameters) models.Posit
 // calculateZoneWeight calcule le poids d'une zone spécifique
 func calculateZoneWeight(d *Drone, zone models.Position, params WeightedParameters) float64 {
 	// Distance entre le drones et la zones
-	distance := calculateDistance(d.Position, zone)
+	distance := zone.CalculateDistance(d.Position)
 
 	// Facteur de distance inversé (plus proche = plus important)
 	distanceFactor := 1.0 / (1.0 + distance)
@@ -242,20 +276,13 @@ func calculateZoneWeight(d *Drone, zone models.Position, params WeightedParamete
 		(clusterFactor * params.ClusteringWeight)
 }
 
-// calculateDistance calcule la distance euclidienne entre deux positions
-func calculateDistance(pos1, pos2 models.Position) float64 {
-	dx := pos1.X - pos2.X
-	dy := pos1.Y - pos2.Y
-	return math.Sqrt(dx*dx + dy*dy)
-}
-
 // calculateClusterFactor évalue combien de zones sont proches de la zone donnée
 func calculateClusterFactor(d *Drone, targetZone models.Position) float64 {
 	const proximityThreshold = 2.0 // Distance considérée comme "proche"
 	nearbyZones := 0.0
 
 	for _, zone := range d.ReportedZonesByCentrale {
-		if calculateDistance(targetZone, zone) < proximityThreshold {
+		if zone.CalculateDistance(targetZone) < proximityThreshold {
 			nearbyZones += 1.0
 		}
 	}

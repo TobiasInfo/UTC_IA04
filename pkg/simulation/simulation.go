@@ -98,7 +98,11 @@ func (s *Simulation) handleMovementRequests() {
 				req.ResponseChan <- models.MovementResponse{Authorized: false, Reason: "Member not found"}
 			}
 		} else {
-			req.ResponseChan <- models.MovementResponse{Authorized: false, Reason: "Position is blocked"}
+			if req.MemberType == "drone" {
+				req.ResponseChan <- models.MovementResponse{Authorized: true, Reason: "Drones can move above obstables"}
+			} else {
+				req.ResponseChan <- models.MovementResponse{Authorized: false, Reason: "Position is blocked"}
+			}
 		}
 	}
 }
@@ -331,7 +335,7 @@ func (s *Simulation) Update() {
 	if s.festivalTime.IsEventEnded() {
 		return
 	}
-	//time.Sleep(200 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 	if s.hardDebug {
 		fmt.Println("New Tick")
 	}
