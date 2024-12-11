@@ -52,31 +52,31 @@ func NewSurveillanceDrone(id int, position models.Position, battery float64, dro
 
 // Add charging check method
 func (d *Drone) tryCharging() bool {
-    if d.IsCharging {
-        // Already charging, continue
-        d.Battery += 5
-        if d.Battery >= 80 + rand.Float64()*20 { // Random value between 80 and 100
-            d.IsCharging = false
-            return false
-        }
-        return true
-    }
+	if d.IsCharging {
+		// Already charging, continue
+		d.Battery += 5
+		if d.Battery >= 80+rand.Float64()*20 { // Random value between 80 and 100
+			d.IsCharging = false
+			return false
+		}
+		return true
+	}
 
-    // Try to start charging
-    responseChan := make(chan models.ChargingResponse)
-    d.ChargingChan <- models.ChargingRequest{
-        DroneID:      d.ID,
-        Position:     d.Position,
-        ResponseChan: responseChan,
-    }
-    
-    response := <-responseChan
-    if response.Authorized {
-        d.IsCharging = true
-        d.Battery += 5
-        return true
-    }
-    return false
+	// Try to start charging
+	responseChan := make(chan models.ChargingResponse)
+	d.ChargingChan <- models.ChargingRequest{
+		DroneID:      d.ID,
+		Position:     d.Position,
+		ResponseChan: responseChan,
+	}
+
+	response := <-responseChan
+	if response.Authorized {
+		d.IsCharging = true
+		d.Battery += 5
+		return true
+	}
+	return false
 }
 
 // Move updates the drones's position to the destination
@@ -174,12 +174,10 @@ func (d *Drone) Think() models.Position {
 	}
 
 	closestStation, minDistance := d.closestChargingStation()
-	fmt.Printf("Drone %d Battery: %.2f Closest Station: (%f, %f) Min Distance: %.2f\n", d.ID, d.Battery, closestStation.X, closestStation.Y, minDistance)
 
 	// If the drone's battery is low enough that it cannot safely move elsewhere, head towards the station.
 	// Instead of returning the station's full coordinates, we return just one step in the right direction.
 	if d.Battery <= minDistance+5 {
-		fmt.Printf("Drone %d is heading towards the closest charging station\n", d.ID)
 
 		// Compute the step direction towards the charging station
 		dx := closestStation.X - d.Position.X
@@ -235,13 +233,13 @@ func (d *Drone) Myturn() {
 	// Get the next position to move to
 	d.SeenPeople = []*persons.Person{}
 	d.DroneInComRange = []*Drone{}
-    
+
 	// Check if we're at a charging station and should charge
-    if d.tryCharging() {
-        d.ReceiveInfo()
-        return // Skip movement if charging
-    }
-	
+	if d.tryCharging() {
+		d.ReceiveInfo()
+		return // Skip movement if charging
+	}
+
 	target := d.Think()
 
 	// Try to move to the calculated target

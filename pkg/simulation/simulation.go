@@ -91,45 +91,51 @@ func (s *Simulation) handleChargingRequests() {
 
 func (s *Simulation) handleMovementRequests() {
 	for req := range s.MoveChan {
-		//fmt.Printf("Received movement request for %s %d to position (%.2f, %.2f)\n")
-		if !s.Map.IsBlocked(req.NewPosition) {
-			if req.MemberType != "persons" && req.MemberType != "drone" {
-				req.ResponseChan <- models.MovementResponse{Authorized: false, Reason: "Invalid member type"}
-				continue
-			}
+		// Vérifie si la position cible est valide sur la carte
+		if req.MemberType != "persons" && req.MemberType != "drone" {
+			req.ResponseChan <- models.MovementResponse{Authorized: false, Reason: "Invalid member type"}
+			continue
+		}
 
-			var entity interface{}
-			s.mu.RLock()
-			if req.MemberType == "drone" {
-				for _, drone := range s.Drones {
-					if drone.ID == req.MemberID {
-						entity = &drone
-						break
-					}
+		var entity interface{}
+		s.mu.RLock()
+		if req.MemberType == "drone" {
+			for i := range s.Drones {
+				if s.Drones[i].ID == req.MemberID {
+					entity = &s.Drones[i]
+					break
 				}
 			}
+		}
 
-			if req.MemberType == "persons" {
-				for _, person := range s.Persons {
-					if person.ID == req.MemberID {
-						entity = &person
-						break
-					}
+		if req.MemberType == "persons" {
+			for i := range s.Persons {
+				if s.Persons[i].ID == req.MemberID {
+					entity = &s.Persons[i]
+					break
 				}
 			}
-			s.mu.RUnlock()
+		}
+		s.mu.RUnlock()
 
-			if entity != nil {
+		if entity == nil {
+			req.ResponseChan <- models.MovementResponse{Authorized: false, Reason: "Member not found"}
+			continue
+		}
+
+		if req.MemberType == "drone" {
+			// Pour les drones, ignorer les obstacles
+			s.mu.Lock()
+			s.Map.MoveEntity(entity, req.NewPosition)
+			s.mu.Unlock()
+			req.ResponseChan <- models.MovementResponse{Authorized: true, Reason: "Drones can move above obstacles"}
+		} else {
+			// Pour les personnes, vérifier les obstacles
+			if !s.Map.IsBlocked(req.NewPosition) {
 				s.mu.Lock()
 				s.Map.MoveEntity(entity, req.NewPosition)
 				s.mu.Unlock()
 				req.ResponseChan <- models.MovementResponse{Authorized: true, Reason: "OK"}
-			} else {
-				req.ResponseChan <- models.MovementResponse{Authorized: false, Reason: "Member not found"}
-			}
-		} else {
-			if req.MemberType == "drone" {
-				req.ResponseChan <- models.MovementResponse{Authorized: true, Reason: "Drones can move above obstables"}
 			} else {
 				req.ResponseChan <- models.MovementResponse{Authorized: false, Reason: "Position is blocked"}
 			}
