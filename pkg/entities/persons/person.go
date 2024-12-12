@@ -36,6 +36,7 @@ type Person struct {
 	hardDebug               bool
 	HasReceivedMedical      bool
 	TreatmentTime           time.Duration
+	HealChan                chan bool
 }
 
 func NewCrowdMember(id int, position models.Position, distressProbability float64, lifespan int, width int, height int, moveChan chan models.MovementRequest, deadChan chan models.DeadRequest, exitChan chan models.ExitRequest) Person {
@@ -44,7 +45,7 @@ func NewCrowdMember(id int, position models.Position, distressProbability float6
 	zonePreference := GetZonePreference(movementPattern)
 	now := time.Now()
 
-	return Person{
+	p := Person{
 		ID:                      id,
 		Position:                position,
 		InDistress:              false,
@@ -72,7 +73,11 @@ func NewCrowdMember(id int, position models.Position, distressProbability float6
 		hardDebug:               false,
 		HasReceivedMedical:      false,
 		TreatmentTime:           0,
+		HealChan:                make(chan bool),
 	}
+
+	go p.SavePerson()
+	return p
 }
 
 func (c *Person) Myturn() {
@@ -80,6 +85,7 @@ func (c *Person) Myturn() {
 		fmt.Printf("Person %d executing turn - Current State: %v, Position: %v\n",
 			c.ID, c.State.CurrentState, c.Position)
 	}
+	fmt.Printf("mYturn 0: Person %d is  %v\n", c.ID, c.InDistress)
 	if c.InDistress {
 		if c.hardDebug {
 			fmt.Printf("Person %d is in distress, not moving\n", c.ID)
@@ -87,9 +93,11 @@ func (c *Person) Myturn() {
 		c.UpdateHealth()
 		return
 	}
-
+	fmt.Printf("mYturn 1: Person %d is  %v\n", c.ID, c.InDistress)
 	c.State.UpdateState(c)
+	fmt.Printf("mYturn 2: Person %d is  %v\n", c.ID, c.InDistress)
 	c.UpdateHealth()
+	fmt.Printf("mYturn 3: Person %d is  %v\n", c.ID, c.InDistress)
 
 	if c.GetCurrentZone() == "exit" {
 		c.Exit()
@@ -320,49 +328,24 @@ func (c *Person) determineCurrentZone() string {
 	return "exit"
 }
 
-// func (c *Person) UpdateHealth() {
-// 	if c.State.CurrentState == Resting {
-// 		c.Profile.StaminaLevel += 0.01
-// 		if c.Profile.StaminaLevel > 1.0 {
-// 			c.Profile.StaminaLevel = 1.0
-// 		}
-// 		if c.InDistress {
-// 			c.CurrentDistressDuration++
-// 			if c.CurrentDistressDuration >= c.Lifespan {
-// 				c.Die()
-// 			}
-// 		}
-// 		return
-// 	}
-
-// 	staminaReduction := 0.001
-// 	if c.State.CurrentState == SeekingPOI {
-// 		staminaReduction = 0.002
-// 	}
-// 	c.Profile.StaminaLevel -= staminaReduction
-// 	if c.Profile.StaminaLevel < 0 {
-// 		c.Profile.StaminaLevel = 0
-// 	}
-
-// 	effectiveProbability := c.DistressProbability *
-// 		(1.0 - c.Profile.MalaiseResistance) *
-// 		(1.0 - c.Profile.StaminaLevel)
-
-// 	if rand.Float64() < effectiveProbability {
-// 		c.InDistress = true
-// 	}
-
-// 	if c.InDistress {
-// 		c.CurrentDistressDuration++
-// 		if c.CurrentDistressDuration >= c.Lifespan {
-// 			c.Die()
-// 		}
-// 	} else {
-// 		c.CurrentDistressDuration = 0
-// 	}
-// }
+func (p *Person) SavePerson() {
+	for {
+		select {
+		case <-p.HealChan:
+			fmt.Printf("Person %d has been healed\n", p.ID)
+			p.InDistress = false
+			p.CurrentDistressDuration = 0
+			p.State.CurrentState = Resting
+			p.Profile.StaminaLevel = 1.0
+			p.State.UpdateState(p)
+			fmt.Printf("Person %d is now in state %v\n", p.ID, p)
+			return
+		}
+	}
+}
 
 func (c *Person) UpdateHealth() {
+
 	if c.State.CurrentState == Resting {
 		c.Profile.StaminaLevel += 0.01
 		if c.Profile.StaminaLevel > 1.0 {
@@ -380,19 +363,7 @@ func (c *Person) UpdateHealth() {
 	}
 
 	if c.InDistress {
-		if c.HasReceivedMedical {
-			c.TreatmentTime++
-			// Recovery chance increases with treatment
-			recoveryChance := float64(c.TreatmentTime) * 0.1 // 10% per tick
-			if rand.Float64() < recoveryChance {
-				c.InDistress = false
-				c.HasReceivedMedical = false
-				c.TreatmentTime = 0
-				return
-			}
-		}
-
-		c.CurrentDistressDuration++
+		//c.CurrentDistressDuration++
 		if c.CurrentDistressDuration >= c.Lifespan {
 			c.Die()
 		}

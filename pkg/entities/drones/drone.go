@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	//"UTC_IA04/pkg/utils"
 )
 
 //TODO il faut un channel par drones pour que la centrale puisse communiquer de manière
@@ -31,6 +32,10 @@ type Drone struct {
 	MedicalDeliveryChan     chan models.MedicalDeliveryRequest
 	MedicalTentTimer        int
 	DeploymentTimer         int
+	PeopleToSave            *persons.Person
+	Objectif                models.Position
+	HasMedicalGear          bool
+	SavePersonChan          chan models.SavePersonRequest
 }
 
 // NewSurveillanceDrone creates a new instance of SurveillanceDrone
@@ -43,7 +48,8 @@ func NewSurveillanceDrone(id int,
 	moveChan chan models.MovementRequest,
 	mapPoi map[models.POIType][]models.Position,
 	chargingChan chan models.ChargingRequest,
-	medicalDeliveryChan chan models.MedicalDeliveryRequest) Drone {
+	medicalDeliveryChan chan models.MedicalDeliveryRequest,
+	savePersonChan chan models.SavePersonRequest) Drone {
 	return Drone{
 		ID:                      id,
 		Position:                position,
@@ -62,6 +68,10 @@ func NewSurveillanceDrone(id int,
 		MedicalDeliveryChan:     medicalDeliveryChan,
 		MedicalTentTimer:        0,
 		DeploymentTimer:         1,
+		PeopleToSave:            nil,
+		Objectif:                models.Position{},
+		HasMedicalGear:          false,
+		SavePersonChan:          savePersonChan,
 	}
 }
 
@@ -182,106 +192,175 @@ func (d *Drone) closestPOI(poiType models.POIType) (models.Position, float64) {
 	return closestPOI, minDistance
 }
 
+func (d *Drone) nextStepToPos(pos models.Position) models.Position {
+	// Compute the step direction towards the charging station
+	dx := pos.X - d.Position.X
+	dy := pos.Y - d.Position.Y
+
+	var step models.Position
+	// Choose the axis along which the difference is greater to make the move
+	if math.Abs(dx) > math.Abs(dy) {
+		// Move along X-axis
+		if dx > 0 {
+			step = models.Position{X: d.Position.X + 1, Y: d.Position.Y} // Move right
+		} else {
+			step = models.Position{X: d.Position.X - 1, Y: d.Position.Y} // Move left
+		}
+	} else {
+		// Move along Y-axis
+		if dy > 0 {
+			step = models.Position{X: d.Position.X, Y: d.Position.Y + 1} // Move down
+		} else {
+			step = models.Position{X: d.Position.X, Y: d.Position.Y - 1} // Move up
+		}
+	}
+
+	return step
+}
+
+func (d *Drone) BatteryManagement() (models.Position, bool) {
+	closestStation, minDistance := d.closestPOI(models.ChargingStation)
+	if d.Battery <= minDistance+5 {
+		step := d.nextStepToPos(closestStation)
+
+		if step.X >= 0 && step.Y >= 0 && step.X < 30 && step.Y < 20 {
+			return step, true
+		}
+
+		return d.Position, true
+	}
+	return models.Position{}, false
+}
+
 func (d *Drone) Think() models.Position {
 
-	closestStation, minDistance := d.closestPOI(models.ChargingStation)
-	// fmt.Printf("Drone %d Battery: %.2f Closest Station: (%f, %f) Min Distance: %.2f\n", d.ID, d.Battery, closestStation.X, closestStation.Y, minDistance)
-
-	// If the drone's battery is low enough that it cannot safely move elsewhere, head towards the station.
-	// Instead of returning the station's full coordinates, we return just one step in the right direction.
-	if d.Battery <= minDistance+5 {
-		// fmt.Printf("Drone %d is heading towards the closest charging station\n", d.ID)
-
-		// Compute the step direction towards the charging station
-		dx := closestStation.X - d.Position.X
-		dy := closestStation.Y - d.Position.Y
-
-		var step models.Position
-		// Choose the axis along which the difference is greater to make the move
-		if math.Abs(dx) > math.Abs(dy) {
-			// Move along X-axis
-			if dx > 0 {
-				step = models.Position{X: d.Position.X + 1, Y: d.Position.Y} // Move right
-			} else {
-				step = models.Position{X: d.Position.X - 1, Y: d.Position.Y} // Move left
-			}
-		} else {
-			// Move along Y-axis
-			if dy > 0 {
-				step = models.Position{X: d.Position.X, Y: d.Position.Y + 1} // Move down
-			} else {
-				step = models.Position{X: d.Position.X, Y: d.Position.Y - 1} // Move up
-			}
-		}
-
-		// Ensure the step is within map boundaries
-		if step.X >= 0 && step.Y >= 0 && step.X < 30 && step.Y < 20 {
-			return step
-		}
-
-		// If the chosen step is invalid, just don't move
-		return d.Position
+	pos, goCharging := d.BatteryManagement()
+	if goCharging {
+		return pos
 	}
+
+	if d.Objectif != (models.Position{}) {
+
+		if d.Position.X == d.Objectif.X && d.Position.Y == d.Objectif.Y {
+			medicalTentPos, _ := d.closestPOI(models.MedicalTent)
+			if d.Position.X == medicalTentPos.X && d.Position.Y == medicalTentPos.Y {
+				fmt.Println("MEDICAL : Drone", d.ID, "is at medical tent")
+				responseChan := make(chan models.MedicalDeliveryResponse)
+				d.MedicalDeliveryChan <- models.MedicalDeliveryRequest{
+					PersonID:     d.PeopleToSave.ID,
+					DroneID:      d.ID,
+					ResponseChan: responseChan,
+				}
+				rep := <-responseChan
+				if rep.Authorized {
+					d.Objectif = models.Position{X: math.Round(d.PeopleToSave.Position.X), Y: math.Round(d.PeopleToSave.Position.Y)}
+					d.HasMedicalGear = true
+				}
+			}
+			if d.Position.X == math.Round(d.PeopleToSave.Position.X) && d.Position.Y == math.Round(d.PeopleToSave.Position.Y) {
+				fmt.Println("MEDICAL : Drone", d.ID, "is delivering medical supplies to person", d.PeopleToSave.ID)
+				responseSave := make(chan models.SavePersonResponse)
+				d.SavePersonChan <- models.SavePersonRequest{
+					PersonID:     d.PeopleToSave.ID,
+					DroneID:      d.ID,
+					ResponseChan: responseSave,
+				}
+				rep := <-responseSave
+				if rep.Authorized {
+					d.PeopleToSave = nil
+					d.Objectif = models.Position{}
+					d.HasMedicalGear = false
+				}
+			}
+		}
+		step := d.nextStepToPos(d.Objectif)
+		return step
+	}
+
+	var step models.Position
+	// Recover all people in distress
 	for _, person := range d.SeenPeople {
-		if person.IsInDistress() && !person.HasReceivedMedical {
-			fmt.Println("MEDICAL : Drone", d.ID, "detected person", person.ID, "in distress")
+		if person.IsInDistress() { //&& !person.HasReceivedMedical {
+			// Add the person to the queue of people to save
+			d.PeopleToSave = person
 			medicalTentPos, _ := d.closestPOI(models.MedicalTent)
 			_, distanceToCharging := d.closestPOI(models.ChargingStation)
-
-			// Calculate complete mission battery requirement
 			distanceToTent := d.Position.CalculateDistance(medicalTentPos)
-			distancePersonToTent := person.Position.CalculateDistance(medicalTentPos) * 2
+			distancePersonToTent := person.Position.CalculateDistance(medicalTentPos)
 			totalBatteryNeeded := distanceToTent + distancePersonToTent + distanceToCharging + 2
-
-			if d.Battery > totalBatteryNeeded {
+			if d.Battery >= totalBatteryNeeded {
 				fmt.Println("MEDICAL : Drone", d.ID, "has enough battery to complete the mission")
+				fmt.Println("MEDICAL : Drone", d.ID, "detected person", person.ID, "in distress")
 				// If at medical tent, wait required time
-				if d.Position.X == medicalTentPos.X && d.Position.Y == medicalTentPos.Y {
-					fmt.Println("MEDICAL : Drone", d.ID, "is at medical tent")
-					if d.MedicalTentTimer > 0 {
-						d.MedicalTentTimer--
-						return d.Position
-					}
-					// After waiting, go to person
-					d.MedicalTentTimer = 0
-					return person.GetPosition()
-				}
-
-				// If at person position, deliver medical supplies
-				if d.Position.X == person.GetPosition().X && d.Position.Y == person.GetPosition().Y {
-					if d.DeploymentTimer > 0 {
-						d.DeploymentTimer--
-						return d.Position
-					}
-
-					responseChan := make(chan models.MedicalDeliveryResponse)
-					d.MedicalDeliveryChan <- models.MedicalDeliveryRequest{
-						PersonID:     person.ID,
-						DroneID:      d.ID,
-						ResponseChan: responseChan,
-					}
-					fmt.Println("MEDICAL : Drone", d.ID, "is delivering medical supplies to person", person.ID)
-					response := <-responseChan
-					fmt.Println("MEDICAL : Drone", d.ID, "received response:", response)
-
-					if response.Authorized {
-						d.DeploymentTimer = 1  // Reset for next time
-						d.MedicalTentTimer = 2 // Reset for next time
-					}
-					return d.Position
-				}
-
-				// If not at medical tent yet, go there first
-				if d.MedicalTentTimer == 0 {
-					d.MedicalTentTimer = 2 // Initialize timer for tent stay
-					return medicalTentPos
-				}
-
-				// If between tent and person, continue to person
-				return person.GetPosition()
+				d.Objectif = medicalTentPos
+				step = d.nextStepToPos(d.Objectif)
+				return step
 			}
 		}
 	}
+
+	// for _, person := range d.SeenPeople {
+	// 	if person.IsInDistress() { //&& !person.HasReceivedMedical {
+	// 		// Add the person to the queue of people to save
+	// 		d.PeopleToSave.EnqueueIfNotPresent(person)
+	// 		fmt.Println("MEDICAL : Drone", d.ID, "detected person", person.ID, "in distress")
+	// 		medicalTentPos, _ := d.closestPOI(models.MedicalTent)
+	// 		_, distanceToCharging := d.closestPOI(models.ChargingStation)
+
+	// 		// Calculate complete mission battery requirement
+	// 		distanceToTent := d.Position.CalculateDistance(medicalTentPos)
+	// 		distancePersonToTent := person.Position.CalculateDistance(medicalTentPos) * 2
+	// 		totalBatteryNeeded := distanceToTent + distancePersonToTent + distanceToCharging + 2
+
+	// 		if d.Battery > totalBatteryNeeded {
+	// 			fmt.Println("MEDICAL : Drone", d.ID, "has enough battery to complete the mission")
+	// 			// If at medical tent, wait required time
+	// 			if d.Position.X == medicalTentPos.X && d.Position.Y == medicalTentPos.Y {
+	// 				fmt.Println("MEDICAL : Drone", d.ID, "is at medical tent")
+	// 				if d.MedicalTentTimer > 0 {
+	// 					d.MedicalTentTimer--
+	// 					return d.Position
+	// 				}
+	// 				// After waiting, go to person
+	// 				d.MedicalTentTimer = 0
+	// 				return person.GetPosition()
+	// 			}
+
+	// 			// If at person position, deliver medical supplies
+	// 			if d.Position.X == person.GetPosition().X && d.Position.Y == person.GetPosition().Y {
+	// 				if d.DeploymentTimer > 0 {
+	// 					d.DeploymentTimer--
+	// 					return d.Position
+	// 				}
+
+	// 				responseChan := make(chan models.MedicalDeliveryResponse)
+	// 				d.MedicalDeliveryChan <- models.MedicalDeliveryRequest{
+	// 					PersonID:     person.ID,
+	// 					DroneID:      d.ID,
+	// 					ResponseChan: responseChan,
+	// 				}
+	// 				fmt.Println("MEDICAL : Drone", d.ID, "is delivering medical supplies to person", person.ID)
+	// 				response := <-responseChan
+	// 				fmt.Println("MEDICAL : Drone", d.ID, "received response:", response)
+
+	// 				if response.Authorized {
+	// 					d.DeploymentTimer = 1  // Reset for next time
+	// 					d.MedicalTentTimer = 2 // Reset for next time
+	// 				}
+	// 				return d.Position
+	// 			}
+
+	// 			// If not at medical tent yet, go there first
+	// 			if d.MedicalTentTimer == 0 {
+	// 				d.MedicalTentTimer = 2 // Initialize timer for tent stay
+	// 				return medicalTentPos
+	// 			}
+
+	// 			// If between tent and person, continue to person
+	// 			return person.GetPosition()
+	// 		}
+	// 	}
+	// }
 
 	directions := []models.Position{
 		{X: 0, Y: -1}, // Up
@@ -319,13 +398,12 @@ func (d *Drone) Myturn() {
 		d.ReceiveInfo()
 		return // Skip movement if charging
 	}
+	d.ReceiveInfo()
 
 	target := d.Think()
 
 	// Try to move to the calculated target
 	moved := d.Move(target)
-
-	d.ReceiveInfo()
 
 	if !moved {
 		fmt.Printf("Drone %d could not move to %v\n", d.ID, target)

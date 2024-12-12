@@ -9,13 +9,14 @@ import (
 	"UTC_IA04/pkg/entities/persons"
 	"UTC_IA04/pkg/models"
 	"fmt"
+	"math"
 	"math/rand"
 	"sync"
 	"time"
 )
 
 const (
-	DEFAULT_DISTRESS_PROBABILITY = 0.9
+	DEFAULT_DISTRESS_PROBABILITY = 0.999999
 )
 
 type Simulation struct {
@@ -27,6 +28,7 @@ type Simulation struct {
 	ExitChan                   chan models.ExitRequest
 	ChargingChan               chan models.ChargingRequest
 	MedicalDeliveryChan        chan models.MedicalDeliveryRequest
+	SavePersonChan             chan models.SavePersonRequest
 	Persons                    []persons.Person
 	Drones                     []drones.Drone
 	Obstacles                  []obstacles.Obstacle
@@ -51,6 +53,7 @@ func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 		DeadChan:            make(chan models.DeadRequest),
 		ExitChan:            make(chan models.ExitRequest),
 		ChargingChan:        make(chan models.ChargingRequest),
+		SavePersonChan:      make(chan models.SavePersonRequest),
 		debug:               false,
 		hardDebug:           false,
 		currentTick:         0,
@@ -64,27 +67,62 @@ func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 	go s.handleExitRequest()
 	go s.handleChargingRequests()
 	go s.handleMedicalDelivery()
+	go s.handleSavePerson()
 	return s
+}
+
+func (s *Simulation) handleSavePerson() {
+	for req := range s.SavePersonChan {
+		authorized := false
+		for _, drone := range s.Drones {
+			if drone.ID == req.DroneID {
+				if !drone.HasMedicalGear {
+					break
+				}
+				for index, pers := range s.Persons {
+					if pers.ID == req.PersonID {
+						if math.Round(pers.Position.X) == drone.Position.X && math.Round(pers.Position.Y) == drone.Position.Y {
+							if pers.InDistress {
+								authorized = true
+								// pers.HealChan <- true
+								(&s.Persons[index] ).HealChan <- true
+								break
+							}
+						}
+					}
+				}
+			}
+
+		}
+		req.ResponseChan <- models.SavePersonResponse{
+			Authorized: authorized,
+			Reason:     map[bool]string{true: "Person saved", false: "Save failed"}[authorized],
+		}
+	}
 }
 
 func (s *Simulation) handleMedicalDelivery() {
 	for req := range s.MedicalDeliveryChan {
-		s.mu.Lock()
+		// s.mu.Lock()
 		authorized := false
-		for _, person := range s.Persons {
-			if person.ID == req.PersonID && person.InDistress && !person.HasReceivedMedical {
-				person.HasReceivedMedical = true
-				authorized = true
-				break
+		for _, drone := range s.Drones {
+			if drone.ID == req.DroneID {
+				for _, pos := range s.poiMap[models.MedicalTent] {
+					if pos.X == drone.Position.X && pos.Y == drone.Position.Y {
+						authorized = true
+						break
+					}
+				}
 			}
 		}
-		s.mu.Unlock()
+		// s.mu.Unlock()
 		req.ResponseChan <- models.MedicalDeliveryResponse{
 			Authorized: authorized,
 			Reason:     map[bool]string{true: "Medical delivered", false: "Delivery failed"}[authorized],
 		}
 	}
 }
+
 func (s *Simulation) handleChargingRequests() {
 	for req := range s.ChargingChan {
 		s.mu.RLock()
@@ -374,7 +412,7 @@ func (s *Simulation) createDrones(n int) {
 	for i := 0; i < n; i++ {
 		// Generate a value between 60 and 100 in float
 		battery := 60 + rand.Float64()*(100-60)
-		d := drones.NewSurveillanceDrone(i, models.Position{X: 15, Y: 15}, battery, s.DroneSeeRange, s.DroneCommRange, droneSeeFunction, droneInComRange, s.MoveChan, s.poiMap, s.ChargingChan, s.MedicalDeliveryChan)
+		d := drones.NewSurveillanceDrone(i, models.Position{X: 15, Y: 15}, battery, s.DroneSeeRange, s.DroneCommRange, droneSeeFunction, droneInComRange, s.MoveChan, s.poiMap, s.ChargingChan, s.MedicalDeliveryChan, s.SavePersonChan)
 		s.Drones = append(s.Drones, d)
 		s.Map.AddDrone(&s.Drones[len(s.Drones)-1])
 	}
@@ -385,7 +423,7 @@ func (s *Simulation) createInitialCrowd(n int) {
 	for i := 0; i < n; i++ {
 		member := persons.NewCrowdMember(i,
 			models.Position{X: 0, Y: float64(rand.Intn(s.Map.Height))},
-			s.DefaultDistressProbability, 20, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan, s.ExitChan)
+			s.DefaultDistressProbability, 200, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan, s.ExitChan)
 		s.Persons = append(s.Persons, member)
 		s.Map.AddCrowdMember(&s.Persons[len(s.Persons)-1])
 	}
