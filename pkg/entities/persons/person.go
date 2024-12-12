@@ -362,51 +362,50 @@ func (c *Person) determineCurrentZone() string {
 // 	}
 // }
 
-
 func (c *Person) UpdateHealth() {
-    if c.State.CurrentState == Resting {
-        c.Profile.StaminaLevel += 0.01
-        if c.Profile.StaminaLevel > 1.0 {
-            c.Profile.StaminaLevel = 1.0
-        }
-    } else {
-        staminaReduction := 0.001
-        if c.State.CurrentState == SeekingPOI {
-            staminaReduction = 0.002
-        }
-        c.Profile.StaminaLevel -= staminaReduction
-        if c.Profile.StaminaLevel < 0 {
-            c.Profile.StaminaLevel = 0
-        }
-    }
+	if c.State.CurrentState == Resting {
+		c.Profile.StaminaLevel += 0.01
+		if c.Profile.StaminaLevel > 1.0 {
+			c.Profile.StaminaLevel = 1.0
+		}
+	} else {
+		staminaReduction := 0.001
+		if c.State.CurrentState == SeekingPOI {
+			staminaReduction = 0.002
+		}
+		c.Profile.StaminaLevel -= staminaReduction
+		if c.Profile.StaminaLevel < 0 {
+			c.Profile.StaminaLevel = 0
+		}
+	}
 
-    if c.InDistress {
-        if c.HasReceivedMedical {
-            c.TreatmentTime++
-            // Recovery chance increases with treatment
-            recoveryChance := float64(c.TreatmentTime) * 0.1 // 10% per tick
-            if rand.Float64() < recoveryChance {
-                c.InDistress = false
-                c.HasReceivedMedical = false
-                c.TreatmentTime = 0
-                return
-            }
-        }
-        
-        c.CurrentDistressDuration++
-        if c.CurrentDistressDuration >= c.Lifespan {
-            c.Die()
-        }
-    } else {
-        effectiveProbability := c.DistressProbability *
-            (1.0 - c.Profile.MalaiseResistance) *
-            (1.0 - c.Profile.StaminaLevel)
+	if c.InDistress {
+		if c.HasReceivedMedical {
+			c.TreatmentTime++
+			// Recovery chance increases with treatment
+			recoveryChance := float64(c.TreatmentTime) * 0.1 // 10% per tick
+			if rand.Float64() < recoveryChance {
+				c.InDistress = false
+				c.HasReceivedMedical = false
+				c.TreatmentTime = 0
+				return
+			}
+		}
 
-        if rand.Float64() < effectiveProbability {
-            c.InDistress = true
-        }
-        c.CurrentDistressDuration = 0
-    }
+		c.CurrentDistressDuration++
+		if c.CurrentDistressDuration >= c.Lifespan {
+			c.Die()
+		}
+	} else {
+		effectiveProbability := c.DistressProbability *
+			(1.0 - c.Profile.MalaiseResistance) *
+			(1.0 - c.Profile.StaminaLevel)
+
+		if rand.Float64() < effectiveProbability {
+			c.InDistress = true
+		}
+		c.CurrentDistressDuration = 0
+	}
 }
 
 func (c *Person) Die() {

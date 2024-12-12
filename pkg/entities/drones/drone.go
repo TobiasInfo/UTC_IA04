@@ -223,7 +223,7 @@ func (d *Drone) Think() models.Position {
 		return d.Position
 	}
 	for _, person := range d.SeenPeople {
-		if person.IsInDistress() { //&& !person.HasReceivedMedical {
+		if person.IsInDistress() && !person.HasReceivedMedical {
 			fmt.Println("MEDICAL : Drone", d.ID, "detected person", person.ID, "in distress")
 			medicalTentPos, _ := d.closestPOI(models.MedicalTent)
 			_, distanceToCharging := d.closestPOI(models.ChargingStation)

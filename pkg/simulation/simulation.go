@@ -14,7 +14,9 @@ import (
 	"time"
 )
 
-//const ( DEFAULT_DISTRESS_PROBABILITY = 0.9 )
+const (
+	DEFAULT_DISTRESS_PROBABILITY = 0.9
+)
 
 type Simulation struct {
 	Map                        *Map
@@ -223,7 +225,7 @@ func (s *Simulation) handleExitRequest() {
 func (s *Simulation) Initialize(nDrones int, nCrowd int, nObstacles int) {
 	fmt.Println("Initializing simulation")
 	// @TODO : Récupérer la distress depuis la config.
-	s.DefaultDistressProbability = 0.9
+	s.DefaultDistressProbability = DEFAULT_DISTRESS_PROBABILITY
 
 	configPath := "configs/festival_layout.json"
 	config, err := LoadFestivalConfig(configPath)
@@ -393,7 +395,7 @@ func (s *Simulation) Update() {
 	if s.festivalTime.IsEventEnded() {
 		return
 	}
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 	if s.hardDebug {
 		fmt.Println("New Tick")
 	}
