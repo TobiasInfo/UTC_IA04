@@ -3,8 +3,10 @@ package main
 import (
 	game "UTC_IA04/cmd/simu"
 	"UTC_IA04/cmd/ui"
-	"github.com/hajimehoshi/ebiten/v2"
+	"image/color"
 	"strconv"
+
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 func main() {
@@ -34,15 +36,18 @@ func main() {
 			g.PeopleCount = value
 		},
 	}
-	g.ObstacleField = ui.TextField{
-		X: fieldX, Y: 300, Width: fieldWidth, Height: fieldHeight, Text: "5",
-		OnEnter: func(value int) {
-			g.ObstacleCount = value
+
+	g.DropdownMap = ui.Dropdown{
+		X: fieldX, Y: 300, Width: fieldWidth, Height: fieldHeight,
+		Options:       []string{"Carte test 1", "Carte test 2", "Option 3"},
+		SelectedIndex: 0,
+		OnSelect: func(index int) {
+			println("Selected option:", index)
 		},
 	}
 
 	g.StartButton = ui.Button{
-		X: 400 - 100, Y: 380, Width: 200, Height: 50, Text: "Start Simulation",
+		X: fieldX, Y: 450, Width: 200, Height: 50, Text: "Start Simulation",
 		OnClick: func() {
 			// Parse current values from the text fields to ensure they are up-to-date
 			if val, err := strconv.Atoi(g.DroneField.Text); err == nil {
@@ -50,9 +55,6 @@ func main() {
 			}
 			if val, err := strconv.Atoi(g.PeopleField.Text); err == nil {
 				g.PeopleCount = val
-			}
-			if val, err := strconv.Atoi(g.ObstacleField.Text); err == nil {
-				g.ObstacleCount = val
 			}
 
 			// Now start the simulation with the updated values
@@ -68,7 +70,7 @@ func main() {
 	}
 
 	g.StartButtonDebug = ui.Button{
-		X: 400 - 100, Y: 450, Width: 300, Height: 50, Text: "Start Simulation (Debug Mode)",
+		X: fieldX + 250, Y: 300, Width: 250, Height: 50, Text: "Start Simulation (Debug Mode)", Couleur: color.RGBA{255, 0, 0, 255},
 		OnClick: func() {
 			// Parse current values from the text fields to ensure they are up-to-date
 			if val, err := strconv.Atoi(g.DroneField.Text); err == nil {
@@ -76,9 +78,6 @@ func main() {
 			}
 			if val, err := strconv.Atoi(g.PeopleField.Text); err == nil {
 				g.PeopleCount = val
-			}
-			if val, err := strconv.Atoi(g.ObstacleField.Text); err == nil {
-				g.ObstacleCount = val
 			}
 
 			// Now start the simulation with the updated values

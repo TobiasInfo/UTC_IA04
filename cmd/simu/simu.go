@@ -35,6 +35,7 @@ type Game struct {
 	DroneField       ui.TextField
 	PeopleField      ui.TextField
 	ObstacleField    ui.TextField
+	DropdownMap      ui.Dropdown
 	Sim              *simulation.Simulation
 	StaticLayer      *ebiten.Image
 	DynamicLayer     *ebiten.Image
@@ -109,8 +110,7 @@ func (g *Game) Update() error {
 		g.StartButtonDebug.Update(float64(mx), float64(my), mousePressed)
 		g.DroneField.Update(float64(mx), float64(my), mousePressed, inputRunes, ebiten.IsKeyPressed(ebiten.KeyEnter))
 		g.PeopleField.Update(float64(mx), float64(my), mousePressed, inputRunes, ebiten.IsKeyPressed(ebiten.KeyEnter))
-		g.ObstacleField.Update(float64(mx), float64(my), mousePressed, inputRunes, ebiten.IsKeyPressed(ebiten.KeyEnter))
-
+		g.DropdownMap.Update(float64(mx), float64(my), mousePressed)
 	case Simulation:
 		g.SimButton.Update(float64(mx), float64(my), mousePressed)
 		g.PauseButton.Update(float64(mx), float64(my), mousePressed)
@@ -202,14 +202,14 @@ func (g *Game) drawMenu(screen *ebiten.Image) {
 		"Click fields to edit, press Enter to confirm."
 	ebitenutil.DebugPrintAt(screen, instructions, 200, 100)
 
-	ebitenutil.DebugPrintAt(screen, "Number of Drones:", 200, 200)
+	ebitenutil.DebugPrintAt(screen, "Number of Drones:", 190, 200)
 	g.DroneField.Draw(screen)
 
-	ebitenutil.DebugPrintAt(screen, "Number of People:", 200, 250)
+	ebitenutil.DebugPrintAt(screen, "Number of People:", 190, 250)
 	g.PeopleField.Draw(screen)
 
-	ebitenutil.DebugPrintAt(screen, "Number of Obstacles:", 200, 300)
-	g.ObstacleField.Draw(screen)
+	ebitenutil.DebugPrintAt(screen, "Map Selection:", 190, 300)
+	g.DropdownMap.Draw(screen)
 
 	g.StartButton.Draw(screen)
 	g.StartButtonDebug.Draw(screen)
