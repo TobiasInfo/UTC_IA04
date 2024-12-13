@@ -123,7 +123,7 @@ func (d *Drone) Move(target models.Position) bool {
 
 	if response.Authorized {
 		// TODO : Adjust this value
-		dechargingStep := 0.0
+		dechargingStep := 1.0
 		if d.Battery >= dechargingStep {
 			d.Battery -= dechargingStep
 		} else {

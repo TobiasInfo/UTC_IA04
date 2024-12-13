@@ -36,7 +36,6 @@ type Person struct {
 	hardDebug               bool
 	HasReceivedMedical      bool
 	TreatmentTime           time.Duration
-	HealChan                chan bool
 }
 
 func NewCrowdMember(id int, position models.Position, distressProbability float64, lifespan int, width int, height int, moveChan chan models.MovementRequest, deadChan chan models.DeadRequest, exitChan chan models.ExitRequest) Person {
@@ -73,10 +72,7 @@ func NewCrowdMember(id int, position models.Position, distressProbability float6
 		hardDebug:               false,
 		HasReceivedMedical:      false,
 		TreatmentTime:           0,
-		HealChan:                make(chan bool),
 	}
-
-	go p.SavePerson()
 	return p
 }
 
@@ -85,7 +81,6 @@ func (c *Person) Myturn() {
 		fmt.Printf("Person %d executing turn - Current State: %v, Position: %v\n",
 			c.ID, c.State.CurrentState, c.Position)
 	}
-	fmt.Printf("mYturn 0: Person %d is  %v\n", c.ID, c.InDistress)
 	if c.InDistress {
 		if c.hardDebug {
 			fmt.Printf("Person %d is in distress, not moving\n", c.ID)
@@ -93,11 +88,8 @@ func (c *Person) Myturn() {
 		c.UpdateHealth()
 		return
 	}
-	fmt.Printf("mYturn 1: Person %d is  %v\n", c.ID, c.InDistress)
 	c.State.UpdateState(c)
-	fmt.Printf("mYturn 2: Person %d is  %v\n", c.ID, c.InDistress)
 	c.UpdateHealth()
-	fmt.Printf("mYturn 3: Person %d is  %v\n", c.ID, c.InDistress)
 
 	if c.GetCurrentZone() == "exit" {
 		c.Exit()
@@ -326,22 +318,6 @@ func (c *Person) determineCurrentZone() string {
 		return "main"
 	}
 	return "exit"
-}
-
-func (p *Person) SavePerson() {
-	for {
-		select {
-		case <-p.HealChan:
-			fmt.Printf("Person %d has been healed\n", p.ID)
-			p.InDistress = false
-			p.CurrentDistressDuration = 0
-			p.State.CurrentState = Resting
-			p.Profile.StaminaLevel = 1.0
-			p.State.UpdateState(p)
-			fmt.Printf("Person %d is now in state %v\n", p.ID, p)
-			return
-		}
-	}
 }
 
 func (c *Person) UpdateHealth() {

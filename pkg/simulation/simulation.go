@@ -79,20 +79,26 @@ func (s *Simulation) handleSavePerson() {
 				if !drone.HasMedicalGear {
 					break
 				}
-				for index, pers := range s.Persons {
-					if pers.ID == req.PersonID {
-						if math.Round(pers.Position.X) == drone.Position.X && math.Round(pers.Position.Y) == drone.Position.Y {
-							if pers.InDistress {
+				for i := range s.Persons {
+					person := &s.Persons[i]
+					if person.ID == req.PersonID {
+						if math.Round(person.Position.X) == drone.Position.X && math.Round(person.Position.Y) == drone.Position.Y {
+							if person.InDistress {
 								authorized = true
-								// pers.HealChan <- true
-								(&s.Persons[index] ).HealChan <- true
+								person.InDistress = false
+								person.CurrentDistressDuration = 0
+								person.State.CurrentState = 2
+								person.Profile.StaminaLevel = 1.0
+								person.State.UpdateState(person)
+								if s.debug {
+									fmt.Printf("Person %d has been healed!\n", person.ID)
+								}
 								break
 							}
 						}
 					}
 				}
 			}
-
 		}
 		req.ResponseChan <- models.SavePersonResponse{
 			Authorized: authorized,
