@@ -21,7 +21,7 @@ func main() {
 	// Centering and making the UI look nicer
 	fieldWidth := 200.0
 	fieldHeight := 30.0
-	fieldX := 400.0 - fieldWidth/2
+	fieldX := 200.0 - fieldWidth/2
 
 	g.DroneField = ui.TextField{
 		X: fieldX, Y: 200, Width: fieldWidth, Height: fieldHeight, Text: "5",
@@ -30,7 +30,7 @@ func main() {
 		},
 	}
 	g.PeopleField = ui.TextField{
-		X: fieldX, Y: 250, Width: fieldWidth, Height: fieldHeight, Text: "10",
+		X: fieldX + 250, Y: 200, Width: fieldWidth, Height: fieldHeight, Text: "10",
 		OnEnter: func(value int) {
 			g.Sim.UpdateCrowdSize(value)
 			g.PeopleCount = value
@@ -38,10 +38,21 @@ func main() {
 	}
 
 	g.DropdownMap = ui.Dropdown{
-		X: fieldX, Y: 300, Width: fieldWidth, Height: fieldHeight,
+		X: fieldX, Y: 270, Width: fieldWidth, Height: fieldHeight,
 		Options:       []string{"Carte test 1", "Carte test 2", "Option 3"},
 		SelectedIndex: 0,
 		OnSelect: func(index int) {
+			//TODO il faut que l'on puisse influencer la simu pour le chargement de la carte
+			println("Selected option:", index)
+		},
+	}
+
+	g.DropdownProtocole = ui.Dropdown{
+		X: fieldX + 250, Y: 270, Width: fieldWidth, Height: fieldHeight,
+		Options:       []string{"Protocole test 1", "Protocole test 2", "Option 3"},
+		SelectedIndex: 0,
+		OnSelect: func(index int) {
+			//TODO il faut que l'on puisse influencer la simu pour le changement de protocole
 			println("Selected option:", index)
 		},
 	}
@@ -70,7 +81,7 @@ func main() {
 	}
 
 	g.StartButtonDebug = ui.Button{
-		X: fieldX + 250, Y: 300, Width: 250, Height: 50, Text: "Start Simulation (Debug Mode)", Couleur: color.RGBA{255, 0, 0, 255},
+		X: fieldX + 250, Y: 450, Width: 250, Height: 50, Text: "Start Simulation (Debug Mode)", Couleur: color.RGBA{255, 0, 0, 255},
 		OnClick: func() {
 			// Parse current values from the text fields to ensure they are up-to-date
 			if val, err := strconv.Atoi(g.DroneField.Text); err == nil {

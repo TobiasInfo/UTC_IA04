@@ -27,25 +27,25 @@ const (
 )
 
 type Game struct {
-	Mode             Mode
-	StartButton      ui.Button
-	StartButtonDebug ui.Button
-	PauseButton      ui.Button
-	SimButton        ui.Button
-	DroneField       ui.TextField
-	PeopleField      ui.TextField
-	ObstacleField    ui.TextField
-	DropdownMap      ui.Dropdown
-	Sim              *simulation.Simulation
-	StaticLayer      *ebiten.Image
-	DynamicLayer     *ebiten.Image
-	Paused           bool
-	DroneCount       int
-	PeopleCount      int
-	ObstacleCount    int
-	DroneImage       *ebiten.Image
-	PoiImages        map[models.POIType]*ebiten.Image
-	hoveredPos       *models.Position
+	Mode              Mode
+	StartButton       ui.Button
+	StartButtonDebug  ui.Button
+	PauseButton       ui.Button
+	SimButton         ui.Button
+	DroneField        ui.TextField
+	PeopleField       ui.TextField
+	DropdownMap       ui.Dropdown
+	DropdownProtocole ui.Dropdown
+	Sim               *simulation.Simulation
+	StaticLayer       *ebiten.Image
+	DynamicLayer      *ebiten.Image
+	Paused            bool
+	DroneCount        int
+	PeopleCount       int
+	ObstacleCount     int
+	DroneImage        *ebiten.Image
+	PoiImages         map[models.POIType]*ebiten.Image
+	hoveredPos        *models.Position
 }
 
 // Zone colors
@@ -111,6 +111,7 @@ func (g *Game) Update() error {
 		g.DroneField.Update(float64(mx), float64(my), mousePressed, inputRunes, ebiten.IsKeyPressed(ebiten.KeyEnter))
 		g.PeopleField.Update(float64(mx), float64(my), mousePressed, inputRunes, ebiten.IsKeyPressed(ebiten.KeyEnter))
 		g.DropdownMap.Update(float64(mx), float64(my), mousePressed)
+		g.DropdownProtocole.Update(float64(mx), float64(my), mousePressed)
 	case Simulation:
 		g.SimButton.Update(float64(mx), float64(my), mousePressed)
 		g.PauseButton.Update(float64(mx), float64(my), mousePressed)
@@ -202,14 +203,17 @@ func (g *Game) drawMenu(screen *ebiten.Image) {
 		"Click fields to edit, press Enter to confirm."
 	ebitenutil.DebugPrintAt(screen, instructions, 200, 100)
 
-	ebitenutil.DebugPrintAt(screen, "Number of Drones:", 190, 200)
+	ebitenutil.DebugPrintAt(screen, "Number of Drones:", 100, 183)
 	g.DroneField.Draw(screen)
 
-	ebitenutil.DebugPrintAt(screen, "Number of People:", 190, 250)
+	ebitenutil.DebugPrintAt(screen, "Number of People:", 350, 183)
 	g.PeopleField.Draw(screen)
 
-	ebitenutil.DebugPrintAt(screen, "Map Selection:", 190, 300)
+	ebitenutil.DebugPrintAt(screen, "Map Selection:", 100, 253)
 	g.DropdownMap.Draw(screen)
+
+	ebitenutil.DebugPrintAt(screen, "Protocole Selection:", 350, 253)
+	g.DropdownProtocole.Draw(screen)
 
 	g.StartButton.Draw(screen)
 	g.StartButtonDebug.Draw(screen)
@@ -242,38 +246,45 @@ func (g *Game) drawSimulation(screen *ebiten.Image) {
 	}
 	mx, my := ebiten.CursorPosition()
 	if hoveredPerson := g.getHoveredPerson(float64(mx), float64(my)); hoveredPerson != nil {
-		mapPos := g.Sim.GetPersonPauseInMap(hoveredPerson)
+		//mapPos := g.Sim.GetPersonPauseInMap(hoveredPerson)
 		personInfo := fmt.Sprintf(
 			"Person Info\n"+
 				"ID: %d\n"+
 				"In Distress: %t\n"+
 				"Has Reached POI: %t\n"+
 				"Position: (%.1f, %.1f)\n"+
-				"Position in map: (%.1f, %.1f)",
+				"CurrentDistressDuration : %d",
+
 			hoveredPerson.ID,
 			hoveredPerson.InDistress,
 			hoveredPerson.HasReachedPOI(),
 			hoveredPerson.Position.X,
 			hoveredPerson.Position.Y,
-			mapPos.X,
-			mapPos.Y,
+			hoveredPerson.CurrentDistressDuration,
 		)
 		ebitenutil.DebugPrintAt(screen, personInfo, mx+10, my+10)
 	}
 	if hoveredDrone := g.getHoveredDrone(float64(mx), float64(my)); hoveredDrone != nil {
-		dronePosInMap := g.Sim.GetDronePauseInMap(hoveredDrone)
+		//dronePosInMap := g.Sim.GetDronePauseInMap(hoveredDrone)
 		personInfo := fmt.Sprintf(
 			"Drone Info\n"+
 				"ID: %d\n"+
 				"Position: (%.1f, %.1f) \n"+
-				"Position in Map: (%.1f, %.1f)\n"+
-				"Battery: %.1f",
+				"Battery: %.1f\n"+
+				"Number of seen people: %d\n"+
+				"Is charging: %t\n",
+			// "Has medical Gear: %t\n"+
+			// "Objectif: (%.1f, %.1f)",
+
 			hoveredDrone.ID,
 			hoveredDrone.Position.X,
 			hoveredDrone.Position.Y,
-			dronePosInMap.X,
-			dronePosInMap.Y,
 			hoveredDrone.Battery,
+			len(hoveredDrone.SeenPeople),
+			hoveredDrone.IsCharging,
+			// hoveredDrone.HasMedicalGear,
+			// hoveredDrone.Objectif.X,
+			// hoveredDrone.Objectif.Y,
 		)
 		ebitenutil.DebugPrintAt(screen, personInfo, mx+10, my+10)
 	}
@@ -346,6 +357,11 @@ func (g *Game) drawDynamicLayer() {
 				//	couleur = color.RGBA{0, 0, 0, 255} // Black for people in distress
 				//}
 				drawRectangle(g.DynamicLayer, person.Position.X*30, person.Position.Y*30, 5, 5, color.RGBA{255, 255, 0, 255})
+				if person.InDistress {
+					drawRectangle(g.DynamicLayer, person.Position.X*30+1, person.Position.Y*30+1, 2, 2, color.RGBA{0, 0, 0, 255})
+
+				}
+
 				seenPeople[person.ID] = true
 				//fmt.Println("Drone has seen ", person.ID, person.Position.X, person.Position.Y)
 			}
