@@ -6,18 +6,8 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	"sort"
-	"sync"
 	"time"
 )
-
-type DetectedPersonInfo struct {
-	PersonID       int
-	Position       models.Position
-	DetectionTime  time.Time
-	DetectingDrone int
-	InDistress     bool
-}
 
 type Drone struct {
 	ID                      int
@@ -42,17 +32,31 @@ type Drone struct {
 	Objectif                models.Position
 	HasMedicalGear          bool
 	SavePersonChan          chan models.SavePersonRequest
-	DetectedPeople          map[int]DetectedPersonInfo
-	LastVisitedPositions    []models.Position
-	maxPositionHistory      int
-	mu                      sync.RWMutex
+	LastSharedUpdate        time.Time
+	DroneComm               chan DroneUpdate
 }
 
-func NewSurveillanceDrone(
-	id int,
+type RescueIntent struct {
+	DroneID    int
+	PersonID   int
+	PathLength float64
+	Battery    float64
+}
+
+type DroneUpdate struct {
+	DroneID          int
+	Position         models.Position
+	AssignedPersonID int
+	Battery          float64
+	HasMedicalGear   bool
+	TotalPathLength  float64
+	MessageType      string
+	ResponseNeeded   bool // New field to indicate if response is expected
+}
+
+func NewSurveillanceDrone(id int,
 	position models.Position,
-	battery float64,
-	droneSeeRange int,
+	battery float64, droneSeeRange int,
 	droneCommunicationRange int,
 	droneSeeFunc func(d *Drone) []*persons.Person,
 	DroneInComRange func(d *Drone) []*Drone,
@@ -83,10 +87,60 @@ func NewSurveillanceDrone(
 		Objectif:                models.Position{},
 		HasMedicalGear:          false,
 		SavePersonChan:          savePersonChan,
-		DetectedPeople:          make(map[int]DetectedPersonInfo),
-		LastVisitedPositions:    make([]models.Position, 0),
-		maxPositionHistory:      20,
+		DroneComm:               make(chan DroneUpdate, 10),
+		LastSharedUpdate:        time.Now(),
 	}
+}
+
+func (intent RescueIntent) IsBetterThan(other RescueIntent) bool {
+	if math.Abs(intent.PathLength-other.PathLength) < 0.1 {
+		return intent.DroneID < other.DroneID
+	}
+	return intent.PathLength < other.PathLength
+}
+
+func (d *Drone) calculateRescuePath(person *persons.Person) (float64, models.Position) {
+	medicalTentPos, _ := d.closestPOI(models.MedicalTent)
+
+	// Calculate total path: current -> medical tent -> person
+	distanceToTent := d.Position.CalculateDistance(medicalTentPos)
+	distanceFromTentToPerson := medicalTentPos.CalculateDistance(person.Position)
+
+	totalDistance := distanceToTent + distanceFromTentToPerson
+
+	return totalDistance, medicalTentPos
+}
+
+func (d *Drone) ShareStatus(nearbyDrones []*Drone) {
+	if time.Since(d.LastSharedUpdate) < 500*time.Millisecond {
+		return
+	}
+
+	assignedID := -1
+	if d.PeopleToSave != nil {
+		assignedID = d.PeopleToSave.ID
+	}
+
+	update := DroneUpdate{
+		DroneID:          d.ID,
+		Position:         d.Position,
+		AssignedPersonID: assignedID,
+		Battery:          d.Battery,
+		HasMedicalGear:   d.HasMedicalGear,
+		TotalPathLength:  0,
+		MessageType:      "STATUS",
+	}
+
+	for _, otherDrone := range nearbyDrones {
+		if d.ID != otherDrone.ID {
+			select {
+			case otherDrone.DroneComm <- update:
+			default:
+			}
+		}
+	}
+
+	d.LastSharedUpdate = time.Now()
 }
 
 func (d *Drone) tryCharging() bool {
@@ -129,7 +183,7 @@ func (d *Drone) Move(target models.Position) bool {
 	response := <-responseChan
 
 	if response.Authorized {
-		dechargingStep := 1.0
+		dechargingStep := 0.25
 		if d.Battery >= dechargingStep {
 			d.Battery -= dechargingStep
 		} else {
@@ -150,37 +204,6 @@ func (d *Drone) ReceiveInfo() {
 
 	d.SeenPeople = seenPeople
 	d.DroneInComRange = droneInComRange
-}
-
-func (d *Drone) ShareDetectedPeople() {
-	d.mu.Lock()
-	for _, person := range d.SeenPeople {
-		if person.IsInDistress() {
-			info := DetectedPersonInfo{
-				PersonID:       person.ID,
-				Position:       person.Position,
-				DetectionTime:  time.Now(),
-				DetectingDrone: d.ID,
-				InDistress:     true,
-			}
-			d.DetectedPeople[person.ID] = info
-			
-			for _, nearbyDrone := range d.DroneInComRange {
-				nearbyDrone.ReceivePersonInfo(info)
-			}
-		}
-	}
-	d.mu.Unlock()
-}
-
-func (d *Drone) ReceivePersonInfo(info DetectedPersonInfo) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	
-	if existing, exists := d.DetectedPeople[info.PersonID]; !exists || 
-		existing.DetectionTime.Before(info.DetectionTime) {
-		d.DetectedPeople[info.PersonID] = info
-	}
 }
 
 func (d *Drone) closestPOI(poiType models.POIType) (models.Position, float64) {
@@ -220,91 +243,6 @@ func (d *Drone) nextStepToPos(pos models.Position) models.Position {
 	return step
 }
 
-func (d *Drone) calculateWeightedMove() models.Position {
-	type cellWeight struct {
-		pos    models.Position
-		weight float64
-	}
-	
-	var possibleMoves []cellWeight
-	currentPos := d.Position
-	
-	for x := -1.0; x <= 1.0; x++ {
-		for y := -1.0; y <= 1.0; y++ {
-			if x == 0 && y == 0 {
-				continue
-			}
-			
-			newPos := models.Position{
-				X: currentPos.X + x,
-				Y: currentPos.Y + y,
-			}
-			
-			if newPos.X < 0 || newPos.Y < 0 || newPos.X >= 30 || newPos.Y >= 20 {
-				continue
-			}
-			
-			weight := d.calculatePositionWeight(newPos)
-			possibleMoves = append(possibleMoves, cellWeight{
-				pos:    newPos,
-				weight: weight,
-			})
-		}
-	}
-	
-	if len(possibleMoves) == 0 {
-		return d.Position
-	}
-	
-	sort.Slice(possibleMoves, func(i, j int) bool {
-		return possibleMoves[i].weight > possibleMoves[j].weight
-	})
-	
-	d.mu.Lock()
-	d.LastVisitedPositions = append(d.LastVisitedPositions, d.Position)
-	if len(d.LastVisitedPositions) > d.maxPositionHistory {
-		d.LastVisitedPositions = d.LastVisitedPositions[1:]
-	}
-	d.mu.Unlock()
-	
-	return possibleMoves[0].pos
-}
-
-func (d *Drone) calculatePositionWeight(pos models.Position) float64 {
-	var weight float64 = 1.0
-	
-	distanceWeight := 1.0 / (1.0 + pos.CalculateDistance(d.Position))
-	weight *= distanceWeight
-	
-	d.mu.RLock()
-	for i, visitedPos := range d.LastVisitedPositions {
-		if visitedPos.CalculateDistance(pos) < 2.0 {
-			recencyPenalty := float64(len(d.LastVisitedPositions)-i) / float64(len(d.LastVisitedPositions))
-			weight *= (1.0 - recencyPenalty*0.5)
-		}
-	}
-	d.mu.RUnlock()
-	
-	for _, otherDrone := range d.DroneInComRange {
-		if otherDrone.ID != d.ID {
-			droneDistance := pos.CalculateDistance(otherDrone.Position)
-			if droneDistance < float64(d.DroneCommRange) {
-				weight *= droneDistance / float64(d.DroneCommRange)
-			}
-		}
-	}
-	
-	chargerPos, minDistance := d.closestPOI(models.ChargingStation)
-	distanceToCharger := pos.CalculateDistance(chargerPos)
-	if d.Battery < 40.0 && distanceToCharger < minDistance {
-		weight *= 1.5
-	}
-	
-	weight *= 0.9 + rand.Float64()*0.2
-	
-	return weight
-}
-
 func (d *Drone) BatteryManagement() (models.Position, bool) {
 	closestStation, minDistance := d.closestPOI(models.ChargingStation)
 	if d.Battery <= minDistance+5 {
@@ -322,14 +260,29 @@ func (d *Drone) BatteryManagement() (models.Position, bool) {
 func (d *Drone) Think() models.Position {
 	pos, goCharging := d.BatteryManagement()
 	if goCharging {
+		fmt.Printf("[DRONE-%d] Low battery (%.1f%%), heading to charge\n", d.ID, d.Battery)
 		return pos
 	}
+
+	nearbyDrones := d.DroneInComRangeFunc(d)
+	d.ShareStatus(nearbyDrones)
+
+	// Process any pending updates
+	for {
+		select {
+		case update := <-d.DroneComm:
+			d.handleDroneUpdate(update)
+		default:
+			goto processLoop
+		}
+	}
+processLoop:
 
 	if d.Objectif != (models.Position{}) {
 		if d.Position.X == d.Objectif.X && d.Position.Y == d.Objectif.Y {
 			medicalTentPos, _ := d.closestPOI(models.MedicalTent)
 			if d.Position.X == medicalTentPos.X && d.Position.Y == medicalTentPos.Y {
-				fmt.Println("MEDICAL : Drone", d.ID, "is at medical tent")
+				fmt.Printf("[DRONE-%d] At medical tent\n", d.ID)
 				responseChan := make(chan models.MedicalDeliveryResponse)
 				d.MedicalDeliveryChan <- models.MedicalDeliveryRequest{
 					PersonID:     d.PeopleToSave.ID,
@@ -343,7 +296,7 @@ func (d *Drone) Think() models.Position {
 				}
 			}
 			if d.Position.X == math.Round(d.PeopleToSave.Position.X) && d.Position.Y == math.Round(d.PeopleToSave.Position.Y) {
-				fmt.Println("MEDICAL : Drone", d.ID, "is delivering medical supplies to person", d.PeopleToSave.ID)
+				fmt.Printf("[DRONE-%d] Delivering medical supplies to person %d\n", d.ID, d.PeopleToSave.ID)
 				responseSave := make(chan models.SavePersonResponse)
 				d.SavePersonChan <- models.SavePersonRequest{
 					PersonID:     d.PeopleToSave.ID,
@@ -362,37 +315,177 @@ func (d *Drone) Think() models.Position {
 		return step
 	}
 
-	var step models.Position
+	// Track people we've already considered to avoid duplicate evaluations
+	consideredPeople := make(map[int]bool)
+
 	for _, person := range d.SeenPeople {
-		if person.IsInDistress() {
-			d.PeopleToSave = person
-			medicalTentPos, _ := d.closestPOI(models.MedicalTent)
+		if person.IsInDistress() && !consideredPeople[person.ID] {
+			consideredPeople[person.ID] = true
+
+			if d.isPersonBeingHelped(person, nearbyDrones) {
+				fmt.Printf("[DRONE-%d] Person %d is already being helped by another drone\n",
+					d.ID, person.ID)
+				continue
+			}
+
+			pathLength, medicalTentPos := d.calculateRescuePath(person)
 			_, distanceToCharging := d.closestPOI(models.ChargingStation)
-			distanceToTent := d.Position.CalculateDistance(medicalTentPos)
-			distancePersonToTent := person.Position.CalculateDistance(medicalTentPos)
-			totalBatteryNeeded := distanceToTent + distancePersonToTent + distanceToCharging + 2
+			totalBatteryNeeded := pathLength + distanceToCharging + 2
+
+			fmt.Printf("[DRONE-%d] Evaluating rescue of person %d:\n", d.ID, person.ID)
+			fmt.Printf("[DRONE-%d]  - Total path length: %.1f\n", d.ID, pathLength)
+			fmt.Printf("[DRONE-%d]  - Total battery needed: %.1f (current: %.1f)\n", d.ID,
+				totalBatteryNeeded, d.Battery)
+
 			if d.Battery >= totalBatteryNeeded {
-				fmt.Println("MEDICAL : Drone", d.ID, "has enough battery to complete the mission")
-				fmt.Println("MEDICAL : Drone", d.ID, "detected person", person.ID, "in distress")
-				d.Objectif = medicalTentPos
-				step = d.nextStepToPos(d.Objectif)
-				return step
+				if d.broadcastRescueIntent(person, nearbyDrones) {
+					fmt.Printf("[DRONE-%d] Taking responsibility for person %d\n", d.ID, person.ID)
+					d.PeopleToSave = person
+					d.Objectif = medicalTentPos
+					return d.nextStepToPos(d.Objectif)
+				}
 			}
 		}
 	}
-	return d.calculateWeightedMove()
+
+	return d.calculatePatrolStep()
 }
 
-func (d *Drone) cleanupOldDetections() {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	
-	threshold := time.Now().Add(-5 * time.Minute)
-	for id, info := range d.DetectedPeople {
-		if info.DetectionTime.Before(threshold) {
-			delete(d.DetectedPeople, id)
+func (d *Drone) calculateRescuePriority(pathLength float64) float64 {
+	// Combine path length and drone ID for a unique priority
+	// Lower value = higher priority
+	return pathLength + (float64(d.ID) * 0.001) // Add small drone ID factor to break ties
+}
+
+func (d *Drone) handleDroneUpdate(update DroneUpdate) {
+    // Only care about COMMIT messages if we were considering the same person
+    if update.MessageType == "COMMIT" && 
+       d.PeopleToSave != nil && 
+       update.AssignedPersonID == d.PeopleToSave.ID {
+        fmt.Printf("[DRONE-%d] Dropping rescue of person %d - Drone %d has committed\n",
+            d.ID, update.AssignedPersonID, update.DroneID)
+        d.PeopleToSave = nil
+        d.Objectif = models.Position{}
+        d.HasMedicalGear = false
+    }
+}
+
+func (d *Drone) isDroneProbablyOutOfRange(droneID int) bool {
+	for _, drone := range d.DroneInComRange {
+		if drone.ID == droneID {
+			return false
 		}
 	}
+	return true
+}
+
+func (d *Drone) broadcastRescueIntent(person *persons.Person, nearbyDrones []*Drone) bool {
+    pathLength, _ := d.calculateRescuePath(person)
+    
+    // First broadcast our intention
+    update := DroneUpdate{
+        DroneID:          d.ID,
+        AssignedPersonID: person.ID,
+        TotalPathLength:  pathLength,
+        MessageType:      "INTENT",
+    }
+
+    // Send to all nearby drones
+    for _, otherDrone := range nearbyDrones {
+        if d.ID != otherDrone.ID {
+            select {
+            case otherDrone.DroneComm <- update:
+            default:
+            }
+        }
+    }
+
+    // Wait briefly for any responses that show a shorter path
+    timeout := time.After(50 * time.Millisecond)
+    for {
+        select {
+        case response := <-d.DroneComm:
+            if response.AssignedPersonID == person.ID && response.TotalPathLength < pathLength {
+                fmt.Printf("[DRONE-%d] Backing off from person %d - Drone %d has shorter path (%.1f vs %.1f)\n",
+                    d.ID, person.ID, response.DroneID, response.TotalPathLength, pathLength)
+                return false
+            }
+        case <-timeout:
+            goto timeoutExit
+        }
+    }
+timeoutExit:
+
+    // If we're still here, we have the shortest path - take responsibility
+    commitUpdate := DroneUpdate{
+        DroneID:          d.ID,
+        AssignedPersonID: person.ID,
+        MessageType:      "COMMIT",
+    }
+
+    // Tell others we're taking it
+    for _, otherDrone := range nearbyDrones {
+        if d.ID != otherDrone.ID {
+            select {
+            case otherDrone.DroneComm <- commitUpdate:
+            default:
+            }
+        }
+    }
+
+    fmt.Printf("[DRONE-%d] Taking responsibility for person %d (path length: %.1f)\n",
+        d.ID, person.ID, pathLength)
+    return true
+}
+
+func (d *Drone) isPersonBeingHelped(person *persons.Person, nearbyDrones []*Drone) bool {
+	for _, drone := range nearbyDrones {
+		if drone.PeopleToSave != nil && drone.PeopleToSave.ID == person.ID && drone.ID != d.ID {
+			return true
+		}
+	}
+	return false
+}
+
+func (d *Drone) initiateHelp(person *persons.Person) models.Position {
+	medicalTentPos, _ := d.closestPOI(models.MedicalTent)
+	_, distanceToCharging := d.closestPOI(models.ChargingStation)
+	distanceToTent := d.Position.CalculateDistance(medicalTentPos)
+	distancePersonToTent := person.Position.CalculateDistance(medicalTentPos)
+	totalBatteryNeeded := distanceToTent + distancePersonToTent + distanceToCharging + 2
+
+	if d.Battery >= totalBatteryNeeded {
+		d.PeopleToSave = person
+		d.Objectif = medicalTentPos
+		return d.nextStepToPos(d.Objectif)
+	}
+
+	return d.calculatePatrolStep()
+}
+
+func (d *Drone) calculatePatrolStep() models.Position {
+	directions := []models.Position{
+		{X: 0, Y: -1},
+		{X: 0, Y: 1},
+		{X: -1, Y: 0},
+		{X: 1, Y: 0},
+	}
+
+	rand.Shuffle(len(directions), func(i, j int) {
+		directions[i], directions[j] = directions[j], directions[i]
+	})
+
+	for _, dir := range directions {
+		target := models.Position{
+			X: d.Position.X + dir.X,
+			Y: d.Position.Y + dir.Y,
+		}
+		if target.X >= 0 && target.Y >= 0 && target.X < 30 && target.Y < 20 {
+			return target
+		}
+	}
+
+	return d.Position
 }
 
 func (d *Drone) Myturn() {
@@ -405,17 +498,82 @@ func (d *Drone) Myturn() {
 	}
 	d.ReceiveInfo()
 
-	// Share detected people info with nearby drones
-	d.ShareDetectedPeople()
-	
-	// Clean up old detected people information
-	d.cleanupOldDetections()
-
 	target := d.Think()
 
 	moved := d.Move(target)
 
 	if !moved {
-		fmt.Printf("Drone %d could not move to %v\n", d.ID, target)
+		fmt.Printf("[DRONE-%d] Could not move to target position\n", d.ID)
 	}
+}
+
+type WeightedParameters struct {
+	DistanceWeight   float64 // Poids pour la distance aux zones
+	BatteryWeight    float64 // Poids pour considérer la consommation de batterie
+	ClusteringWeight float64 // Poids pour favoriser les zones avec plus de points proches
+}
+
+func (d *Drone) CalculateOptimalPosition(params WeightedParameters) models.Position {
+	if len(d.ReportedZonesByCentrale) == 0 {
+		return d.Position // Si pas de zones, reste sur place
+	}
+
+	// Calculer le centre de gravité pondéré des zones reportées
+	var sumX, sumY, totalWeight float64
+
+	for _, zone := range d.ReportedZonesByCentrale {
+		// Calculer le poids pour cette zone
+		weight := calculateZoneWeight(d, zone, params)
+
+		sumX += zone.X * weight
+		sumY += zone.Y * weight
+		totalWeight += weight
+	}
+
+	// Éviter la division par zéro
+	if totalWeight == 0 {
+		return d.Position
+	}
+
+	return models.Position{
+		X: sumX / totalWeight,
+		Y: sumY / totalWeight,
+	}
+}
+
+// calculateZoneWeight calcule le poids d'une zone spécifique
+func calculateZoneWeight(d *Drone, zone models.Position, params WeightedParameters) float64 {
+	// Distance entre le drones et la zones
+	distance := zone.CalculateDistance(d.Position)
+
+	// Facteur de distance inversé (plus proche = plus important)
+	distanceFactor := 1.0 / (1.0 + distance)
+
+	// Facteur de batterie (considère la batterie nécessaire pour atteindre la zone)
+	batteryFactor := 1.0 - (distance * 1) // Simplifié: 1 unité de batterie par unité de distance
+	if batteryFactor < 0 {
+		batteryFactor = 0
+	}
+
+	// Facteur de clustering (nombre de zones proches)
+	clusterFactor := calculateClusterFactor(d, zone)
+
+	// Combiner tous les facteurs avec leurs poids
+	return (distanceFactor * params.DistanceWeight) +
+		(batteryFactor * params.BatteryWeight) +
+		(clusterFactor * params.ClusteringWeight)
+}
+
+// calculateClusterFactor évalue combien de zones sont proches de la zone donnée
+func calculateClusterFactor(d *Drone, targetZone models.Position) float64 {
+	const proximityThreshold = 2.0 // Distance considérée comme "proche"
+	nearbyZones := 0.0
+
+	for _, zone := range d.ReportedZonesByCentrale {
+		if zone.CalculateDistance(targetZone) < proximityThreshold {
+			nearbyZones += 1.0
+		}
+	}
+
+	return nearbyZones / float64(len(d.ReportedZonesByCentrale))
 }
