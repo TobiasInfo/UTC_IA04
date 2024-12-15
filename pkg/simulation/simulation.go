@@ -12,6 +12,7 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+	"math"
 )
 
 //const ( DEFAULT_DISTRESS_PROBABILITY = 0.9 )
@@ -346,15 +347,53 @@ func (s *Simulation) createDrones(n int) {
 		}
 		return droneInformations
 	}
+	
+	positionsDrone := goDronesPositions(n, s.Map.Width, s.Map.Height)
 
 	for i := 0; i < n; i++ {
 		// Generate a value between 60 and 100 in float
 		battery := 60 + rand.Float64()*(100-60)
-		d := drones.NewSurveillanceDrone(i, models.Position{X: 0, Y: 0}, battery, s.DroneSeeRange, s.DroneCommRange, droneSeeFunction, droneInComRange, s.MoveChan, s.poiMap, s.ChargingChan)
+		position := positionsDrone[i]
+		d := drones.NewSurveillanceDrone(
+			i,
+			models.Position{X: float64(position[0]), Y: float64(position[1])},
+			battery,
+			s.DroneSeeRange,
+			s.DroneCommRange,
+			droneSeeFunction,
+			droneInComRange,
+			s.MoveChan,
+			s.poiMap,
+			s.ChargingChan,
+		)
 		s.Drones = append(s.Drones, d)
 		s.Map.AddDrone(&s.Drones[len(s.Drones)-1])
 	}
+	
 }
+
+func goDronesPositions(N int, W, H int) [][2]int {
+	if N <= 0 {
+		return [][2]int{}
+	}
+
+	Nx := int(math.Floor(math.Sqrt(float64(N))))
+	Ny := int(math.Ceil(float64(N) / float64(Nx)))
+	dx := float64(W) / float64(Nx+1)
+	dy := float64(H) / float64(Ny+1)
+
+	positions := make([][2]int, N)
+	for k := 0; k < N; k++ {
+		i := k % Nx
+		j := k / Nx
+		x := int(math.Round((float64(i + 1)) * dx))
+		y := int(math.Round((float64(j + 1)) * dy))
+		positions[k] = [2]int{x, y}
+	}
+
+	return positions
+}
+
 
 func (s *Simulation) createInitialCrowd(n int) {
 	fmt.Println("Creating initial crowd")
