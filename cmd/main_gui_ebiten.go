@@ -9,9 +9,9 @@ import (
 
 func main() {
 	g := game.NewGame(
-		5,  // default drone count
-		10, // default people count
-		5,  // default obstacle count
+		1,  // default drone count
+		1, // default people count
+		1,  // default obstacle count
 	)
 	println("Debut simu dans GUI")
 	//fmt.Printf("Simulation Details: %+v\n", g.Sim.GetAvailablePOIs())
@@ -22,20 +22,20 @@ func main() {
 	fieldX := 400.0 - fieldWidth/2
 
 	g.DroneField = ui.TextField{
-		X: fieldX, Y: 200, Width: fieldWidth, Height: fieldHeight, Text: "5",
+		X: fieldX, Y: 200, Width: fieldWidth, Height: fieldHeight, Text: "1",
 		OnEnter: func(value int) {
 			g.DroneCount = value
 		},
 	}
 	g.PeopleField = ui.TextField{
-		X: fieldX, Y: 250, Width: fieldWidth, Height: fieldHeight, Text: "10",
+		X: fieldX, Y: 250, Width: fieldWidth, Height: fieldHeight, Text: "1",
 		OnEnter: func(value int) {
 			g.Sim.UpdateCrowdSize(value)
 			g.PeopleCount = value
 		},
 	}
 	g.ObstacleField = ui.TextField{
-		X: fieldX, Y: 300, Width: fieldWidth, Height: fieldHeight, Text: "5",
+		X: fieldX, Y: 300, Width: fieldWidth, Height: fieldHeight, Text: "1",
 		OnEnter: func(value int) {
 			g.ObstacleCount = value
 		},
