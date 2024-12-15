@@ -29,6 +29,7 @@ type Simulation struct {
 	ChargingChan               chan models.ChargingRequest
 	MedicalDeliveryChan        chan models.MedicalDeliveryRequest
 	SavePersonChan             chan models.SavePersonRequest
+	SavePeopleByRescuerChan    chan models.RescuePeopleRequest
 	Persons                    []persons.Person
 	Drones                     []drones.Drone
 	Obstacles                  []obstacles.Obstacle
@@ -46,20 +47,21 @@ type Simulation struct {
 
 func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 	s := &Simulation{
-		Map:                 GetMap(30, 20),
-		DroneSeeRange:       3,
-		DroneCommRange:      3,
-		MoveChan:            make(chan models.MovementRequest),
-		DeadChan:            make(chan models.DeadRequest),
-		ExitChan:            make(chan models.ExitRequest),
-		ChargingChan:        make(chan models.ChargingRequest),
-		SavePersonChan:      make(chan models.SavePersonRequest),
-		debug:               false,
-		hardDebug:           false,
-		currentTick:         0,
-		festivalTime:        NewFestivalTime(),
-		poiMap:              make(map[models.POIType][]models.Position),
-		MedicalDeliveryChan: make(chan models.MedicalDeliveryRequest),
+		Map:                     GetMap(30, 20),
+		DroneSeeRange:           3,
+		DroneCommRange:          3,
+		MoveChan:                make(chan models.MovementRequest),
+		DeadChan:                make(chan models.DeadRequest),
+		ExitChan:                make(chan models.ExitRequest),
+		ChargingChan:            make(chan models.ChargingRequest),
+		SavePersonChan:          make(chan models.SavePersonRequest),
+		debug:                   false,
+		hardDebug:               false,
+		currentTick:             0,
+		festivalTime:            NewFestivalTime(),
+		poiMap:                  make(map[models.POIType][]models.Position),
+		MedicalDeliveryChan:     make(chan models.MedicalDeliveryRequest),
+		SavePeopleByRescuerChan: make(chan models.RescuePeopleRequest),
 	}
 	s.Initialize(numDrones, numCrowdMembers, numObstacles)
 	go s.handleMovementRequests()
@@ -68,7 +70,63 @@ func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 	go s.handleChargingRequests()
 	go s.handleMedicalDelivery()
 	go s.handleSavePerson()
+	go s.handleSavePersonByRescuer()
 	return s
+}
+
+func (s *Simulation) handleSavePersonByRescuer() {
+	for req := range s.SavePeopleByRescuerChan {
+		authorized := false
+		reason := "Save failed"
+
+		// Trouver le drone correspondant au RescuerID
+		var theDrone *drones.Drone
+		for i := range s.Drones {
+			if s.Drones[i].ID == req.RescuerID {
+				theDrone = &s.Drones[i]
+				break
+			}
+		}
+
+		if theDrone != nil && theDrone.Rescuer != nil && theDrone.Rescuer.Person != nil {
+			// Vérifier que c'est la bonne personne
+			if theDrone.Rescuer.Person.ID == req.PersonID {
+				// Trouver la personne dans la simulation
+				var personToSave *persons.Person
+				for i := range s.Persons {
+					if s.Persons[i].ID == req.PersonID {
+						personToSave = &s.Persons[i]
+						break
+					}
+				}
+
+				if personToSave != nil {
+					// Vérifier la position du rescuer et de la personne
+					if math.Round(personToSave.Position.X) == math.Round(theDrone.Rescuer.Position.X) &&
+						math.Round(personToSave.Position.Y) == math.Round(theDrone.Rescuer.Position.Y) &&
+						personToSave.InDistress {
+
+						// Mise à jour de la personne
+						authorized = true
+						reason = "Person saved"
+						personToSave.InDistress = false
+						personToSave.CurrentDistressDuration = 0
+						personToSave.State.CurrentState = 2
+						personToSave.Profile.StaminaLevel = 1.0
+						personToSave.State.UpdateState(personToSave)
+						if s.debug {
+							fmt.Printf("Person %d has been healed by rescuer!\n", personToSave.ID)
+						}
+					}
+				}
+			}
+		}
+
+		req.ResponseChan <- models.RescuePeopleResponse{
+			Authorized: authorized,
+			Reason:     reason,
+		}
+	}
 }
 
 func (s *Simulation) handleSavePerson() {
@@ -417,7 +475,7 @@ func (s *Simulation) createDrones(n int) {
 	for i := 0; i < n; i++ {
 		// Generate a value between 60 and 100 in float
 		battery := 60 + rand.Float64()*(100-60)
-		d := drones.NewSurveillanceDrone(i, models.Position{X: 15, Y: 15}, battery, s.DroneSeeRange, s.DroneCommRange, droneSeeFunction, droneInComRange, s.MoveChan, s.poiMap, s.ChargingChan, s.MedicalDeliveryChan, s.SavePersonChan, 2)
+		d := drones.NewSurveillanceDrone(i, models.Position{X: 15, Y: 15}, battery, s.DroneSeeRange, s.DroneCommRange, droneSeeFunction, droneInComRange, s.MoveChan, s.poiMap, s.ChargingChan, s.MedicalDeliveryChan, s.SavePersonChan, 2, s.SavePeopleByRescuerChan)
 		s.Drones = append(s.Drones, d)
 		s.Map.AddDrone(&s.Drones[len(s.Drones)-1])
 	}

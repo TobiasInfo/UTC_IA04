@@ -30,9 +30,19 @@ type Drone struct {
 	Objectif                models.Position
 	HasMedicalGear          bool
 	SavePersonChan          chan models.SavePersonRequest
-	ProtocolMode            int // 1 = ancien protocole, 2 = nouveau protocole
+	ProtocolMode            int      // 1 = ancien protocole, 2 = nouveau protocole, 3 = nouveau protocole avec sauveteur
+	Rescuer                 *Rescuer // Pour le protocole 3, le sauveteur créé
+	SavePersonByRescuer     chan models.RescuePeopleRequest
 }
 
+type Rescuer struct {
+	Position    models.Position
+	Person      *persons.Person
+	MedicalTent models.Position
+	State       int // 0 = aller vers la personne, 1 = retour vers MedicalTent
+}
+
+// NewSurveillanceDrone crée un nouveau drone
 func NewSurveillanceDrone(id int,
 	position models.Position,
 	battery float64, droneSeeRange int,
@@ -44,7 +54,8 @@ func NewSurveillanceDrone(id int,
 	chargingChan chan models.ChargingRequest,
 	medicalDeliveryChan chan models.MedicalDeliveryRequest,
 	savePersonChan chan models.SavePersonRequest,
-	protocolMode int) Drone { // Ajout du paramètre protocolMode
+	protocolMode int,
+	savePersonByRescuer chan models.RescuePeopleRequest) Drone {
 	return Drone{
 		ID:                      id,
 		Position:                position,
@@ -68,6 +79,8 @@ func NewSurveillanceDrone(id int,
 		HasMedicalGear:          false,
 		SavePersonChan:          savePersonChan,
 		ProtocolMode:            protocolMode,
+		Rescuer:                 nil,
+		SavePersonByRescuer:     savePersonByRescuer,
 	}
 }
 
@@ -122,21 +135,12 @@ func (d *Drone) Move(target models.Position) bool {
 }
 
 func (d *Drone) ReceiveInfo() {
-	if d.ProtocolMode == 2 {
-		// NOUVEAU CODE (déjà parfait)
-		seenPeople := d.DroneSeeFunction(d)
-		droneInComRange := d.DroneInComRangeFunc(d)
+	// Le code est le même pour protocole 1, 2 ou 3, on récupère juste les infos
+	seenPeople := d.DroneSeeFunction(d)
+	droneInComRange := d.DroneInComRangeFunc(d)
 
-		d.SeenPeople = seenPeople
-		d.DroneInComRange = droneInComRange
-	} else {
-		// ANCIEN CODE
-		seenPeople := d.DroneSeeFunction(d)
-		droneInComRange := d.DroneInComRangeFunc(d)
-
-		d.SeenPeople = seenPeople
-		d.DroneInComRange = droneInComRange
-	}
+	d.SeenPeople = seenPeople
+	d.DroneInComRange = droneInComRange
 }
 
 func FindBestDroneForRescue(drones []*Drone, person *persons.Person) *Drone {
@@ -150,6 +154,7 @@ func FindBestDroneForRescue(drones []*Drone, person *persons.Person) *Drone {
 
 		medicalTentPos, _ := dr.closestPOI(models.MedicalTent)
 		_, distanceToCharging := dr.closestPOI(models.ChargingStation)
+		// On utilise la distance de Manhattan ici comme dans la version actuelle
 		distanceToTent := dr.Position.CalculateManhattanDistance(medicalTentPos)
 		distanceTentToPerson := medicalTentPos.CalculateManhattanDistance(person.Position)
 		totalDistance := distanceToTent + distanceTentToPerson + distanceToCharging + 2
@@ -219,7 +224,6 @@ func (d *Drone) nextStepToPos(pos models.Position) models.Position {
 			step = models.Position{X: d.Position.X, Y: d.Position.Y - 1}
 		}
 	}
-
 	return step
 }
 
@@ -232,7 +236,157 @@ func (d *Drone) BatteryManagement() (models.Position, bool) {
 	return models.Position{}, false
 }
 
+func (d *Drone) UpdateRescuer() {
+	if d.Rescuer == nil {
+		return
+	}
+	rescuer := d.Rescuer
+	if rescuer.State == 0 {
+		// Aller vers la personne
+		if rescuer.Position.X == math.Round(rescuer.Person.Position.X) && rescuer.Position.Y == math.Round(rescuer.Person.Position.Y) {
+			// Sauver la personne
+			fmt.Printf("[RESCUER] A sauvé la personne %d !\n", rescuer.Person.ID)
+			rescuer.Person.AssignedDroneID = nil
+
+			rescueResponse := make(chan models.RescuePeopleResponse)
+			d.SavePersonByRescuer <- models.RescuePeopleRequest{
+				PersonID:     rescuer.Person.ID,
+				RescuerID:    d.ID,
+				ResponseChan: rescueResponse,
+			}
+
+			// Lire la réponse pour éviter le deadlock
+			response := <-rescueResponse
+			if response.Authorized {
+				fmt.Printf("[RESCUER] La personne %d a bien été soignée\n", rescuer.Person.ID)
+			} else {
+				fmt.Printf("[RESCUER] Échec du soin de la personne %d : %s\n", rescuer.Person.ID, response.Reason)
+			}
+
+			// Retourner au MedicalTent
+			rescuer.State = 1
+		} else {
+			rescuer.Position = stepTowards(rescuer.Position, rescuer.Person.Position)
+		}
+	} else if rescuer.State == 1 {
+		// Retour au MedicalTent
+		if rescuer.Position.X == rescuer.MedicalTent.X && rescuer.Position.Y == rescuer.MedicalTent.Y {
+			// Rescuer disparaît
+			fmt.Printf("[RESCUER] Mission terminée, disparition du sauveteur.\n")
+			d.Rescuer = nil
+			d.PeopleToSave = nil
+		} else {
+			rescuer.Position = stepTowards(rescuer.Position, rescuer.MedicalTent)
+		}
+	}
+}
+
+// stepTowards calcule un pas vers une cible
+func stepTowards(from, to models.Position) models.Position {
+	dx := to.X - from.X
+	dy := to.Y - from.Y
+	var step models.Position = from
+	if math.Abs(dx) > math.Abs(dy) {
+		if dx > 0 {
+			step.X = from.X + 1
+		} else {
+			step.X = from.X - 1
+		}
+	} else {
+		if dy > 0 {
+			step.Y = from.Y + 1
+		} else {
+			step.Y = from.Y - 1
+		}
+	}
+	return step
+}
+
 func (d *Drone) Think() models.Position {
+	if d.ProtocolMode == 3 {
+		// Protocole 3 : Comme le 2 mais le drone n'a pas besoin d'aller au medical gear physiquement
+		// Il doit juste se mettre à distance de communication d'un medical gear
+		// Une fois le medical gear dans sa communication range, il crée un Rescuer
+		// Le Rescuer va de la tente médicale à la personne, la sauve, puis revient.
+
+		pos, goCharging := d.BatteryManagement()
+		if goCharging {
+			return pos
+		}
+
+		// Si on a déjà un rescuer, on le met à jour
+		if d.Rescuer != nil {
+			d.UpdateRescuer()
+			if d.Rescuer != nil {
+				// Le rescuer est toujours en mission, le drone peut bouger aléatoirement
+				// pour continuer sa patrouille pendant que le sauveteur opère.
+				return d.randomMovement() // ADDED : fonction pour mouvement aléatoire
+			} else {
+				// Le sauveteur a terminé, le drone n'a plus de mission
+				return d.randomMovement() // ADDED
+			}
+		}
+
+		// Si pas de rescuer, on regarde si on a une personne à sauver
+		if d.PeopleToSave != nil {
+			medicalTentPos, _ := d.closestPOI(models.MedicalTent)
+			distToTent := d.Position.CalculateManhattanDistance(medicalTentPos)
+			if distToTent <= float64(d.DroneCommRange) {
+				// On peut appeler un rescuer
+				fmt.Printf("[DRONE %d] Le medical gear est à portée de communication, création d'un Rescuer pour la personne %d\n", d.ID, d.PeopleToSave.ID)
+				d.Rescuer = &Rescuer{
+					Position:    medicalTentPos,
+					Person:      d.PeopleToSave,
+					MedicalTent: medicalTentPos,
+					State:       0,
+				}
+				// Le drone n'est plus responsable de la personne
+				d.PeopleToSave = nil // ADDED : Le drone se libère de la mission
+				// Maintenant le drone peut reprendre sa patrouille
+				return d.randomMovement() // ADDED
+			} else {
+				// Se rapprocher du medicalTent
+				return d.nextStepToPos(medicalTentPos)
+			}
+		}
+
+		// Sinon, on cherche une personne en détresse
+		for _, person := range d.SeenPeople {
+			if person.IsInDistress() {
+				if person.IsAssigned() && (d.PeopleToSave == nil || d.PeopleToSave.ID != person.ID) {
+					continue
+				}
+				fmt.Printf("[DRONE %d] A détecté une personne en détresse (ID: %d) à (%.0f, %.0f)\n", d.ID, person.ID, person.Position.X, person.Position.Y)
+				allDrones := d.GetAllReachableDrones()
+				for _, dr := range allDrones {
+					if dr.ID != d.ID {
+						fmt.Printf("[DRONE %d] Informe DRONE %d d'une personne en détresse (ID: %d)\n", d.ID, dr.ID, person.ID)
+					}
+				}
+
+				bestDrone := FindBestDroneForRescue(allDrones, person)
+				if bestDrone == nil {
+					fmt.Printf("[DRONE %d] Aucun drone ne peut gérer la personne %d (batterie insuffisante ou tous occupés)\n", d.ID, person.ID)
+					break
+				}
+				if bestDrone.ID == d.ID {
+					fmt.Printf("[DRONE %d] Prend en charge la personne %d (protocole 3)\n", d.ID, person.ID)
+					person.AssignedDroneID = &d.ID
+					d.PeopleToSave = person
+					medicalTentPos, _ := d.closestPOI(models.MedicalTent)
+					return d.nextStepToPos(medicalTentPos)
+				} else {
+					fmt.Printf("[DRONE %d] Ne gère pas la personne %d, c'est le DRONE %d qui s'en charge.\n", d.ID, person.ID, bestDrone.ID)
+					person.AssignedDroneID = &bestDrone.ID
+					bestDrone.PeopleToSave = person
+					return d.randomMovement() // Le drone courant continue sa patrouille
+				}
+			}
+		}
+
+		// Pas de personne en détresse, on patrouille
+		return d.randomMovement()
+	}
 	if d.ProtocolMode == 2 {
 		pos, goCharging := d.BatteryManagement()
 		if goCharging {
@@ -315,28 +469,7 @@ func (d *Drone) Think() models.Position {
 				}
 			}
 		}
-
-		directions := []models.Position{
-			{X: 0, Y: -1},
-			{X: 0, Y: 1},
-			{X: -1, Y: 0},
-			{X: 1, Y: 0},
-		}
-
-		rand.Shuffle(len(directions), func(i, j int) {
-			directions[i], directions[j] = directions[j], directions[i]
-		})
-
-		for _, dir := range directions {
-			target := models.Position{
-				X: d.Position.X + dir.X,
-				Y: d.Position.Y + dir.Y,
-			}
-			if target.X >= 0 && target.Y >= 0 && target.X < 30 && target.Y < 20 {
-				return target
-			}
-		}
-		return d.Position
+		return d.randomMovement()
 	} else {
 		pos, goCharging := d.BatteryManagement()
 		if goCharging {
@@ -404,29 +537,32 @@ func (d *Drone) Think() models.Position {
 				}
 			}
 		}
-
-		directions := []models.Position{
-			{X: 0, Y: -1},
-			{X: 0, Y: 1},
-			{X: -1, Y: 0},
-			{X: 1, Y: 0},
-		}
-
-		rand.Shuffle(len(directions), func(i, j int) {
-			directions[i], directions[j] = directions[j], directions[i]
-		})
-
-		for _, dir := range directions {
-			target := models.Position{
-				X: d.Position.X + dir.X,
-				Y: d.Position.Y + dir.Y,
-			}
-			if target.X >= 0 && target.Y >= 0 && target.X < 30 && target.Y < 20 {
-				return target
-			}
-		}
-		return d.Position
+		return d.randomMovement()
 	}
+}
+
+func (d *Drone) randomMovement() models.Position {
+	directions := []models.Position{
+		{X: 0, Y: -1},
+		{X: 0, Y: 1},
+		{X: -1, Y: 0},
+		{X: 1, Y: 0},
+	}
+
+	rand.Shuffle(len(directions), func(i, j int) {
+		directions[i], directions[j] = directions[j], directions[i]
+	})
+
+	for _, dir := range directions {
+		target := models.Position{
+			X: d.Position.X + dir.X,
+			Y: d.Position.Y + dir.Y,
+		}
+		if target.X >= 0 && target.Y >= 0 && target.X < 30 && target.Y < 20 {
+			return target
+		}
+	}
+	return d.Position
 }
 
 func (d *Drone) Myturn() {
@@ -436,13 +572,7 @@ func (d *Drone) Myturn() {
 	}
 	d.ReceiveInfo()
 
-	if d.ProtocolMode == 2 {
-		target := d.Think()
-		moved := d.Move(target)
-		if !moved {
-			fmt.Printf("Drone %d could not move to %v\n", d.ID, target)
-		}
-	} else {
+	if d.ProtocolMode == 2 || d.ProtocolMode == 1 || d.ProtocolMode == 3 {
 		target := d.Think()
 		moved := d.Move(target)
 		if !moved {
