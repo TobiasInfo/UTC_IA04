@@ -36,6 +36,7 @@ type Person struct {
 	hardDebug               bool
 	HasReceivedMedical      bool
 	TreatmentTime           time.Duration
+	AssignedDroneID        *int
 }
 
 func NewCrowdMember(id int, position models.Position, distressProbability float64, lifespan int, width int, height int, moveChan chan models.MovementRequest, deadChan chan models.DeadRequest, exitChan chan models.ExitRequest) Person {
@@ -74,6 +75,10 @@ func NewCrowdMember(id int, position models.Position, distressProbability float6
 		TreatmentTime:           0,
 	}
 	return p
+}
+
+func (p *Person) IsAssigned() bool {
+    return p.AssignedDroneID != nil
 }
 
 func (c *Person) Myturn() {

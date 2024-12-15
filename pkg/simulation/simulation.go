@@ -48,7 +48,7 @@ func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 	s := &Simulation{
 		Map:                 GetMap(30, 20),
 		DroneSeeRange:       3,
-		DroneCommRange:      5,
+		DroneCommRange:      3,
 		MoveChan:            make(chan models.MovementRequest),
 		DeadChan:            make(chan models.DeadRequest),
 		ExitChan:            make(chan models.ExitRequest),
@@ -395,30 +395,29 @@ func (s *Simulation) createDrones(n int) {
 	}
 
 	droneInComRange := func(d *drones.Drone) []*drones.Drone {
-		currentCell := d.Position
 		rangeDrone := s.DroneCommRange
-
-		Vector := models.Vector{X: currentCell.X, Y: currentCell.Y}
-		_, valuesInt := Vector.GenerateCircleValues(rangeDrone)
-
 		droneInformations := make([]*drones.Drone, 0)
 
-		for i := 0; i < len(valuesInt); i++ {
-			position := valuesInt[i]
-			if _, exists := s.Map.Cells[position]; exists {
-				for _, drone := range s.Drones {
-					droneInformations = append(droneInformations, &drone)
+		for i := range s.Drones {
+			drone := &s.Drones[i]
+			if drone == d {
+				continue
+			}
 
-				}
+			dist := drone.Position.CalculateDistance(d.Position)
+
+			if dist <= float64(rangeDrone) {
+				droneInformations = append(droneInformations, drone)
 			}
 		}
+
 		return droneInformations
 	}
 
 	for i := 0; i < n; i++ {
 		// Generate a value between 60 and 100 in float
 		battery := 60 + rand.Float64()*(100-60)
-		d := drones.NewSurveillanceDrone(i, models.Position{X: 15, Y: 15}, battery, s.DroneSeeRange, s.DroneCommRange, droneSeeFunction, droneInComRange, s.MoveChan, s.poiMap, s.ChargingChan, s.MedicalDeliveryChan, s.SavePersonChan)
+		d := drones.NewSurveillanceDrone(i, models.Position{X: 15, Y: 15}, battery, s.DroneSeeRange, s.DroneCommRange, droneSeeFunction, droneInComRange, s.MoveChan, s.poiMap, s.ChargingChan, s.MedicalDeliveryChan, s.SavePersonChan, 2)
 		s.Drones = append(s.Drones, d)
 		s.Map.AddDrone(&s.Drones[len(s.Drones)-1])
 	}
