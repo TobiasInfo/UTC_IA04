@@ -240,7 +240,35 @@ func (g *Game) drawSimulation(screen *ebiten.Image) {
 		info := fmt.Sprintf("Visitors: %d", personsAtPOI)
 		ebitenutil.DebugPrintAt(screen, info, mx+10, my+10)
 	}
+
 	mx, my := ebiten.CursorPosition()
+
+	// Check for hovering over rescuers
+	for _, drone := range g.Sim.Drones {
+		if drone.Rescuer != nil {
+			rescuerPos := drone.Rescuer.Position
+			if math.Abs(float64(mx)/30-rescuerPos.X) <= 0.3 &&
+				math.Abs(float64(my)/30-rescuerPos.Y) <= 0.3 {
+				rescuerInfo := fmt.Sprintf(
+					"Rescuer Info:\n"+
+						"From Drone: %d\n"+
+						"Status: %s\n"+
+						"Target Person: %d\n"+
+						"Position: (%.1f, %.1f)",
+					drone.ID,
+					map[int]string{0: "Going to Person", 1: "Returning to Tent"}[drone.Rescuer.State],
+					drone.Rescuer.Person.ID,
+					rescuerPos.X,
+					rescuerPos.Y,
+				)
+				ebitenutil.DebugPrintAt(screen, rescuerInfo, mx+10, my+10)
+				// Skip other hover checks if we're hovering over a rescuer
+				return
+			}
+		}
+	}
+
+	// Check for hovering over people
 	if hoveredPerson := g.getHoveredPerson(float64(mx), float64(my)); hoveredPerson != nil {
 		mapPos := g.Sim.GetPersonPauseInMap(hoveredPerson)
 		personInfo := fmt.Sprintf(
@@ -260,9 +288,11 @@ func (g *Game) drawSimulation(screen *ebiten.Image) {
 		)
 		ebitenutil.DebugPrintAt(screen, personInfo, mx+10, my+10)
 	}
+
+	// Check for hovering over drones
 	if hoveredDrone := g.getHoveredDrone(float64(mx), float64(my)); hoveredDrone != nil {
 		dronePosInMap := g.Sim.GetDronePauseInMap(hoveredDrone)
-		personInfo := fmt.Sprintf(
+		droneInfo := fmt.Sprintf(
 			"Drone Info\n"+
 				"ID: %d\n"+
 				"Position: (%.1f, %.1f) \n"+
@@ -275,7 +305,7 @@ func (g *Game) drawSimulation(screen *ebiten.Image) {
 			dronePosInMap.Y,
 			hoveredDrone.Battery,
 		)
-		ebitenutil.DebugPrintAt(screen, personInfo, mx+10, my+10)
+		ebitenutil.DebugPrintAt(screen, droneInfo, mx+10, my+10)
 	}
 }
 
@@ -320,6 +350,42 @@ func (g *Game) drawDynamicLayer() {
 
 	seenPeople := make(map[int]bool)
 
+	// Draw rescuers first (before drones)
+	for _, drone := range g.Sim.Drones {
+		if drone.Rescuer != nil {
+			rescuerPos := drone.Rescuer.Position
+
+			// Draw base circle for rescuer
+			drawCircle(g.DynamicLayer, rescuerPos.X*30, rescuerPos.Y*30, 6, color.RGBA{0, 255, 0, 255})
+
+			// Draw red cross over circle
+			crossSize := 4.0
+			drawRectangle(g.DynamicLayer,
+				(rescuerPos.X*30)-crossSize, rescuerPos.Y*30-1,
+				crossSize*2, 2,
+				color.RGBA{255, 0, 0, 255})
+			drawRectangle(g.DynamicLayer,
+				rescuerPos.X*30-1, (rescuerPos.Y*30)-crossSize,
+				2, crossSize*2,
+				color.RGBA{255, 0, 0, 255})
+
+			// Draw path line
+			if drone.Rescuer.State == 0 {
+				// Line to target person
+				ebitenutil.DrawLine(g.DynamicLayer,
+					rescuerPos.X*30, rescuerPos.Y*30,
+					drone.Rescuer.Person.Position.X*30, drone.Rescuer.Person.Position.Y*30,
+					color.RGBA{0, 255, 0, 128})
+			} else {
+				// Line back to medical tent
+				ebitenutil.DrawLine(g.DynamicLayer,
+					rescuerPos.X*30, rescuerPos.Y*30,
+					drone.Rescuer.MedicalTent.X*30, drone.Rescuer.MedicalTent.Y*30,
+					color.RGBA{0, 255, 0, 128})
+			}
+		}
+	}
+
 	// Draw drones
 	for _, drone := range g.Sim.Drones {
 		drawTranslucentCircle(g.DynamicLayer, drone.Position.X*30, drone.Position.Y*30, float64(g.Sim.DroneSeeRange)*30, color.RGBA{0, 0, 0, 32})
@@ -337,17 +403,8 @@ func (g *Game) drawDynamicLayer() {
 			g.DynamicLayer.DrawImage(g.DroneImage, op)
 
 			for _, person := range drone.SeenPeople {
-				//
-				//couleur := color.RGBA{255, 0, 0, 255}
-				//if person.HasReachedPOI() {
-				//	couleur = color.RGBA{0, 255, 0, 255} // Green for resting people
-				//}
-				//if person.IsInDistress() {
-				//	couleur = color.RGBA{0, 0, 0, 255} // Black for people in distress
-				//}
 				drawRectangle(g.DynamicLayer, person.Position.X*30, person.Position.Y*30, 5, 5, color.RGBA{255, 255, 0, 255})
 				seenPeople[person.ID] = true
-				//fmt.Println("Drone has seen ", person.ID, person.Position.X, person.Position.Y)
 			}
 		} else {
 			drawCircle(g.DynamicLayer, drone.Position.X*30, drone.Position.Y*30, 10, color.RGBA{0, 0, 255, 255})
@@ -366,10 +423,10 @@ func (g *Game) drawDynamicLayer() {
 
 		couleur := color.RGBA{255, 0, 0, 255}
 		if person.HasReachedPOI() {
-			couleur = color.RGBA{0, 255, 0, 255} // Green for resting people
+			couleur = color.RGBA{0, 255, 0, 255}
 		}
 		if person.IsInDistress() {
-			couleur = color.RGBA{0, 0, 0, 255} // Black for people in distress
+			couleur = color.RGBA{0, 0, 0, 255}
 		}
 		drawCircle(g.DynamicLayer, person.Position.X*30, person.Position.Y*30, 3, couleur)
 	}

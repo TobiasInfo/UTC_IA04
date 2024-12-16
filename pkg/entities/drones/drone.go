@@ -30,16 +30,18 @@ type Drone struct {
 	Objectif                models.Position
 	HasMedicalGear          bool
 	SavePersonChan          chan models.SavePersonRequest
-	ProtocolMode            int      // 1 = ancien protocole, 2 = nouveau protocole, 3 = nouveau protocole avec sauveteur
-	Rescuer                 *Rescuer // Pour le protocole 3, le sauveteur créé
+	ProtocolMode            int      // 1 = protocol 1, 2 = protocol 2, 3 = protocol 3
+	Rescuer                 *Rescuer // For protocol 3, the spawned rescuer
 	SavePersonByRescuer     chan models.RescuePeopleRequest
 }
 
 type Rescuer struct {
+	ID          int
 	Position    models.Position
 	Person      *persons.Person
 	MedicalTent models.Position
-	State       int // 0 = aller vers la personne, 1 = retour vers MedicalTent
+	State       int  // 0 = going to person, 1 = returning to tent
+	Active      bool // Tracks if Rescuer is currently on a mission
 }
 
 // NewSurveillanceDrone crée un nouveau drone
@@ -241,11 +243,17 @@ func (d *Drone) UpdateRescuer() {
 		return
 	}
 	rescuer := d.Rescuer
+
+	if !rescuer.Active {
+		return
+	}
+
 	if rescuer.State == 0 {
-		// Aller vers la personne
-		if rescuer.Position.X == math.Round(rescuer.Person.Position.X) && rescuer.Position.Y == math.Round(rescuer.Person.Position.Y) {
-			// Sauver la personne
-			fmt.Printf("[RESCUER] A sauvé la personne %d !\n", rescuer.Person.ID)
+		// Moving towards person
+		if rescuer.Position.X == math.Round(rescuer.Person.Position.X) &&
+			rescuer.Position.Y == math.Round(rescuer.Person.Position.Y) {
+			// Save the person
+			fmt.Printf("[RESCUER] Saving person %d\n", rescuer.Person.ID)
 			rescuer.Person.AssignedDroneID = nil
 
 			rescueResponse := make(chan models.RescuePeopleResponse)
@@ -255,27 +263,30 @@ func (d *Drone) UpdateRescuer() {
 				ResponseChan: rescueResponse,
 			}
 
-			// Lire la réponse pour éviter le deadlock
 			response := <-rescueResponse
 			if response.Authorized {
-				fmt.Printf("[RESCUER] La personne %d a bien été soignée\n", rescuer.Person.ID)
+				fmt.Printf("[RESCUER] Successfully treated person %d\n", rescuer.Person.ID)
 			} else {
-				fmt.Printf("[RESCUER] Échec du soin de la personne %d : %s\n", rescuer.Person.ID, response.Reason)
+				fmt.Printf("[RESCUER] Failed to treat person %d: %s\n", rescuer.Person.ID, response.Reason)
 			}
 
-			// Retourner au MedicalTent
+			// Start return journey
 			rescuer.State = 1
 		} else {
+			// Move one step closer to person
 			rescuer.Position = stepTowards(rescuer.Position, rescuer.Person.Position)
 		}
 	} else if rescuer.State == 1 {
-		// Retour au MedicalTent
-		if rescuer.Position.X == rescuer.MedicalTent.X && rescuer.Position.Y == rescuer.MedicalTent.Y {
-			// Rescuer disparaît
-			fmt.Printf("[RESCUER] Mission terminée, disparition du sauveteur.\n")
+		// Returning to medical tent
+		if rescuer.Position.X == rescuer.MedicalTent.X &&
+			rescuer.Position.Y == rescuer.MedicalTent.Y {
+			// Mission complete, rescuer disappears
+			fmt.Printf("[RESCUER] Mission complete, returning to tent.\n")
+			rescuer.Active = false
 			d.Rescuer = nil
 			d.PeopleToSave = nil
 		} else {
+			// Move one step closer to tent
 			rescuer.Position = stepTowards(rescuer.Position, rescuer.MedicalTent)
 		}
 	}
@@ -285,7 +296,8 @@ func (d *Drone) UpdateRescuer() {
 func stepTowards(from, to models.Position) models.Position {
 	dx := to.X - from.X
 	dy := to.Y - from.Y
-	var step models.Position = from
+	step := from
+
 	if math.Abs(dx) > math.Abs(dy) {
 		if dx > 0 {
 			step.X = from.X + 1
@@ -304,87 +316,94 @@ func stepTowards(from, to models.Position) models.Position {
 
 func (d *Drone) Think() models.Position {
 	if d.ProtocolMode == 3 {
-		// Protocole 3 : Comme le 2 mais le drone n'a pas besoin d'aller au medical gear physiquement
-		// Il doit juste se mettre à distance de communication d'un medical gear
-		// Une fois le medical gear dans sa communication range, il crée un Rescuer
-		// Le Rescuer va de la tente médicale à la personne, la sauve, puis revient.
-
+		// Handle battery management first
 		pos, goCharging := d.BatteryManagement()
 		if goCharging {
 			return pos
 		}
 
-		// Si on a déjà un rescuer, on le met à jour
+		// Update existing rescuer if one exists
 		if d.Rescuer != nil {
 			d.UpdateRescuer()
 			if d.Rescuer != nil {
-				// Le rescuer est toujours en mission, le drone peut bouger aléatoirement
-				// pour continuer sa patrouille pendant que le sauveteur opère.
-				return d.randomMovement() // ADDED : fonction pour mouvement aléatoire
+				// Rescuer still active, continue patrol
+				return d.randomMovement()
 			} else {
-				// Le sauveteur a terminé, le drone n'a plus de mission
-				return d.randomMovement() // ADDED
+				// Rescuer finished, clear mission
+				return d.randomMovement()
 			}
 		}
 
-		// Si pas de rescuer, on regarde si on a une personne à sauver
+		// Check if we have a person to save
 		if d.PeopleToSave != nil {
 			medicalTentPos, _ := d.closestPOI(models.MedicalTent)
 			distToTent := d.Position.CalculateManhattanDistance(medicalTentPos)
+
 			if distToTent <= float64(d.DroneCommRange) {
-				// On peut appeler un rescuer
-				fmt.Printf("[DRONE %d] Le medical gear est à portée de communication, création d'un Rescuer pour la personne %d\n", d.ID, d.PeopleToSave.ID)
+				// Within communication range, spawn rescuer
+				fmt.Printf("[DRONE %d] Within medical tent range, spawning rescuer for person %d\n",
+					d.ID, d.PeopleToSave.ID)
 				d.Rescuer = &Rescuer{
+					ID:          d.ID,
 					Position:    medicalTentPos,
 					Person:      d.PeopleToSave,
 					MedicalTent: medicalTentPos,
 					State:       0,
+					Active:      true,
 				}
-				// Le drone n'est plus responsable de la personne
-				d.PeopleToSave = nil // ADDED : Le drone se libère de la mission
-				// Maintenant le drone peut reprendre sa patrouille
-				return d.randomMovement() // ADDED
+				// Clear mission and return to patrol
+				d.PeopleToSave = nil
+				return d.randomMovement()
 			} else {
-				// Se rapprocher du medicalTent
+				// Move towards medical tent
 				return d.nextStepToPos(medicalTentPos)
 			}
 		}
 
-		// Sinon, on cherche une personne en détresse
+		// Look for new people in distress
 		for _, person := range d.SeenPeople {
 			if person.IsInDistress() {
 				if person.IsAssigned() && (d.PeopleToSave == nil || d.PeopleToSave.ID != person.ID) {
 					continue
 				}
-				fmt.Printf("[DRONE %d] A détecté une personne en détresse (ID: %d) à (%.0f, %.0f)\n", d.ID, person.ID, person.Position.X, person.Position.Y)
+
+				fmt.Printf("[DRONE %d] Detected person in distress (ID: %d) at (%.0f, %.0f)\n",
+					d.ID, person.ID, person.Position.X, person.Position.Y)
+
+				// Get all reachable drones
 				allDrones := d.GetAllReachableDrones()
 				for _, dr := range allDrones {
 					if dr.ID != d.ID {
-						fmt.Printf("[DRONE %d] Informe DRONE %d d'une personne en détresse (ID: %d)\n", d.ID, dr.ID, person.ID)
+						fmt.Printf("[DRONE %d] Informing DRONE %d about person in distress (ID: %d)\n",
+							d.ID, dr.ID, person.ID)
 					}
 				}
 
+				// Find best drone for rescue
 				bestDrone := FindBestDroneForRescue(allDrones, person)
 				if bestDrone == nil {
-					fmt.Printf("[DRONE %d] Aucun drone ne peut gérer la personne %d (batterie insuffisante ou tous occupés)\n", d.ID, person.ID)
+					fmt.Printf("[DRONE %d] No drone available for person %d (insufficient battery or all busy)\n",
+						d.ID, person.ID)
 					break
 				}
+
 				if bestDrone.ID == d.ID {
-					fmt.Printf("[DRONE %d] Prend en charge la personne %d (protocole 3)\n", d.ID, person.ID)
+					fmt.Printf("[DRONE %d] Taking responsibility for person %d (protocol 3)\n",
+						d.ID, person.ID)
 					person.AssignedDroneID = &d.ID
 					d.PeopleToSave = person
 					medicalTentPos, _ := d.closestPOI(models.MedicalTent)
 					return d.nextStepToPos(medicalTentPos)
 				} else {
-					fmt.Printf("[DRONE %d] Ne gère pas la personne %d, c'est le DRONE %d qui s'en charge.\n", d.ID, person.ID, bestDrone.ID)
+					fmt.Printf("[DRONE %d] Not handling person %d, DRONE %d will handle it.\n",
+						d.ID, person.ID, bestDrone.ID)
 					person.AssignedDroneID = &bestDrone.ID
 					bestDrone.PeopleToSave = person
-					return d.randomMovement() // Le drone courant continue sa patrouille
 				}
 			}
 		}
 
-		// Pas de personne en détresse, on patrouille
+		// No person in distress, continue patrol
 		return d.randomMovement()
 	}
 	if d.ProtocolMode == 2 {

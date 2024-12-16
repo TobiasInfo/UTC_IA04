@@ -17,6 +17,7 @@ import (
 
 const (
 	DEFAULT_DISTRESS_PROBABILITY = 0.999999
+	DEFAULT_PROTOCOL_MODE        = 3
 )
 
 type Simulation struct {
@@ -473,9 +474,13 @@ func (s *Simulation) createDrones(n int) {
 	}
 
 	for i := 0; i < n; i++ {
-		// Generate a value between 60 and 100 in float
 		battery := 60 + rand.Float64()*(100-60)
-		d := drones.NewSurveillanceDrone(i, models.Position{X: 15, Y: 15}, battery, s.DroneSeeRange, s.DroneCommRange, droneSeeFunction, droneInComRange, s.MoveChan, s.poiMap, s.ChargingChan, s.MedicalDeliveryChan, s.SavePersonChan, 2, s.SavePeopleByRescuerChan)
+		d := drones.NewSurveillanceDrone(i, models.Position{X: 15, Y: 15},
+			battery, s.DroneSeeRange, s.DroneCommRange,
+			droneSeeFunction, droneInComRange, s.MoveChan,
+			s.poiMap, s.ChargingChan, s.MedicalDeliveryChan,
+			s.SavePersonChan, DEFAULT_PROTOCOL_MODE, // Use the constant here
+			s.SavePeopleByRescuerChan)
 		s.Drones = append(s.Drones, d)
 		s.Map.AddDrone(&s.Drones[len(s.Drones)-1])
 	}
