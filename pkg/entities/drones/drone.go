@@ -298,7 +298,7 @@ func stepTowards(from, to models.Position) models.Position {
 	dy := to.Y - from.Y
 	step := from
 
-	if math.Abs(dx) > math.Abs(dy) {
+	if math.Abs(dx) > math.Abs(dy)+0.0001 {
 		if dx > 0 {
 			step.X = from.X + 1
 		} else {
