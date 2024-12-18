@@ -11,9 +11,9 @@ import (
 
 func main() {
 	g := game.NewGame(
-		5,  // default drone count
-		10, // default people count
-		5,  // default obstacle count
+		1,  // default drone count
+		1, // default people count
+		1,  // default obstacle count
 	)
 	println("Debut simu dans GUI")
 	//fmt.Printf("Simulation Details: %+v\n", g.Sim.GetAvailablePOIs())
@@ -24,7 +24,7 @@ func main() {
 	fieldX := 200.0 - fieldWidth/2
 
 	g.DroneField = ui.TextField{
-		X: fieldX, Y: 200, Width: fieldWidth, Height: fieldHeight, Text: "5",
+		X: fieldX, Y: 200, Width: fieldWidth, Height: fieldHeight, Text: "1",
 		OnEnter: func(value int) {
 			g.DroneCount = value
 		},
@@ -36,7 +36,6 @@ func main() {
 			g.PeopleCount = value
 		},
 	}
-
 	g.DropdownMap = ui.Dropdown{
 		X: fieldX, Y: 270, Width: fieldWidth, Height: fieldHeight,
 		Options:       []string{"Carte test 1", "Carte test 2", "Option 3"},
@@ -67,12 +66,6 @@ func main() {
 			if val, err := strconv.Atoi(g.PeopleField.Text); err == nil {
 				g.PeopleCount = val
 			}
-
-			// Now start the simulation with the updated values
-			// BIG BIG ERREUR DE TOBIAS ICI, POUR LE SHAMER NOUS ALLONS LAISSER LE CODE D'ORIGINE
-			// SHAME ??, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔
-			//g.Sim = simulation.NewSimulation(g.DroneCount, g.PeopleCount, g.ObstacleCount)
-
 			g.Sim.UpdateCrowdSize(g.PeopleCount)
 			g.Sim.UpdateDroneSize(g.DroneCount)
 
@@ -90,12 +83,6 @@ func main() {
 			if val, err := strconv.Atoi(g.PeopleField.Text); err == nil {
 				g.PeopleCount = val
 			}
-
-			// Now start the simulation with the updated values
-			// BIG BIG ERREUR DE TOBIAS ICI, POUR LE SHAMER NOUS ALLONS LAISSER LE CODE D'ORIGINE
-			// SHAME ??, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔
-			//g.Sim = simulation.NewSimulation(g.DroneCount, g.PeopleCount, g.ObstacleCount)
-
 			g.Sim.UpdateCrowdSize(g.PeopleCount)
 			g.Sim.UpdateDroneSize(g.DroneCount)
 

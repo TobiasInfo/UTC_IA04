@@ -9,13 +9,17 @@ import (
 	"UTC_IA04/pkg/entities/persons"
 	"UTC_IA04/pkg/models"
 	"fmt"
+	"math"
 	"math/rand"
 	"sync"
 	"time"
 	"math"
 )
 
-//const ( DEFAULT_DISTRESS_PROBABILITY = 0.9 )
+const (
+	DEFAULT_DISTRESS_PROBABILITY = 0.999999
+	DEFAULT_PROTOCOL_MODE        = 3
+)
 
 type Simulation struct {
 	Map                        *Map
@@ -25,6 +29,9 @@ type Simulation struct {
 	DeadChan                   chan models.DeadRequest
 	ExitChan                   chan models.ExitRequest
 	ChargingChan               chan models.ChargingRequest
+	MedicalDeliveryChan        chan models.MedicalDeliveryRequest
+	SavePersonChan             chan models.SavePersonRequest
+	SavePeopleByRescuerChan    chan models.RescuePeopleRequest
 	Persons                    []persons.Person
 	Drones                     []drones.Drone
 	Obstacles                  []obstacles.Obstacle
@@ -42,25 +49,144 @@ type Simulation struct {
 
 func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 	s := &Simulation{
-		Map:            GetMap(30, 20),
-		DroneSeeRange:  3,
-		DroneCommRange: 5,
-		MoveChan:       make(chan models.MovementRequest),
-		DeadChan:       make(chan models.DeadRequest),
-		ExitChan:       make(chan models.ExitRequest),
-		ChargingChan:   make(chan models.ChargingRequest),
-		debug:          false,
-		hardDebug:      false,
-		currentTick:    0,
-		festivalTime:   NewFestivalTime(),
-		poiMap:         make(map[models.POIType][]models.Position),
+		Map:                     GetMap(30, 20),
+		DroneSeeRange:           3,
+		DroneCommRange:          3,
+		MoveChan:                make(chan models.MovementRequest),
+		DeadChan:                make(chan models.DeadRequest),
+		ExitChan:                make(chan models.ExitRequest),
+		ChargingChan:            make(chan models.ChargingRequest),
+		SavePersonChan:          make(chan models.SavePersonRequest),
+		debug:                   false,
+		hardDebug:               false,
+		currentTick:             0,
+		festivalTime:            NewFestivalTime(),
+		poiMap:                  make(map[models.POIType][]models.Position),
+		MedicalDeliveryChan:     make(chan models.MedicalDeliveryRequest),
+		SavePeopleByRescuerChan: make(chan models.RescuePeopleRequest),
 	}
 	s.Initialize(numDrones, numCrowdMembers, numObstacles)
 	go s.handleMovementRequests()
 	go s.handleDeadPerson()
 	go s.handleExitRequest()
 	go s.handleChargingRequests()
+	go s.handleMedicalDelivery()
+	go s.handleSavePerson()
+	go s.handleSavePersonByRescuer()
 	return s
+}
+
+func (s *Simulation) handleSavePersonByRescuer() {
+	for req := range s.SavePeopleByRescuerChan {
+		authorized := false
+		reason := "Save failed"
+
+		// Trouver le drone correspondant au RescuerID
+		var theDrone *drones.Drone
+		for i := range s.Drones {
+			if s.Drones[i].ID == req.RescuerID {
+				theDrone = &s.Drones[i]
+				break
+			}
+		}
+
+		if theDrone != nil && theDrone.Rescuer != nil && theDrone.Rescuer.Person != nil {
+			// Vérifier que c'est la bonne personne
+			if theDrone.Rescuer.Person.ID == req.PersonID {
+				// Trouver la personne dans la simulation
+				var personToSave *persons.Person
+				for i := range s.Persons {
+					if s.Persons[i].ID == req.PersonID {
+						personToSave = &s.Persons[i]
+						break
+					}
+				}
+
+				if personToSave != nil {
+					// Vérifier la position du rescuer et de la personne
+					if math.Round(personToSave.Position.X) == math.Round(theDrone.Rescuer.Position.X) &&
+						math.Round(personToSave.Position.Y) == math.Round(theDrone.Rescuer.Position.Y) &&
+						personToSave.InDistress {
+
+						// Mise à jour de la personne
+						authorized = true
+						reason = "Person saved"
+						personToSave.InDistress = false
+						personToSave.CurrentDistressDuration = 0
+						personToSave.State.CurrentState = 2
+						personToSave.Profile.StaminaLevel = 1.0
+						personToSave.State.UpdateState(personToSave)
+						if s.debug {
+							fmt.Printf("Person %d has been healed by rescuer!\n", personToSave.ID)
+						}
+					}
+				}
+			}
+		}
+
+		req.ResponseChan <- models.RescuePeopleResponse{
+			Authorized: authorized,
+			Reason:     reason,
+		}
+	}
+}
+
+func (s *Simulation) handleSavePerson() {
+	for req := range s.SavePersonChan {
+		authorized := false
+		for _, drone := range s.Drones {
+			if drone.ID == req.DroneID {
+				if !drone.HasMedicalGear {
+					break
+				}
+				for i := range s.Persons {
+					person := &s.Persons[i]
+					if person.ID == req.PersonID {
+						if math.Round(person.Position.X) == drone.Position.X && math.Round(person.Position.Y) == drone.Position.Y {
+							if person.InDistress {
+								authorized = true
+								person.InDistress = false
+								person.CurrentDistressDuration = 0
+								person.State.CurrentState = 2
+								person.Profile.StaminaLevel = 1.0
+								person.State.UpdateState(person)
+								if s.debug {
+									fmt.Printf("Person %d has been healed!\n", person.ID)
+								}
+								break
+							}
+						}
+					}
+				}
+			}
+		}
+		req.ResponseChan <- models.SavePersonResponse{
+			Authorized: authorized,
+			Reason:     map[bool]string{true: "Person saved", false: "Save failed"}[authorized],
+		}
+	}
+}
+
+func (s *Simulation) handleMedicalDelivery() {
+	for req := range s.MedicalDeliveryChan {
+		// s.mu.Lock()
+		authorized := false
+		for _, drone := range s.Drones {
+			if drone.ID == req.DroneID {
+				for _, pos := range s.poiMap[models.MedicalTent] {
+					if pos.X == drone.Position.X && pos.Y == drone.Position.Y {
+						authorized = true
+						break
+					}
+				}
+			}
+		}
+		// s.mu.Unlock()
+		req.ResponseChan <- models.MedicalDeliveryResponse{
+			Authorized: authorized,
+			Reason:     map[bool]string{true: "Medical delivered", false: "Delivery failed"}[authorized],
+		}
+	}
 }
 
 func (s *Simulation) handleChargingRequests() {
@@ -203,7 +329,7 @@ func (s *Simulation) handleExitRequest() {
 func (s *Simulation) Initialize(nDrones int, nCrowd int, nObstacles int) {
 	fmt.Println("Initializing simulation")
 	// @TODO : Récupérer la distress depuis la config.
-	s.DefaultDistressProbability = 0.9
+	s.DefaultDistressProbability = DEFAULT_DISTRESS_PROBABILITY
 
 	configPath := "configs/festival_layout.json"
 	config, err := LoadFestivalConfig(configPath)
@@ -315,8 +441,9 @@ func (s *Simulation) createDrones(n int) {
 				}
 				//fmt.Println("Position : ", position)
 				for _, member := range cell.Persons {
+					probaDetection := 1.0
 					//probaDetection := max(0, 1.0-distance/float64(s.DroneSeeRange)-(float64(nbPersDetected)*0.03))
-					if rand.Float64() < 1.0 {
+					if rand.Float64() < probaDetection {
 						//fmt.Printf("Drone %d (%.2f, %.2f) sees person %d (%.2f, %.2f) \n", d.ID, d.Position.X, d.Position.Y, member.ID, member.Position.X, member.Position.Y)
 						droneInformations = append(droneInformations, member)
 						nbPersDetected++
@@ -328,44 +455,35 @@ func (s *Simulation) createDrones(n int) {
 	}
 
 	droneInComRange := func(d *drones.Drone) []*drones.Drone {
-		currentCell := d.Position
 		rangeDrone := s.DroneCommRange
-
-		Vector := models.Vector{X: currentCell.X, Y: currentCell.Y}
-		_, valuesInt := Vector.GenerateCircleValues(rangeDrone)
-
 		droneInformations := make([]*drones.Drone, 0)
 
-		for i := 0; i < len(valuesInt); i++ {
-			position := valuesInt[i]
-			if _, exists := s.Map.Cells[position]; exists {
-				for _, drone := range s.Drones {
-					droneInformations = append(droneInformations, &drone)
+		for i := range s.Drones {
+			drone := &s.Drones[i]
+			if drone == d {
+				continue
+			}
 
-				}
+			dist := drone.Position.CalculateDistance(d.Position)
+
+			if dist <= float64(rangeDrone) {
+				droneInformations = append(droneInformations, drone)
 			}
 		}
+
 		return droneInformations
 	}
 	
 	positionsDrone := goDronesPositions(n, s.Map.Width, s.Map.Height)
 
 	for i := 0; i < n; i++ {
-		// Generate a value between 60 and 100 in float
 		battery := 60 + rand.Float64()*(100-60)
-		position := positionsDrone[i]
-		d := drones.NewSurveillanceDrone(
-			i,
-			models.Position{X: float64(position[0]), Y: float64(position[1])},
-			battery,
-			s.DroneSeeRange,
-			s.DroneCommRange,
-			droneSeeFunction,
-			droneInComRange,
-			s.MoveChan,
-			s.poiMap,
-			s.ChargingChan,
-		)
+		d := drones.NewSurveillanceDrone(i, models.Position{X: 15, Y: 15},
+			battery, s.DroneSeeRange, s.DroneCommRange,
+			droneSeeFunction, droneInComRange, s.MoveChan,
+			s.poiMap, s.ChargingChan, s.MedicalDeliveryChan,
+			s.SavePersonChan, DEFAULT_PROTOCOL_MODE, // Use the constant here
+			s.SavePeopleByRescuerChan)
 		s.Drones = append(s.Drones, d)
 		s.Map.AddDrone(&s.Drones[len(s.Drones)-1])
 	}
@@ -400,7 +518,7 @@ func (s *Simulation) createInitialCrowd(n int) {
 	for i := 0; i < n; i++ {
 		member := persons.NewCrowdMember(i,
 			models.Position{X: 0, Y: float64(rand.Intn(s.Map.Height))},
-			s.DefaultDistressProbability, 20, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan, s.ExitChan)
+			s.DefaultDistressProbability, 200, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan, s.ExitChan)
 		s.Persons = append(s.Persons, member)
 		s.Map.AddCrowdMember(&s.Persons[len(s.Persons)-1])
 	}
@@ -410,7 +528,7 @@ func (s *Simulation) Update() {
 	if s.festivalTime.IsEventEnded() {
 		return
 	}
-	time.Sleep(1 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 	if s.hardDebug {
 		fmt.Println("New Tick")
 	}

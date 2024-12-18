@@ -93,6 +93,7 @@ func (s *StateData) UpdateState(person *Person) {
 		}
 
 	case InDistress:
+
 		// Stay in distress until rescued
 		// No state change possible until rescue
 		return
