@@ -13,11 +13,17 @@ type Button struct {
 	Text                string
 	OnClick             func()
 	lastClicked         time.Time
+	Couleur             color.Color
 }
 
 func (b *Button) Draw(screen *ebiten.Image) {
 	buttonImage := ebiten.NewImage(int(b.Width), int(b.Height))
-	buttonImage.Fill(color.RGBA{0, 128, 255, 255}) // Blue background
+	if b.Couleur == nil {
+		buttonImage.Fill(color.RGBA{0, 128, 255, 255})
+
+	} else {
+		buttonImage.Fill(b.Couleur)
+	}
 	opts := &ebiten.DrawImageOptions{}
 	opts.GeoM.Translate(b.X, b.Y)
 	screen.DrawImage(buttonImage, opts)

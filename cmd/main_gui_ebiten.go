@@ -3,8 +3,10 @@ package main
 import (
 	game "UTC_IA04/cmd/simu"
 	"UTC_IA04/cmd/ui"
-	"github.com/hajimehoshi/ebiten/v2"
+	"image/color"
 	"strconv"
+
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 func main() {
@@ -19,7 +21,7 @@ func main() {
 	// Centering and making the UI look nicer
 	fieldWidth := 200.0
 	fieldHeight := 30.0
-	fieldX := 400.0 - fieldWidth/2
+	fieldX := 200.0 - fieldWidth/2
 
 	g.DroneField = ui.TextField{
 		X: fieldX, Y: 200, Width: fieldWidth, Height: fieldHeight, Text: "1",
@@ -28,21 +30,34 @@ func main() {
 		},
 	}
 	g.PeopleField = ui.TextField{
-		X: fieldX, Y: 250, Width: fieldWidth, Height: fieldHeight, Text: "1",
+		X: fieldX + 250, Y: 200, Width: fieldWidth, Height: fieldHeight, Text: "10",
 		OnEnter: func(value int) {
 			g.Sim.UpdateCrowdSize(value)
 			g.PeopleCount = value
 		},
 	}
-	g.ObstacleField = ui.TextField{
-		X: fieldX, Y: 300, Width: fieldWidth, Height: fieldHeight, Text: "1",
-		OnEnter: func(value int) {
-			g.ObstacleCount = value
+	g.DropdownMap = ui.Dropdown{
+		X: fieldX, Y: 270, Width: fieldWidth, Height: fieldHeight,
+		Options:       []string{"Carte test 1", "Carte test 2", "Option 3"},
+		SelectedIndex: 0,
+		OnSelect: func(index int) {
+			//TODO il faut que l'on puisse influencer la simu pour le chargement de la carte
+			println("Selected option:", index)
+		},
+	}
+
+	g.DropdownProtocole = ui.Dropdown{
+		X: fieldX + 250, Y: 270, Width: fieldWidth, Height: fieldHeight,
+		Options:       []string{"Protocole test 1", "Protocole test 2", "Option 3"},
+		SelectedIndex: 0,
+		OnSelect: func(index int) {
+			//TODO il faut que l'on puisse influencer la simu pour le changement de protocole
+			println("Selected option:", index)
 		},
 	}
 
 	g.StartButton = ui.Button{
-		X: 400 - 100, Y: 380, Width: 200, Height: 50, Text: "Start Simulation",
+		X: fieldX, Y: 450, Width: 200, Height: 50, Text: "Start Simulation",
 		OnClick: func() {
 			// Parse current values from the text fields to ensure they are up-to-date
 			if val, err := strconv.Atoi(g.DroneField.Text); err == nil {
@@ -51,15 +66,6 @@ func main() {
 			if val, err := strconv.Atoi(g.PeopleField.Text); err == nil {
 				g.PeopleCount = val
 			}
-			if val, err := strconv.Atoi(g.ObstacleField.Text); err == nil {
-				g.ObstacleCount = val
-			}
-
-			// Now start the simulation with the updated values
-			// BIG BIG ERREUR DE TOBIAS ICI, POUR LE SHAMER NOUS ALLONS LAISSER LE CODE D'ORIGINE
-			// SHAME ??, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔
-			//g.Sim = simulation.NewSimulation(g.DroneCount, g.PeopleCount, g.ObstacleCount)
-
 			g.Sim.UpdateCrowdSize(g.PeopleCount)
 			g.Sim.UpdateDroneSize(g.DroneCount)
 
@@ -68,7 +74,7 @@ func main() {
 	}
 
 	g.StartButtonDebug = ui.Button{
-		X: 400 - 100, Y: 450, Width: 300, Height: 50, Text: "Start Simulation (Debug Mode)",
+		X: fieldX + 250, Y: 450, Width: 250, Height: 50, Text: "Start Simulation (Debug Mode)", Couleur: color.RGBA{255, 0, 0, 255},
 		OnClick: func() {
 			// Parse current values from the text fields to ensure they are up-to-date
 			if val, err := strconv.Atoi(g.DroneField.Text); err == nil {
@@ -77,15 +83,6 @@ func main() {
 			if val, err := strconv.Atoi(g.PeopleField.Text); err == nil {
 				g.PeopleCount = val
 			}
-			if val, err := strconv.Atoi(g.ObstacleField.Text); err == nil {
-				g.ObstacleCount = val
-			}
-
-			// Now start the simulation with the updated values
-			// BIG BIG ERREUR DE TOBIAS ICI, POUR LE SHAMER NOUS ALLONS LAISSER LE CODE D'ORIGINE
-			// SHAME ??, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔, SHAME🔔
-			//g.Sim = simulation.NewSimulation(g.DroneCount, g.PeopleCount, g.ObstacleCount)
-
 			g.Sim.UpdateCrowdSize(g.PeopleCount)
 			g.Sim.UpdateDroneSize(g.DroneCount)
 

@@ -589,6 +589,7 @@ func (d *Drone) Myturn() {
 		d.ReceiveInfo()
 		return
 	}
+
 	d.ReceiveInfo()
 
 	if d.ProtocolMode == 2 || d.ProtocolMode == 1 || d.ProtocolMode == 3 {

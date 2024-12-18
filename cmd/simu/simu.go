@@ -27,24 +27,25 @@ const (
 )
 
 type Game struct {
-	Mode             Mode
-	StartButton      ui.Button
-	StartButtonDebug ui.Button
-	PauseButton      ui.Button
-	SimButton        ui.Button
-	DroneField       ui.TextField
-	PeopleField      ui.TextField
-	ObstacleField    ui.TextField
-	Sim              *simulation.Simulation
-	StaticLayer      *ebiten.Image
-	DynamicLayer     *ebiten.Image
-	Paused           bool
-	DroneCount       int
-	PeopleCount      int
-	ObstacleCount    int
-	DroneImage       *ebiten.Image
-	PoiImages        map[models.POIType]*ebiten.Image
-	hoveredPos       *models.Position
+	Mode              Mode
+	StartButton       ui.Button
+	StartButtonDebug  ui.Button
+	PauseButton       ui.Button
+	SimButton         ui.Button
+	DroneField        ui.TextField
+	PeopleField       ui.TextField
+	DropdownMap       ui.Dropdown
+	DropdownProtocole ui.Dropdown
+	Sim               *simulation.Simulation
+	StaticLayer       *ebiten.Image
+	DynamicLayer      *ebiten.Image
+	Paused            bool
+	DroneCount        int
+	PeopleCount       int
+	ObstacleCount     int
+	DroneImage        *ebiten.Image
+	PoiImages         map[models.POIType]*ebiten.Image
+	hoveredPos        *models.Position
 }
 
 // Zone colors
@@ -112,8 +113,8 @@ func (g *Game) Update() error {
 		g.StartButtonDebug.Update(float64(mx), float64(my), mousePressed)
 		g.DroneField.Update(float64(mx), float64(my), mousePressed, inputRunes, ebiten.IsKeyPressed(ebiten.KeyEnter))
 		g.PeopleField.Update(float64(mx), float64(my), mousePressed, inputRunes, ebiten.IsKeyPressed(ebiten.KeyEnter))
-		g.ObstacleField.Update(float64(mx), float64(my), mousePressed, inputRunes, ebiten.IsKeyPressed(ebiten.KeyEnter))
-
+		g.DropdownMap.Update(float64(mx), float64(my), mousePressed)
+		g.DropdownProtocole.Update(float64(mx), float64(my), mousePressed)
 	case Simulation:
 		g.SimButton.Update(float64(mx), float64(my), mousePressed)
 		g.PauseButton.Update(float64(mx), float64(my), mousePressed)
@@ -210,14 +211,17 @@ func (g *Game) drawMenu(screen *ebiten.Image) {
 		"Click fields to edit, press Enter to confirm."
 	ebitenutil.DebugPrintAt(screen, instructions, 200, 100)
 
-	ebitenutil.DebugPrintAt(screen, "Number of Drones:", 200, 200)
+	ebitenutil.DebugPrintAt(screen, "Number of Drones:", 100, 183)
 	g.DroneField.Draw(screen)
 
-	ebitenutil.DebugPrintAt(screen, "Number of People:", 200, 250)
+	ebitenutil.DebugPrintAt(screen, "Number of People:", 350, 183)
 	g.PeopleField.Draw(screen)
 
-	ebitenutil.DebugPrintAt(screen, "Number of Obstacles:", 200, 300)
-	g.ObstacleField.Draw(screen)
+	ebitenutil.DebugPrintAt(screen, "Map Selection:", 100, 253)
+	g.DropdownMap.Draw(screen)
+
+	ebitenutil.DebugPrintAt(screen, "Protocole Selection:", 350, 253)
+	g.DropdownProtocole.Draw(screen)
 
 	g.StartButton.Draw(screen)
 	g.StartButtonDebug.Draw(screen)
@@ -309,14 +313,14 @@ func (g *Game) drawSimulation(screen *ebiten.Image) {
 				"In Distress: %t\n"+
 				"Has Reached POI: %t\n"+
 				"Position: (%.1f, %.1f)\n"+
-				"Position in map: (%.1f, %.1f)",
+				"CurrentDistressDuration : %d",
+
 			hoveredPerson.ID,
 			hoveredPerson.InDistress,
 			hoveredPerson.HasReachedPOI(),
 			hoveredPerson.Position.X,
 			hoveredPerson.Position.Y,
-			mapPos.X,
-			mapPos.Y,
+			hoveredPerson.CurrentDistressDuration,
 		)
 		ebitenutil.DebugPrintAt(screen, personInfo, mx+10, my+10)
 	}
@@ -328,14 +332,21 @@ func (g *Game) drawSimulation(screen *ebiten.Image) {
 			"Drone Info\n"+
 				"ID: %d\n"+
 				"Position: (%.1f, %.1f) \n"+
-				"Position in Map: (%.1f, %.1f)\n"+
-				"Battery: %.1f",
+				"Battery: %.1f\n"+
+				"Number of seen people: %d\n"+
+				"Is charging: %t\n",
+			// "Has medical Gear: %t\n"+
+			// "Objectif: (%.1f, %.1f)",
+
 			hoveredDrone.ID,
 			hoveredDrone.Position.X,
 			hoveredDrone.Position.Y,
-			dronePosInMap.X,
-			dronePosInMap.Y,
 			hoveredDrone.Battery,
+			len(hoveredDrone.SeenPeople),
+			hoveredDrone.IsCharging,
+			// hoveredDrone.HasMedicalGear,
+			// hoveredDrone.Objectif.X,
+			// hoveredDrone.Objectif.Y,
 		)
 		ebitenutil.DebugPrintAt(screen, droneInfo, mx+10, my+10)
 	}
