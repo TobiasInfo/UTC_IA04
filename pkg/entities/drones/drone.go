@@ -652,3 +652,15 @@ func calculateClusterFactor(d *Drone, targetZone models.Position) float64 {
 	}
 	return nearbyZones / float64(len(d.ReportedZonesByCentrale))
 }
+
+func (d *Drone) UpdateProtocole(newprot int) {
+	if newprot != 1 && newprot != 2 && newprot != 3 {
+		return
+	}
+	if d.ProtocolMode == newprot {
+		return
+	}
+	d.ProtocolMode = newprot
+	println("Changed protocol for drone ", d.ID, " to ", newprot)
+	return
+}

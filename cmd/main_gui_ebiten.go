@@ -11,9 +11,9 @@ import (
 
 func main() {
 	g := game.NewGame(
-		1,  // default drone count
+		1, // default drone count
 		1, // default people count
-		1,  // default obstacle count
+		1, // default obstacle count
 	)
 	println("Debut simu dans GUI")
 	//fmt.Printf("Simulation Details: %+v\n", g.Sim.GetAvailablePOIs())
@@ -51,8 +51,7 @@ func main() {
 		Options:       []string{"Protocole test 1", "Protocole test 2", "Option 3"},
 		SelectedIndex: 0,
 		OnSelect: func(index int) {
-			//TODO il faut que l'on puisse influencer la simu pour le changement de protocole
-			println("Selected option:", index)
+			println("Selected Protocol:", index+1)
 		},
 	}
 
@@ -68,6 +67,7 @@ func main() {
 			}
 			g.Sim.UpdateCrowdSize(g.PeopleCount)
 			g.Sim.UpdateDroneSize(g.DroneCount)
+			g.Sim.UpdateDroneProtocole(g.DropdownProtocole.SelectedIndex + 1)
 
 			g.Mode = game.Simulation
 		},
@@ -85,6 +85,7 @@ func main() {
 			}
 			g.Sim.UpdateCrowdSize(g.PeopleCount)
 			g.Sim.UpdateDroneSize(g.DroneCount)
+			g.Sim.UpdateDroneProtocole(g.DropdownProtocole.SelectedIndex + 1)
 
 			g.Mode = game.SimulationDebug
 		},
