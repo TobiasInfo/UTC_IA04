@@ -11,7 +11,7 @@ import (
 
 func main() {
 	g := game.NewGame(
-		1, // default drone count
+		0, // default drone count
 		1, // default people count
 		1, // default obstacle count
 	)
@@ -38,17 +38,17 @@ func main() {
 	}
 	g.DropdownMap = ui.Dropdown{
 		X: fieldX, Y: 270, Width: fieldWidth, Height: fieldHeight,
-		Options:       []string{"Carte test 1", "Carte test 2", "Option 3"},
+		Options:       []string{"Carte test 1", "Carte test 2", "Carte test 3"},
 		SelectedIndex: 0,
 		OnSelect: func(index int) {
-			//TODO il faut que l'on puisse influencer la simu pour le chargement de la carte
-			println("Selected option:", index)
+			//La correspondance entre index et Carte doit être faite dans les ifelse de OnClick
+			println("Index Map Selected:", index)
 		},
 	}
 
 	g.DropdownProtocole = ui.Dropdown{
 		X: fieldX + 250, Y: 270, Width: fieldWidth, Height: fieldHeight,
-		Options:       []string{"Protocole test 1", "Protocole test 2", "Option 3"},
+		Options:       []string{"Protocole test 1", "Protocole test 2", "Protocole test 3"},
 		SelectedIndex: 0,
 		OnSelect: func(index int) {
 			println("Selected Protocol:", index+1)
@@ -65,6 +65,23 @@ func main() {
 			if val, err := strconv.Atoi(g.PeopleField.Text); err == nil {
 				g.PeopleCount = val
 			}
+
+			var chosenMap string
+			if g.DropdownMap.SelectedIndex == 0 {
+				chosenMap = "festival_layout"
+			} else {
+				if g.DropdownMap.SelectedIndex == 1 {
+					chosenMap = "test_layout"
+				} else {
+					if g.DropdownMap.SelectedIndex == 2 {
+						chosenMap = "test_layout"
+					} else {
+						chosenMap = "test_layout"
+					}
+				}
+			}
+			g.Sim.UpdateMap(chosenMap)
+
 			g.Sim.UpdateCrowdSize(g.PeopleCount)
 			g.Sim.UpdateDroneSize(g.DroneCount)
 			g.Sim.UpdateDroneProtocole(g.DropdownProtocole.SelectedIndex + 1)
@@ -83,6 +100,22 @@ func main() {
 			if val, err := strconv.Atoi(g.PeopleField.Text); err == nil {
 				g.PeopleCount = val
 			}
+
+			var chosenMap string
+			if g.DropdownMap.SelectedIndex == 0 {
+				chosenMap = "festival_layout"
+			} else {
+				if g.DropdownMap.SelectedIndex == 1 {
+					chosenMap = "test_layout"
+				} else {
+					if g.DropdownMap.SelectedIndex == 2 {
+						chosenMap = "test_layout"
+					} else {
+						chosenMap = "test_layout"
+					}
+				}
+			}
+			g.Sim.UpdateMap(chosenMap)
 			g.Sim.UpdateCrowdSize(g.PeopleCount)
 			g.Sim.UpdateDroneSize(g.DroneCount)
 			g.Sim.UpdateDroneProtocole(g.DropdownProtocole.SelectedIndex + 1)

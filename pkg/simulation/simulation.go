@@ -330,21 +330,21 @@ func (s *Simulation) Initialize(nDrones int, nCrowd int, nObstacles int) {
 	// @TODO : Récupérer la distress depuis la config.
 	s.DefaultDistressProbability = DEFAULT_DISTRESS_PROBABILITY
 
-	configPath := "configs/festival_layout.json"
+	configPath := "configs/empty_layout.json"
 	config, err := LoadFestivalConfig(configPath)
 	if err != nil {
-		fmt.Printf("Warning: Could not load festival config from %s: %v\n", configPath, err)
+		fmt.Printf("Warning: Could not load empty config from %s: %v\n", configPath, err)
 		fmt.Println("Using default obstacle initialization...")
 		s.initializeDefaultObstacles(nObstacles)
 	} else {
-		fmt.Println("Successfully loaded festival configuration!")
+		fmt.Println("Successfully loaded empty configuration!")
 		s.FestivalConfig = config
 		err = s.Map.ApplyFestivalConfig(config)
 		if err != nil {
-			fmt.Printf("Error applying festival config: %v\nFalling back to default initialization\n", err)
+			fmt.Printf("Error applying empty config: %v\nFalling back to default initialization\n", err)
 			s.initializeDefaultObstacles(nObstacles)
 		} else {
-			fmt.Println("Successfully applied festival configuration")
+			fmt.Println("Successfully applied empty configuration")
 			s.buildPOIMap()
 		}
 	}
@@ -352,6 +352,29 @@ func (s *Simulation) Initialize(nDrones int, nCrowd int, nObstacles int) {
 	s.createDrones(nDrones)
 	s.createInitialCrowd(nCrowd)
 	s.festivalTime.Start()
+}
+
+func (s *Simulation) UpdateMap(nomConfig string) {
+	fmt.Println("Loading Map")
+
+	configPath := "configs/" + nomConfig + ".json"
+	config, err := LoadFestivalConfig(configPath)
+	if err != nil {
+		fmt.Printf("Warning: Could not load festival config from %s: %v\n", configPath, err)
+		fmt.Println("Using default obstacle initialization...")
+		s.initializeDefaultObstacles(0)
+	} else {
+		fmt.Println("Successfully loaded festival configuration!")
+		s.FestivalConfig = config
+		err = s.Map.ApplyFestivalConfig(config)
+		if err != nil {
+			fmt.Printf("Error applying festival config: %v\nFalling back to default initialization\n", err)
+			s.initializeDefaultObstacles(0)
+		} else {
+			fmt.Println("Successfully applied festival configuration")
+			s.buildPOIMap()
+		}
+	}
 }
 
 func (s *Simulation) buildPOIMap() {
