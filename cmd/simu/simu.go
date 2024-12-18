@@ -306,7 +306,7 @@ func (g *Game) drawSimulation(screen *ebiten.Image) {
 
 	// Check for hovering over people with scaled coordinates
 	if hoveredPerson := g.getHoveredPerson(simX/30, simY/30); hoveredPerson != nil {
-		mapPos := g.Sim.GetPersonPauseInMap(hoveredPerson)
+		//mapPos := g.Sim.GetPersonPauseInMap(hoveredPerson)
 		personInfo := fmt.Sprintf(
 			"Person Info\n"+
 				"ID: %d\n"+
@@ -327,7 +327,7 @@ func (g *Game) drawSimulation(screen *ebiten.Image) {
 
 	// Check for hovering over drones with scaled coordinates
 	if hoveredDrone := g.getHoveredDrone(simX/30, simY/30); hoveredDrone != nil {
-		dronePosInMap := g.Sim.GetDronePauseInMap(hoveredDrone)
+		//dronePosInMap := g.Sim.GetDronePauseInMap(hoveredDrone)
 		droneInfo := fmt.Sprintf(
 			"Drone Info\n"+
 				"ID: %d\n"+

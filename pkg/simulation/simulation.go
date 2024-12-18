@@ -13,7 +13,6 @@ import (
 	"math/rand"
 	"sync"
 	"time"
-	"math"
 )
 
 const (
@@ -473,12 +472,13 @@ func (s *Simulation) createDrones(n int) {
 
 		return droneInformations
 	}
-	
+
 	positionsDrone := goDronesPositions(n, s.Map.Width, s.Map.Height)
 
 	for i := 0; i < n; i++ {
+		position := positionsDrone[i]
 		battery := 60 + rand.Float64()*(100-60)
-		d := drones.NewSurveillanceDrone(i, models.Position{X: 15, Y: 15},
+		d := drones.NewSurveillanceDrone(i, models.Position{X: float64(position[0]), Y: float64(position[1])},
 			battery, s.DroneSeeRange, s.DroneCommRange,
 			droneSeeFunction, droneInComRange, s.MoveChan,
 			s.poiMap, s.ChargingChan, s.MedicalDeliveryChan,
@@ -487,7 +487,7 @@ func (s *Simulation) createDrones(n int) {
 		s.Drones = append(s.Drones, d)
 		s.Map.AddDrone(&s.Drones[len(s.Drones)-1])
 	}
-	
+
 }
 
 func goDronesPositions(N int, W, H int) [][2]int {
@@ -511,7 +511,6 @@ func goDronesPositions(N int, W, H int) [][2]int {
 
 	return positions
 }
-
 
 func (s *Simulation) createInitialCrowd(n int) {
 	fmt.Println("Creating initial crowd")
