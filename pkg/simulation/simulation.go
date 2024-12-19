@@ -663,14 +663,12 @@ func (s *Simulation) UpdateDroneSize(newSize int) {
 }
 
 func (s *Simulation) UpdateDroneProtocole(newprot int) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+    s.mu.Lock()
+    defer s.mu.Unlock()
 
-	for _, drone := range s.Drones {
-
-		drone.UpdateProtocole(newprot)
-	}
-
+    for i := range s.Drones {
+        s.Drones[i].UpdateProtocole(newprot)
+    }
 }
 
 func (s *Simulation) UpdateCrowdSize(newSize int) {

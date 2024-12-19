@@ -661,6 +661,4 @@ func (d *Drone) UpdateProtocole(newprot int) {
 		return
 	}
 	d.ProtocolMode = newprot
-	println("Changed protocol for drone ", d.ID, " to ", newprot)
-	return
 }
