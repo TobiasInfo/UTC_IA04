@@ -508,16 +508,18 @@ func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
 	stats := g.Sim.GetStatistics()
 	text := fmt.Sprintf(
 		"Simulation Metrics\n"+
-			"Drones: %d\n"+
-			"People: %d\n"+
+			"Total People: %d\n"+
 			"In Distress: %d\n"+
-			"Phase: %s\n"+
-			"Time Left: %.0fm",
-		stats.ActiveDrones,
+			"Cases Treated: %d\n"+
+			"Avg Battery: %.1f%%\n"+
+			"Area Coverage: %.1f%%\n"+
+			"Avg Comms Range: %.1f",
 		stats.TotalPeople,
-		stats.PeopleInDistress,
-		stats.CurrentPhase,
-		stats.RemainingTime.Minutes(),
+		stats.InDistress,
+		stats.CasesTreated,
+		stats.AverageBattery,
+		stats.AverageCoverage,
+		stats.AverageCommsRange,
 	)
 	ebitenutil.DebugPrintAt(metrics, text, 10, 10)
 

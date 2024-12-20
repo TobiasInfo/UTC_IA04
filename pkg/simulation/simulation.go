@@ -42,6 +42,7 @@ type Simulation struct {
 	festivalTime               *FestivalTime
 	poiMap                     map[models.POIType][]models.Position
 	mu                         sync.RWMutex
+	treatedCases               int
 }
 
 // CIMITIERE DES PERSONNES MORTES EN (-10, -10)
@@ -111,6 +112,9 @@ func (s *Simulation) handleSavePersonByRescuer() {
 						authorized = true
 						reason = "Person saved"
 						personToSave.InDistress = false
+						s.mu.Lock()
+						s.treatedCases++
+						s.mu.Unlock()
 						personToSave.CurrentDistressDuration = 0
 						personToSave.State.CurrentState = 2
 						personToSave.Profile.StaminaLevel = 1.0
@@ -145,6 +149,9 @@ func (s *Simulation) handleSavePerson() {
 							if person.InDistress {
 								authorized = true
 								person.InDistress = false
+								s.mu.Lock()
+								s.treatedCases++
+								s.mu.Unlock()
 								person.CurrentDistressDuration = 0
 								person.State.CurrentState = 2
 								person.Profile.StaminaLevel = 1.0
@@ -663,12 +670,12 @@ func (s *Simulation) UpdateDroneSize(newSize int) {
 }
 
 func (s *Simulation) UpdateDroneProtocole(newprot int) {
-    s.mu.Lock()
-    defer s.mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-    for i := range s.Drones {
-        s.Drones[i].UpdateProtocole(newprot)
-    }
+	for i := range s.Drones {
+		s.Drones[i].UpdateProtocole(newprot)
+	}
 }
 
 func (s *Simulation) UpdateCrowdSize(newSize int) {
@@ -745,39 +752,53 @@ func (s *Simulation) GetStatistics() SimulationStatistics {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	// Calculate people metrics
 	totalPeople := len(s.Persons)
-	peopleInDistress := s.CountCrowdMembersInDistress()
-	activeDrones := len(s.Drones)
+	inDistress := s.CountCrowdMembersInDistress()
 
-	zoneStats := make(map[string]int)
-	zoneStats["entrance"] = 0
-	zoneStats["main"] = 0
-	zoneStats["exit"] = 0
+	totalBattery := 0.0
+	totalCommsRange := 0.0
+	droneCount := len(s.Drones)
 
-	for _, person := range s.Persons {
-		zone := person.GetCurrentZone()
-		zoneStats[zone]++
+	if droneCount > 0 {
+		for _, d := range s.Drones {
+			totalBattery += d.Battery
+			totalCommsRange += float64(len(d.DroneInComRange))
+		}
+	}
+
+	// Calculate averages safely
+	var avgBattery, avgCommsRange, coverage float64
+	if droneCount > 0 {
+		avgBattery = totalBattery / float64(droneCount)
+		avgCommsRange = totalCommsRange / float64(droneCount)
+
+		// Coverage calculation
+		totalArea := float64(s.Map.Width * s.Map.Height)
+		droneArea := math.Pi * float64(s.DroneSeeRange*s.DroneSeeRange)
+		coverage = math.Min((float64(droneCount)*droneArea/totalArea)*100, 100)
 	}
 
 	return SimulationStatistics{
-		TotalPeople:      totalPeople,
-		PeopleInDistress: peopleInDistress,
-		ActiveDrones:     activeDrones,
-		ZoneStatistics:   zoneStats,
-		CurrentPhase:     s.festivalTime.GetPhase(),
-		ElapsedTime:      s.festivalTime.GetElapsedTime(),
-		RemainingTime:    s.festivalTime.GetRemainingTime(),
+		TotalPeople:       totalPeople,
+		InDistress:        inDistress,
+		CasesTreated:      s.treatedCases, // You'll need to add this field to Simulation struct
+		AverageBattery:    avgBattery,
+		AverageCoverage:   coverage,
+		AverageCommsRange: avgCommsRange,
 	}
 }
 
 type SimulationStatistics struct {
-	TotalPeople      int
-	PeopleInDistress int
-	ActiveDrones     int
-	ZoneStatistics   map[string]int
-	CurrentPhase     string
-	ElapsedTime      time.Duration
-	RemainingTime    time.Duration
+	// People Metrics
+	TotalPeople  int
+	InDistress   int
+	CasesTreated int
+
+	// Drone Metrics
+	AverageBattery    float64
+	AverageCoverage   float64
+	AverageCommsRange float64
 }
 
 func (s *Simulation) GetPersonsInRange(center models.Position, radius float64) []*persons.Person {
