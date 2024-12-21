@@ -173,7 +173,9 @@ func main() {
 	}
 
 	ebiten.SetWindowSize(int(windowWidth), int(windowHeight))
-	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
+	//ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
+	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeDisabled)
+	//ebiten.SetWindowResizable(false)
 	ebiten.SetWindowTitle("Simulation Drones")
 	if err := ebiten.RunGame(g); err != nil {
 		panic(err)
