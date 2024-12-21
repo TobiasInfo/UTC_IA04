@@ -15,39 +15,66 @@ func main() {
 		1, // default people count
 		1, // default obstacle count
 	)
-	println("Debut simu dans GUI")
-	//fmt.Printf("Simulation Details: %+v\n", g.Sim.GetAvailablePOIs())
 
-	// Centering and making the UI look nicer
-	fieldWidth := 200.0
+	// Window dimensions
+	windowWidth := 800.0
+	windowHeight := 600.0
+
+	// UI element dimensions
+	fieldWidth := windowWidth * 0.25 // 25% of window width
 	fieldHeight := 30.0
-	fieldX := 200.0 - fieldWidth/2
 
+	// Calculate positions relative to window width
+	leftColumn := windowWidth * 0.25   // 25% from left
+	rightColumn := windowWidth * 0.625 // 62.5% from left
+
+	// Row positions from top
+	firstRow := windowHeight * 0.3   // 30% down
+	secondRow := windowHeight * 0.45 // 45% down
+	buttonRow := windowHeight * 0.75 // 75% down
+
+	// Text input fields
 	g.DroneField = ui.TextField{
-		X: fieldX, Y: 200, Width: fieldWidth, Height: fieldHeight, Text: "1",
+		X:      leftColumn,
+		Y:      firstRow,
+		Width:  fieldWidth,
+		Height: fieldHeight,
+		Text:   "1",
 		OnEnter: func(value int) {
 			g.DroneCount = value
 		},
 	}
+
 	g.PeopleField = ui.TextField{
-		X: fieldX + 250, Y: 200, Width: fieldWidth, Height: fieldHeight, Text: "10",
+		X:      rightColumn,
+		Y:      firstRow,
+		Width:  fieldWidth,
+		Height: fieldHeight,
+		Text:   "10",
 		OnEnter: func(value int) {
 			g.Sim.UpdateCrowdSize(value)
 			g.PeopleCount = value
 		},
 	}
+
+	// Dropdowns
 	g.DropdownMap = ui.Dropdown{
-		X: fieldX, Y: 270, Width: fieldWidth, Height: fieldHeight,
+		X:             leftColumn,
+		Y:             secondRow,
+		Width:         fieldWidth,
+		Height:        fieldHeight,
 		Options:       []string{"Carte test 1", "Carte test 2", "Carte test 3"},
 		SelectedIndex: 0,
 		OnSelect: func(index int) {
-			//La correspondance entre index et Carte doit être faite dans les ifelse de OnClick
 			println("Index Map Selected:", index)
 		},
 	}
 
 	g.DropdownProtocole = ui.Dropdown{
-		X: fieldX + 250, Y: 270, Width: fieldWidth, Height: fieldHeight,
+		X:             rightColumn,
+		Y:             secondRow,
+		Width:         fieldWidth,
+		Height:        fieldHeight,
 		Options:       []string{"Protocole test 1", "Protocole test 2", "Protocole test 3"},
 		SelectedIndex: 0,
 		OnSelect: func(index int) {
@@ -55,10 +82,16 @@ func main() {
 		},
 	}
 
+	// Buttons
+	buttonWidth := fieldWidth
 	g.StartButton = ui.Button{
-		X: fieldX, Y: 450, Width: 200, Height: 50, Text: "Start Simulation",
+		X:      leftColumn,
+		Y:      buttonRow,
+		Width:  buttonWidth,
+		Height: fieldHeight * 1.5,
+		Text:   "Start Simulation",
 		OnClick: func() {
-			// Parse current values from the text fields to ensure they are up-to-date
+			// Parse current values from the text fields
 			if val, err := strconv.Atoi(g.DroneField.Text); err == nil {
 				g.DroneCount = val
 			}
@@ -70,18 +103,9 @@ func main() {
 			if g.DropdownMap.SelectedIndex == 0 {
 				chosenMap = "festival_layout"
 			} else {
-				if g.DropdownMap.SelectedIndex == 1 {
-					chosenMap = "test_layout"
-				} else {
-					if g.DropdownMap.SelectedIndex == 2 {
-						chosenMap = "test_layout"
-					} else {
-						chosenMap = "test_layout"
-					}
-				}
+				chosenMap = "test_layout"
 			}
 			g.Sim.UpdateMap(chosenMap)
-
 			g.Sim.UpdateCrowdSize(g.PeopleCount)
 			g.Sim.UpdateDroneSize(g.DroneCount)
 			g.Sim.UpdateDroneProtocole(g.DropdownProtocole.SelectedIndex + 1)
@@ -91,9 +115,13 @@ func main() {
 	}
 
 	g.StartButtonDebug = ui.Button{
-		X: fieldX + 250, Y: 450, Width: 250, Height: 50, Text: "Start Simulation (Debug Mode)", Couleur: color.RGBA{255, 0, 0, 255},
+		X:       rightColumn,
+		Y:       buttonRow,
+		Width:   buttonWidth * 1.25, // Slightly wider for debug button
+		Height:  fieldHeight * 1.5,
+		Text:    "Start Simulation (Debug Mode)",
+		Couleur: color.RGBA{255, 0, 0, 255},
 		OnClick: func() {
-			// Parse current values from the text fields to ensure they are up-to-date
 			if val, err := strconv.Atoi(g.DroneField.Text); err == nil {
 				g.DroneCount = val
 			}
@@ -105,15 +133,7 @@ func main() {
 			if g.DropdownMap.SelectedIndex == 0 {
 				chosenMap = "festival_layout"
 			} else {
-				if g.DropdownMap.SelectedIndex == 1 {
-					chosenMap = "test_layout"
-				} else {
-					if g.DropdownMap.SelectedIndex == 2 {
-						chosenMap = "test_layout"
-					} else {
-						chosenMap = "test_layout"
-					}
-				}
+				chosenMap = "test_layout"
 			}
 			g.Sim.UpdateMap(chosenMap)
 			g.Sim.UpdateCrowdSize(g.PeopleCount)
@@ -124,8 +144,13 @@ func main() {
 		},
 	}
 
+	// Initialize simulation buttons
 	g.PauseButton = ui.Button{
-		X: 600, Y: 180, Width: 150, Height: 40, Text: "Pause",
+		X:      windowWidth * 0.75, // 75% from left
+		Y:      windowHeight * 0.3, // 30% from top
+		Width:  windowWidth * 0.2,  // 20% of window width
+		Height: fieldHeight,
+		Text:   "Pause",
 		OnClick: func() {
 			g.Paused = !g.Paused
 			if g.Paused {
@@ -137,13 +162,17 @@ func main() {
 	}
 
 	g.SimButton = ui.Button{
-		X: 600, Y: 250, Width: 150, Height: 40, Text: "Update Sim",
+		X:      windowWidth * 0.75, // 75% from left
+		Y:      windowHeight * 0.4, // 40% from top
+		Width:  windowWidth * 0.2,  // 20% of window width
+		Height: fieldHeight,
+		Text:   "Update Sim",
 		OnClick: func() {
 			g.Sim.Update()
 		},
 	}
 
-	ebiten.SetWindowSize(800, 600)
+	ebiten.SetWindowSize(int(windowWidth), int(windowHeight))
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	ebiten.SetWindowTitle("Simulation Drones")
 	if err := ebiten.RunGame(g); err != nil {
