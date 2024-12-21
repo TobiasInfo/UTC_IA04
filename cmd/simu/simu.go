@@ -360,7 +360,9 @@ func (g *Game) drawDynamicLayer() {
 		droneScreenX, droneScreenY := g.transform.WorldToScreen(drone.Position.X, drone.Position.Y)
 		seeRangeScreen := g.transform.scale * float64(g.Sim.DroneSeeRange)
 
-		drawTranslucentCircle(g.DynamicLayer, droneScreenX, droneScreenY, seeRangeScreen, color.RGBA{0, 0, 0, 32})
+		if !drone.IsCharging {
+			drawTranslucentCircle(g.DynamicLayer, droneScreenX, droneScreenY, seeRangeScreen, color.RGBA{0, 0, 0, 32})
+		}
 
 		if g.DroneImage != nil {
 			bounds := g.DroneImage.Bounds()
@@ -556,14 +558,12 @@ func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
 			"In Distress: %d\n"+
 			"Cases Treated: %d\n"+
 			"Avg Battery: %.1f%%\n"+
-			"Area Coverage: %.1f%%\n"+
-			"Avg Comms Range: %.1f",
+			"Area Coverage: %.1f%%\n",
 		stats.TotalPeople,
 		stats.InDistress,
 		stats.CasesTreated,
 		stats.AverageBattery,
 		stats.AverageCoverage,
-		stats.AverageCommsRange,
 	)
 	ebitenutil.DebugPrintAt(metrics, text, 10, 10)
 

@@ -8,6 +8,13 @@ import (
 	"math/rand"
 )
 
+type DroneState int
+
+const (
+	NoDefinedState DroneState = iota
+	GoingToCharge
+)
+
 type Drone struct {
 	ID                      int
 	DroneSeeRange           int
@@ -33,6 +40,9 @@ type Drone struct {
 	ProtocolMode            int      // 1 = protocol 1, 2 = protocol 2, 3 = protocol 3
 	Rescuer                 *Rescuer // For protocol 3, the spawned rescuer
 	SavePersonByRescuer     chan models.RescuePeopleRequest
+	MapWidth                int
+	MapHeight               int
+	DroneState              DroneState
 }
 
 type Rescuer struct {
@@ -57,7 +67,9 @@ func NewSurveillanceDrone(id int,
 	medicalDeliveryChan chan models.MedicalDeliveryRequest,
 	savePersonChan chan models.SavePersonRequest,
 	protocolMode int,
-	savePersonByRescuer chan models.RescuePeopleRequest) Drone {
+	savePersonByRescuer chan models.RescuePeopleRequest,
+	MapWidth int,
+	MapHeight int) Drone {
 	return Drone{
 		ID:                      id,
 		Position:                position,
@@ -83,14 +95,22 @@ func NewSurveillanceDrone(id int,
 		ProtocolMode:            protocolMode,
 		Rescuer:                 nil,
 		SavePersonByRescuer:     savePersonByRescuer,
+		MapWidth:                MapWidth,
+		MapHeight:               MapHeight,
+		DroneState:              NoDefinedState,
 	}
 }
 
 func (d *Drone) tryCharging() bool {
+	if d.DroneState != GoingToCharge && !d.IsCharging {
+		return false
+	}
+
 	if d.IsCharging {
 		d.Battery += 5
 		if d.Battery >= 80+rand.Float64()*20 {
 			d.IsCharging = false
+			d.DroneState = NoDefinedState
 			return false
 		}
 		return true
@@ -117,15 +137,16 @@ func (d *Drone) Move(target models.Position) bool {
 	if d.Battery <= 0 {
 		return false
 	}
+	//fmt.Printf("[DRONE %d] Moving from (%.0f, %.0f) to (%.0f, %.0f)\n", d.ID, d.Position.X, d.Position.Y, target.X, target.Y)
 
 	responseChan := make(chan models.MovementResponse)
 	d.MoveChan <- models.MovementRequest{MemberID: d.ID, MemberType: "drone", NewPosition: target, ResponseChan: responseChan}
 	response := <-responseChan
 
 	if response.Authorized {
-		dechargingStep := 1.0
+		dechargingStep := 0.5
 		if d.Battery >= dechargingStep {
-			d.Battery -= dechargingStep
+			//d.Battery -= dechargingStep
 		} else {
 			d.Battery = 0.0
 		}
@@ -209,30 +230,15 @@ func (d *Drone) closestPOI(poiType models.POIType) (models.Position, float64) {
 }
 
 func (d *Drone) nextStepToPos(pos models.Position) models.Position {
-	dx := pos.X - d.Position.X
-	dy := pos.Y - d.Position.Y
-
-	var step models.Position
-	if math.Abs(dx) > math.Abs(dy) {
-		if dx > 0 {
-			step = models.Position{X: d.Position.X + 1, Y: d.Position.Y}
-		} else {
-			step = models.Position{X: d.Position.X - 1, Y: d.Position.Y}
-		}
-	} else {
-		if dy > 0 {
-			step = models.Position{X: d.Position.X, Y: d.Position.Y + 1}
-		} else {
-			step = models.Position{X: d.Position.X, Y: d.Position.Y - 1}
-		}
-	}
-	return step
+	return stepTowards(d.Position, pos)
 }
 
 func (d *Drone) BatteryManagement() (models.Position, bool) {
 	closestStation, minDistance := d.closestPOI(models.ChargingStation)
-	if d.Battery <= minDistance+5 {
+	if d.Battery <= minDistance+5 || d.DroneState == GoingToCharge {
 		step := d.nextStepToPos(closestStation)
+		d.DroneState = GoingToCharge
+		fmt.Printf("[DRONE %d] Low battery, Drone position (%.0f, %0.f), moving to charging station at (%.0f, %.0f) -- Next-Step (%.0f, %.0f)\n", d.ID, d.Position.X, d.Position.Y, closestStation.X, closestStation.Y, step.X, step.Y)
 		return step, true
 	}
 	return models.Position{}, false
@@ -250,8 +256,8 @@ func (d *Drone) UpdateRescuer() {
 
 	if rescuer.State == 0 {
 		// Moving towards person
-		if rescuer.Position.X == math.Round(rescuer.Person.Position.X) &&
-			rescuer.Position.Y == math.Round(rescuer.Person.Position.Y) {
+		// 13.0, 7.0 -- 13.5, 7.5
+		if rescuer.Position.CalculateDistance(rescuer.Person.Position) <= 1 {
 			// Save the person
 			fmt.Printf("[RESCUER] Saving person %d\n", rescuer.Person.ID)
 			rescuer.Person.AssignedDroneID = nil
@@ -278,8 +284,7 @@ func (d *Drone) UpdateRescuer() {
 		}
 	} else if rescuer.State == 1 {
 		// Returning to medical tent
-		if rescuer.Position.X == rescuer.MedicalTent.X &&
-			rescuer.Position.Y == rescuer.MedicalTent.Y {
+		if rescuer.Position.CalculateDistance(rescuer.MedicalTent) <= 1 {
 			// Mission complete, rescuer disappears
 			fmt.Printf("[RESCUER] Mission complete, returning to tent.\n")
 			rescuer.Active = false
@@ -298,40 +303,38 @@ func stepTowards(from, to models.Position) models.Position {
 	dy := to.Y - from.Y
 	step := from
 
-	if math.Abs(dx) > math.Abs(dy)+0.0001 {
+	threshold := 0.5
+
+	if math.Abs(dx) > threshold {
 		if dx > 0 {
-			step.X = from.X + 1
+			step.X += 1
 		} else {
-			step.X = from.X - 1
-		}
-	} else {
-		if dy > 0 {
-			step.Y = from.Y + 1
-		} else {
-			step.Y = from.Y - 1
+			step.X -= 1
 		}
 	}
+	if math.Abs(dy) > threshold {
+		if dy > 0 {
+			step.Y += 1
+		} else {
+			step.Y -= 1
+		}
+	}
+
 	return step
 }
 
 func (d *Drone) Think() models.Position {
-	if d.ProtocolMode == 3 {
-		// Handle battery management first
-		pos, goCharging := d.BatteryManagement()
-		if goCharging {
-			return pos
-		}
+	// Handle battery management first
+	pos, goCharging := d.BatteryManagement()
+	if goCharging {
+		return pos
+	}
 
+	if d.ProtocolMode == 3 {
 		// Update existing rescuer if one exists
 		if d.Rescuer != nil {
 			d.UpdateRescuer()
-			if d.Rescuer != nil {
-				// Rescuer still active, continue patrol
-				return d.randomMovement()
-			} else {
-				// Rescuer finished, clear mission
-				return d.randomMovement()
-			}
+			return d.randomMovement()
 		}
 
 		// Check if we have a person to save
@@ -407,11 +410,6 @@ func (d *Drone) Think() models.Position {
 		return d.randomMovement()
 	}
 	if d.ProtocolMode == 2 {
-		pos, goCharging := d.BatteryManagement()
-		if goCharging {
-			return pos
-		}
-
 		if d.Objectif != (models.Position{}) && d.PeopleToSave != nil {
 			if d.Position.X == d.Objectif.X && d.Position.Y == d.Objectif.Y {
 				medicalTentPos, _ := d.closestPOI(models.MedicalTent)
@@ -442,6 +440,11 @@ func (d *Drone) Think() models.Position {
 						d.PeopleToSave = nil
 						d.Objectif = models.Position{}
 						d.HasMedicalGear = false
+					} else {
+						fmt.Printf("[DRONE %d] n'a pas pu sauver la personne %d !\n", d.ID, d.PeopleToSave.ID)
+						d.PeopleToSave.AssignedDroneID = nil
+						d.PeopleToSave = nil
+						d.Objectif = models.Position{}
 					}
 				}
 			}
@@ -489,13 +492,10 @@ func (d *Drone) Think() models.Position {
 			}
 		}
 		return d.randomMovement()
-	} else {
-		pos, goCharging := d.BatteryManagement()
-		if goCharging {
-			return pos
-		}
-
+	}
+	if d.ProtocolMode == 1 {
 		if d.Objectif != (models.Position{}) {
+			fmt.Printf("[DRONE %d] Objectif : (%.0f, %.0f)\n", d.ID, d.Objectif.X, d.Objectif.Y)
 			if d.Position.X == d.Objectif.X && d.Position.Y == d.Objectif.Y {
 				medicalTentPos, _ := d.closestPOI(models.MedicalTent)
 				if d.Position.X == medicalTentPos.X && d.Position.Y == medicalTentPos.Y {
@@ -525,6 +525,11 @@ func (d *Drone) Think() models.Position {
 						d.PeopleToSave = nil
 						d.Objectif = models.Position{}
 						d.HasMedicalGear = false
+					} else {
+						fmt.Printf("[DRONE %d] n'a pas pu sauver la personne %d !\n", d.ID, d.PeopleToSave.ID)
+						d.PeopleToSave.AssignedDroneID = nil
+						d.PeopleToSave = nil
+						d.Objectif = models.Position{}
 					}
 				}
 			}
@@ -558,16 +563,70 @@ func (d *Drone) Think() models.Position {
 		}
 		return d.randomMovement()
 	}
+
+	// En théorie, ce cas est unreachable.
+	return d.randomMovement()
 }
 
 func (d *Drone) randomMovement() models.Position {
+	// Define all possible directions
 	directions := []models.Position{
 		{X: 0, Y: -1},
 		{X: 0, Y: 1},
 		{X: -1, Y: 0},
+		{X: -1, Y: -1},
+		{X: 1, Y: 1},
+		{X: 1, Y: -1},
+		{X: -1, Y: 1},
 		{X: 1, Y: 0},
 	}
 
+	// Si des personnes sont visibles, privilégier ces directions
+	if len(d.SeenPeople) > 0 {
+		// Calculer les scores pour chaque direction en fonction de la proximité avec les personnes
+		directionScores := make(map[models.Position]float64)
+		for _, dir := range directions {
+			potentialPos := models.Position{
+				X: d.Position.X + dir.X,
+				Y: d.Position.Y + dir.Y,
+			}
+
+			// Vérifier les limites de la carte
+			if potentialPos.X <= 0 || potentialPos.Y <= 0 ||
+				math.Round(potentialPos.X) >= float64(d.MapWidth) ||
+				potentialPos.Y >= float64(d.MapHeight) {
+				continue
+			}
+
+			// Calculer un score basé sur la distance aux personnes visibles
+			score := 0.0
+			for _, person := range d.SeenPeople {
+				dist := potentialPos.CalculateDistance(person.Position)
+				score += 1.0 / (dist + 1) // Plus la distance est faible, plus le score est élevé
+			}
+			directionScores[dir] = score
+		}
+
+		// Trouver la direction avec le meilleur score
+		var bestDir models.Position
+		bestScore := -1.0
+		for dir, score := range directionScores {
+			if score > bestScore {
+				bestScore = score
+				bestDir = dir
+			}
+		}
+
+		if bestScore > 0 {
+			return models.Position{
+				X: d.Position.X + bestDir.X,
+				Y: d.Position.Y + bestDir.Y,
+			}
+		}
+	}
+
+	// Si aucune personne n'est visible ou si aucune direction valide n'a été trouvée,
+	// utiliser le comportement aléatoire original
 	rand.Shuffle(len(directions), func(i, j int) {
 		directions[i], directions[j] = directions[j], directions[i]
 	})
@@ -577,27 +636,35 @@ func (d *Drone) randomMovement() models.Position {
 			X: d.Position.X + dir.X,
 			Y: d.Position.Y + dir.Y,
 		}
-		if target.X >= 0 && target.Y >= 0 && target.X < 30 && target.Y < 20 {
-			return target
+
+		if target.X <= 0 || target.Y <= 0 ||
+			math.Round(target.X) >= float64(d.MapWidth) ||
+			math.Round(target.Y) >= float64(d.MapHeight) {
+			continue
 		}
+
+		return target
 	}
+
 	return d.Position
 }
 
 func (d *Drone) Myturn() {
+	// Cannot communicate with other drones if charging
+	d.ReceiveInfo()
+
 	if d.tryCharging() {
-		d.ReceiveInfo()
 		return
 	}
 
-	d.ReceiveInfo()
-
-	if d.ProtocolMode == 2 || d.ProtocolMode == 1 || d.ProtocolMode == 3 {
-		target := d.Think()
-		moved := d.Move(target)
-		if !moved {
-			fmt.Printf("Drone %d could not move to %v\n", d.ID, target)
-		}
+	target := d.Think()
+	if target.X == d.Position.X && target.Y == d.Position.Y {
+		//d.Battery -= 0.25
+		return
+	}
+	moved := d.Move(target)
+	if !moved {
+		fmt.Printf("Drone %d could not move to %v\n", d.ID, target)
 	}
 }
 

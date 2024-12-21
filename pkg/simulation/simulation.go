@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	DEFAULT_DISTRESS_PROBABILITY = 0.999999
+	DEFAULT_DISTRESS_PROBABILITY = 0.1
 	DEFAULT_PROTOCOL_MODE        = 3
 )
 
@@ -50,8 +50,8 @@ type Simulation struct {
 func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 	s := &Simulation{
 		Map:                     GetMap(30, 20),
-		DroneSeeRange:           3,
-		DroneCommRange:          3,
+		DroneSeeRange:           4,
+		DroneCommRange:          6,
 		MoveChan:                make(chan models.MovementRequest),
 		DeadChan:                make(chan models.DeadRequest),
 		ExitChan:                make(chan models.ExitRequest),
@@ -513,7 +513,7 @@ func (s *Simulation) createDrones(n int) {
 			droneSeeFunction, droneInComRange, s.MoveChan,
 			s.poiMap, s.ChargingChan, s.MedicalDeliveryChan,
 			s.SavePersonChan, DEFAULT_PROTOCOL_MODE, // Use the constant here
-			s.SavePeopleByRescuerChan)
+			s.SavePeopleByRescuerChan, s.Map.Width, s.Map.Height)
 		s.Drones = append(s.Drones, d)
 		s.Map.AddDrone(&s.Drones[len(s.Drones)-1])
 	}
@@ -757,21 +757,22 @@ func (s *Simulation) GetStatistics() SimulationStatistics {
 	inDistress := s.CountCrowdMembersInDistress()
 
 	totalBattery := 0.0
-	totalCommsRange := 0.0
 	droneCount := len(s.Drones)
 
 	if droneCount > 0 {
 		for _, d := range s.Drones {
-			totalBattery += d.Battery
-			totalCommsRange += float64(len(d.DroneInComRange))
+			if !d.IsCharging {
+				totalBattery += d.Battery
+			} else {
+				droneCount--
+			}
 		}
 	}
 
 	// Calculate averages safely
-	var avgBattery, avgCommsRange, coverage float64
+	var avgBattery, coverage float64
 	if droneCount > 0 {
 		avgBattery = totalBattery / float64(droneCount)
-		avgCommsRange = totalCommsRange / float64(droneCount)
 
 		// Coverage calculation
 		totalArea := float64(s.Map.Width * s.Map.Height)
@@ -780,12 +781,11 @@ func (s *Simulation) GetStatistics() SimulationStatistics {
 	}
 
 	return SimulationStatistics{
-		TotalPeople:       totalPeople,
-		InDistress:        inDistress,
-		CasesTreated:      s.treatedCases, // You'll need to add this field to Simulation struct
-		AverageBattery:    avgBattery,
-		AverageCoverage:   coverage,
-		AverageCommsRange: avgCommsRange,
+		TotalPeople:     totalPeople,
+		InDistress:      inDistress,
+		CasesTreated:    s.treatedCases, // You'll need to add this field to Simulation struct
+		AverageBattery:  avgBattery,
+		AverageCoverage: coverage,
 	}
 }
 
@@ -796,9 +796,8 @@ type SimulationStatistics struct {
 	CasesTreated int
 
 	// Drone Metrics
-	AverageBattery    float64
-	AverageCoverage   float64
-	AverageCommsRange float64
+	AverageBattery  float64
+	AverageCoverage float64
 }
 
 func (s *Simulation) GetPersonsInRange(center models.Position, radius float64) []*persons.Person {
