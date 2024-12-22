@@ -90,6 +90,10 @@ func (s *Simulation) handleSavePersonByRescuer() {
 			}
 		}
 
+		if theDrone == nil {
+			reason = "Rescuer not found"
+		}
+
 		if theDrone != nil && theDrone.Rescuer != nil && theDrone.Rescuer.Person != nil {
 			// Vérifier que c'est la bonne personne
 			if theDrone.Rescuer.Person.ID == req.PersonID {
@@ -102,12 +106,14 @@ func (s *Simulation) handleSavePersonByRescuer() {
 					}
 				}
 
+				if personToSave == nil {
+					reason = "Person not found"
+				}
+
 				if personToSave != nil {
 					// Vérifier la position du rescuer et de la personne
-					if math.Round(personToSave.Position.X) == math.Round(theDrone.Rescuer.Position.X) &&
-						math.Round(personToSave.Position.Y) == math.Round(theDrone.Rescuer.Position.Y) &&
+					if personToSave.Position.CalculateDistance(theDrone.Rescuer.Position) < 1.0 &&
 						personToSave.InDistress {
-
 						// Mise à jour de la personne
 						authorized = true
 						reason = "Person saved"
@@ -121,6 +127,11 @@ func (s *Simulation) handleSavePersonByRescuer() {
 						personToSave.State.UpdateState(personToSave)
 						if s.debug {
 							fmt.Printf("Person %d has been healed by rescuer!\n", personToSave.ID)
+						}
+					} else {
+						reason = "Rescuer not at person's position"
+						if !personToSave.InDistress {
+							reason = "Person not in distress"
 						}
 					}
 				}
@@ -503,12 +514,13 @@ func (s *Simulation) createDrones(n int) {
 		return droneInformations
 	}
 
-	positionsDrone := goDronesPositions(n, s.Map.Width, s.Map.Height)
+	positionsDrone := goDronesZones(n, s.Map.Width, s.Map.Height)
 
 	for i := 0; i < n; i++ {
-		position := positionsDrone[i]
+		zone := positionsDrone[i]
 		battery := 60 + rand.Float64()*(100-60)
-		d := drones.NewSurveillanceDrone(i, models.Position{X: float64(position[0]), Y: float64(position[1])},
+		d := drones.NewSurveillanceDrone(i, models.Position{X: float64((zone[0][0] + zone[1][0]) / 2), Y: float64((zone[0][1] + zone[1][1]) / 2)},
+			models.MyWatch{CornerBottomLeft: models.Position{X: float64(zone[0][0]), Y: float64(zone[0][1])}, CornerTopRight: models.Position{X: float64(zone[1][0]), Y: float64(zone[1][1])}},
 			battery, s.DroneSeeRange, s.DroneCommRange,
 			droneSeeFunction, droneInComRange, s.MoveChan,
 			s.poiMap, s.ChargingChan, s.MedicalDeliveryChan,
@@ -520,26 +532,28 @@ func (s *Simulation) createDrones(n int) {
 
 }
 
-func goDronesPositions(N int, W, H int) [][2]int {
+func goDronesZones(N int, W, H int) [][2][2]int {
 	if N <= 0 {
-		return [][2]int{}
+		return [][2][2]int{}
 	}
 
 	Nx := int(math.Floor(math.Sqrt(float64(N))))
 	Ny := int(math.Ceil(float64(N) / float64(Nx)))
-	dx := float64(W) / float64(Nx+1)
-	dy := float64(H) / float64(Ny+1)
+	dx := float64(W) / float64(Nx)
+	dy := float64(H) / float64(Ny)
 
-	positions := make([][2]int, N)
+	zones := make([][2][2]int, N)
 	for k := 0; k < N; k++ {
 		i := k % Nx
 		j := k / Nx
-		x := int(math.Round((float64(i + 1)) * dx))
-		y := int(math.Round((float64(j + 1)) * dy))
-		positions[k] = [2]int{x, y}
+		x1 := int(math.Round(float64(i) * dx))
+		y1 := int(math.Round(float64(j) * dy))
+		x2 := int(math.Round(float64(i+1) * dx))
+		y2 := int(math.Round(float64(j+1) * dy))
+		zones[k] = [2][2]int{{x1, y1}, {x2, y2}}
 	}
 
-	return positions
+	return zones
 }
 
 func (s *Simulation) createInitialCrowd(n int) {

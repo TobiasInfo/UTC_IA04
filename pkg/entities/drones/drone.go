@@ -43,6 +43,7 @@ type Drone struct {
 	MapWidth                int
 	MapHeight               int
 	DroneState              DroneState
+	MyWatch                 models.MyWatch
 }
 
 type Rescuer struct {
@@ -57,6 +58,7 @@ type Rescuer struct {
 // NewSurveillanceDrone crée un nouveau drone
 func NewSurveillanceDrone(id int,
 	position models.Position,
+	myWatch models.MyWatch,
 	battery float64, droneSeeRange int,
 	droneCommunicationRange int,
 	droneSeeFunc func(d *Drone) []*persons.Person,
@@ -70,9 +72,11 @@ func NewSurveillanceDrone(id int,
 	savePersonByRescuer chan models.RescuePeopleRequest,
 	MapWidth int,
 	MapHeight int) Drone {
+	fmt.Printf("[DRONE %d] And now My watch at %v begin !\n", id, myWatch)
 	return Drone{
 		ID:                      id,
 		Position:                position,
+		MyWatch:                 myWatch,
 		Battery:                 battery,
 		DroneSeeRange:           droneSeeRange,
 		DroneCommRange:          droneCommunicationRange,
@@ -598,11 +602,21 @@ func (d *Drone) randomMovement() models.Position {
 				continue
 			}
 
+			// Vérifier les limites de la watch
+			if potentialPos.X <= d.MyWatch.CornerBottomLeft.X || potentialPos.Y <= d.MyWatch.CornerBottomLeft.Y ||
+				potentialPos.X >= d.MyWatch.CornerTopRight.X || potentialPos.Y >= d.MyWatch.CornerTopRight.Y {
+				continue
+			}
+
 			// Calculer un score basé sur la distance aux personnes visibles
 			score := 0.0
 			for _, person := range d.SeenPeople {
 				dist := potentialPos.CalculateDistance(person.Position)
 				score += 1.0 / (dist + 1) // Plus la distance est faible, plus le score est élevé
+			}
+
+			for _, drone := range d.DroneInComRange {
+				score -= 1.0 / (potentialPos.CalculateDistance(drone.Position) + 1)
 			}
 			directionScores[dir] = score
 		}
@@ -640,6 +654,12 @@ func (d *Drone) randomMovement() models.Position {
 		if target.X <= 0 || target.Y <= 0 ||
 			math.Round(target.X) >= float64(d.MapWidth) ||
 			math.Round(target.Y) >= float64(d.MapHeight) {
+			continue
+		}
+
+		// Vérifier les limites de la watch
+		if target.X <= d.MyWatch.CornerBottomLeft.X || target.Y <= d.MyWatch.CornerBottomLeft.Y ||
+			target.X >= d.MyWatch.CornerTopRight.X || target.Y >= d.MyWatch.CornerTopRight.Y {
 			continue
 		}
 

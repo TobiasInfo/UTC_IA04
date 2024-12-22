@@ -526,12 +526,17 @@ func (g *Game) drawSimulation(screen *ebiten.Image) {
 			"Drone Info:\n"+
 				"ID: %d\n"+
 				"Position: (%.1f, %.1f)\n"+
+				"Watch Bounds: (%.1f, %.1f) - (%.1f, %.1f)\n"+
 				"Battery: %.1f\n"+
 				"Number of seen people: %d\n"+
 				"Is charging: %t\n",
 			hoveredDrone.ID,
 			hoveredDrone.Position.X,
 			hoveredDrone.Position.Y,
+			hoveredDrone.MyWatch.CornerBottomLeft.X,
+			hoveredDrone.MyWatch.CornerBottomLeft.Y,
+			hoveredDrone.MyWatch.CornerTopRight.X,
+			hoveredDrone.MyWatch.CornerTopRight.Y,
 			hoveredDrone.Battery,
 			len(hoveredDrone.SeenPeople),
 			hoveredDrone.IsCharging,

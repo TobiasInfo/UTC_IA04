@@ -6,6 +6,11 @@ type Position struct {
 	X, Y float64
 }
 
+type MyWatch struct {
+	CornerBottomLeft Position
+	CornerTopRight   Position
+}
+
 // Round rounds the position to the nearest integer
 // e.g., (1.1, 2.2) -> (1, 2)
 // Deprecated: Don't use this, will be removed soon
