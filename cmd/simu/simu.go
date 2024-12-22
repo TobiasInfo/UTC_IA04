@@ -5,6 +5,7 @@ import (
 	"UTC_IA04/cmd/ui/assets"
 	"UTC_IA04/pkg/entities/drones"
 	"UTC_IA04/pkg/entities/persons"
+	"UTC_IA04/pkg/entities/rescue"
 	"UTC_IA04/pkg/models"
 	"UTC_IA04/pkg/simulation"
 	"fmt"
@@ -321,41 +322,6 @@ func (g *Game) drawDynamicLayer() {
 
 	// Draw rescuers
 	for _, drone := range g.Sim.Drones {
-		if drone.Rescuer != nil {
-			rescuerPos := drone.Rescuer.Position
-			screenX, screenY := g.transform.WorldToScreen(rescuerPos.X, rescuerPos.Y)
-
-			drawCircle(g.DynamicLayer, screenX, screenY, 6, color.RGBA{0, 255, 0, 255})
-
-			crossSize := 4.0
-			drawRectangle(g.DynamicLayer,
-				screenX-crossSize, screenY-1,
-				crossSize*2, 2,
-				color.RGBA{255, 0, 0, 255})
-			drawRectangle(g.DynamicLayer,
-				screenX-1, screenY-crossSize,
-				2, crossSize*2,
-				color.RGBA{255, 0, 0, 255})
-
-			if drone.Rescuer.State == 0 && drone.Rescuer.Person != nil {
-				targetScreenX, targetScreenY := g.transform.WorldToScreen(
-					drone.Rescuer.Person.Position.X,
-					drone.Rescuer.Person.Position.Y)
-				ebitenutil.DrawLine(g.DynamicLayer,
-					screenX, screenY,
-					targetScreenX, targetScreenY,
-					color.RGBA{0, 255, 0, 128})
-			} else if drone.Rescuer.MedicalTent.X != 0 || drone.Rescuer.MedicalTent.Y != 0 {
-				tentScreenX, tentScreenY := g.transform.WorldToScreen(
-					drone.Rescuer.MedicalTent.X,
-					drone.Rescuer.MedicalTent.Y)
-				ebitenutil.DrawLine(g.DynamicLayer,
-					screenX, screenY,
-					tentScreenX, tentScreenY,
-					color.RGBA{0, 255, 0, 128})
-			}
-		}
-
 		// Draw drone and its vision range
 		droneScreenX, droneScreenY := g.transform.WorldToScreen(drone.Position.X, drone.Position.Y)
 		seeRangeScreen := g.transform.scale * float64(g.Sim.DroneSeeRange)
@@ -378,11 +344,57 @@ func (g *Game) drawDynamicLayer() {
 
 			for _, person := range drone.SeenPeople {
 				personScreenX, personScreenY := g.transform.WorldToScreen(person.Position.X, person.Position.Y)
-				drawRectangle(g.DynamicLayer, personScreenX-2.5, personScreenY-2.5, 5, 5, color.RGBA{255, 255, 0, 255})
+				if person.IsInDistress() {
+					drawRectangle(g.DynamicLayer, personScreenX-2.5, personScreenY-2.5, 5, 5, color.RGBA{148, 0, 211, 255})
+				} else {
+					drawRectangle(g.DynamicLayer, personScreenX-2.5, personScreenY-2.5, 5, 5, color.RGBA{255, 255, 0, 255})
+				}
 				seenPeople[person.ID] = true
 			}
 		} else {
 			drawCircle(g.DynamicLayer, droneScreenX, droneScreenY, 10, color.RGBA{0, 0, 255, 255})
+		}
+	}
+
+	for _, rp := range g.Sim.RescuePoints {
+		for _, rescuer := range rp.Rescuers {
+			if !rescuer.Active {
+				continue
+			}
+
+			screenX, screenY := g.transform.WorldToScreen(rescuer.Position.X, rescuer.Position.Y)
+
+			drawCircle(g.DynamicLayer, screenX, screenY, 6, color.RGBA{0, 255, 0, 255})
+
+			crossSize := 4.0
+			drawRectangle(g.DynamicLayer,
+				screenX-crossSize, screenY-1,
+				crossSize*2, 2,
+				color.RGBA{255, 0, 0, 255})
+			drawRectangle(g.DynamicLayer,
+				screenX-1, screenY-crossSize,
+				2, crossSize*2,
+				color.RGBA{255, 0, 0, 255})
+
+			if rescuer.State == rescue.MovingToPerson && rescuer.Person != nil {
+				targetScreenX, targetScreenY := g.transform.WorldToScreen(
+					rescuer.Person.Position.X,
+					rescuer.Person.Position.Y)
+				ebitenutil.DrawLine(g.DynamicLayer,
+					screenX, screenY,
+					targetScreenX, targetScreenY,
+					color.RGBA{0, 255, 0, 128})
+			}
+
+			if rescuer.State == rescue.ReturningToBase && rescuer.HomePoint.X != 0 || rescuer.HomePoint.Y != 0 {
+				tentScreenX, tentScreenY := g.transform.WorldToScreen(
+					rescuer.HomePoint.X,
+					rescuer.HomePoint.Y)
+				ebitenutil.DrawLine(g.DynamicLayer,
+					screenX, screenY,
+					tentScreenX, tentScreenY,
+					color.RGBA{0, 255, 0, 128})
+			}
 		}
 	}
 

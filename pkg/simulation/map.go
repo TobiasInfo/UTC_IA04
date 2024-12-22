@@ -158,11 +158,11 @@ func (m *Map) MoveEntity(entity interface{}, newPosition models.Position) {
 		newCell = m.Cells[newPosition]
 
 		// Lock cells in order to prevent deadlock
-		if currentCell.Position.X < newCell.Position.X ||
-			(currentCell.Position.X == newCell.Position.X && currentCell.Position.Y < newCell.Position.Y) {
-			//currentCell.mu.Lock()
-			//newCell.mu.Lock()
-		}
+		// if currentCell.Position.X < newCell.Position.X ||
+		// 	(currentCell.Position.X == newCell.Position.X && currentCell.Position.Y < newCell.Position.Y) {
+		// 	//currentCell.mu.Lock()
+		// 	//newCell.mu.Lock()
+		// }
 
 		removeDroneFromCell(currentCell, e)
 		newCell.Drones = append(newCell.Drones, e)
