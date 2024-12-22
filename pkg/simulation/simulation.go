@@ -954,22 +954,3 @@ func (s *Simulation) InitializeRescuePoints() {
 
 	fmt.Printf("[SIMULATION] Initialized %d rescue points\n", len(s.RescuePoints))
 }
-
-// // GetRescuePoint retourne le rescue point le plus proche d'une position donnée
-// func (s *Simulation) GetRescuePoint(pos models.Position) *rescue.RescuePoint {
-// 	s.mu.RLock()
-// 	defer s.mu.RUnlock()
-
-// 	var closest *rescue.RescuePoint
-// 	minDist := math.Inf(1)
-
-// 	for _, rp := range s.RescuePoints {
-// 		dist := pos.CalculateManhattanDistance(rp.Position)
-// 		if dist < minDist {
-// 			minDist = dist
-// 			closest = rp
-// 		}
-// 	}
-
-// 	return closest
-// }
