@@ -10,7 +10,7 @@ func POIIcon(poiType models.POIType) string {
 	case 0: // MedicalTent
 		return "img/tente-secours.png"
 	case 1: // ChargingStation
-		return "img/station chargement.png"
+		return "img/drone-station-real.png"
 	case 2: // Toilet
 		return "img/toilets-real.png"
 	case 3: // DrinkStand
@@ -33,7 +33,7 @@ func PoiScale(poiType models.POIType) float64 {
 	case 0: // MedicalTent
 		return 0.14
 	case 1: // ChargingStation
-		return 0.10
+		return 0.20
 	case 2: // Toilet
 		return 0.10
 	case 3: // DrinkStand
@@ -45,7 +45,7 @@ func PoiScale(poiType models.POIType) float64 {
 	case 6: // SecondaryStage
 		return 0.15
 	case 7: // RestArea
-		return 0.15
+		return 0.20
 	default: //POI pas défini
 		return 0.10
 	}

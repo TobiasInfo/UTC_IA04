@@ -134,7 +134,7 @@ func NewGame(droneCount, peopleCount, obstacleCount int) *Game {
 		transform:     NewWorldTransform(1000, 700, 30, 20),
 	}
 
-	g.DroneImage = loadImage("img/drone.png")
+	g.DroneImage = loadImage("img/drone-real.png")
 	g.GrassImage = loadImage("img/grass.png")
 	g.PoiImages = map[models.POIType]*ebiten.Image{
 		0: loadImage(assets.POIIcon(0)),
@@ -348,7 +348,7 @@ func (g *Game) drawDynamicLayer() {
 			w, h := float64(bounds.Dx()), float64(bounds.Dy())
 
 			op := &ebiten.DrawImageOptions{}
-			scale := 0.04
+			scale := 0.08
 			op.GeoM.Scale(scale, scale)
 			op.GeoM.Translate(-w*scale/2, -h*scale/2)
 			op.GeoM.Translate(droneScreenX, droneScreenY)
