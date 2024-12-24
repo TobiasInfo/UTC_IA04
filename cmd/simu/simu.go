@@ -120,6 +120,7 @@ type Game struct {
 	hoveredPos        *models.Position
 	transform         *WorldTransform
 	GrassImage        *ebiten.Image
+	TiledFloorImage   *ebiten.Image
 }
 
 func NewGame(droneCount, peopleCount, obstacleCount int) *Game {
@@ -136,6 +137,7 @@ func NewGame(droneCount, peopleCount, obstacleCount int) *Game {
 
 	g.DroneImage = loadImage("img/drone-real.png")
 	g.GrassImage = loadImage("img/grass.png")
+	g.TiledFloorImage = loadImage("img/tiledfloor-preview.png")
 	g.PoiImages = map[models.POIType]*ebiten.Image{
 		0: loadImage(assets.POIIcon(0)),
 		1: loadImage(assets.POIIcon(1)),
@@ -285,11 +287,14 @@ func (g *Game) drawStaticLayer() {
 		}
 	}
 
+	// tileW := g.TiledFloorImage.Bounds().Dx()
+	// tileH := g.TiledFloorImage.Bounds().Dy()
+
 	// Draw zones using world coordinates
 	worldWidth := float64(g.Sim.Map.Width)
 	worldHeight := float64(g.Sim.Map.Height)
 	entranceX1, y1 := g.transform.WorldToScreen(0, 0)
-	entranceX2, _ := g.transform.WorldToScreen(worldWidth*0.1, 0)
+	entranceX2, y2 := g.transform.WorldToScreen(worldWidth*0.1, 0)
 	mainX2, _ := g.transform.WorldToScreen(worldWidth*0.9, 0)
 	exitX2, y2 := g.transform.WorldToScreen(worldWidth, worldHeight)
 
@@ -297,10 +302,16 @@ func (g *Game) drawStaticLayer() {
 		fmt.Printf("Drawing zones - Entrance: (%f,%f)->(%f,%f), Main: ->(%f), Exit: ->(%f)\n",
 			entranceX1, y1, entranceX2, y2, mainX2, exitX2)
 	}
+	//On dessine l'entrée
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Translate(entranceX1, y1)
+	g.StaticLayer.DrawImage(g.TiledFloorImage, op)
+	op.GeoM.Translate(entranceX1, y1+200.0)
+	g.StaticLayer.DrawImage(g.TiledFloorImage, op)
 
-	drawRectangle(g.StaticLayer, entranceX1, y1, entranceX2-entranceX1, y2-y1, EntranceZoneColor)
-	drawRectangle(g.StaticLayer, entranceX2, y1, mainX2-entranceX2, y2-y1, MainZoneColor)
-	drawRectangle(g.StaticLayer, mainX2, y1, exitX2-mainX2, y2-y1, ExitZoneColor)
+	// drawRectangle(g.StaticLayer, entranceX1, y1, entranceX2-entranceX1, y2-y1, EntranceZoneColor)
+	// drawRectangle(g.StaticLayer, entranceX2, y1, mainX2-entranceX2, y2-y1, MainZoneColor)
+	// drawRectangle(g.StaticLayer, mainX2, y1, exitX2-mainX2, y2-y1, ExitZoneColor)
 
 	// Draw POIs using world coordinates
 	poiMap := g.Sim.GetAvailablePOIs()
