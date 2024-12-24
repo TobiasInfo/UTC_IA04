@@ -17,8 +17,8 @@ func main() {
 	)
 
 	// Window dimensions
-	windowWidth := 800.0
-	windowHeight := 600.0
+	windowWidth := 1000.0
+	windowHeight := 700.0
 
 	// UI element dimensions
 	fieldWidth := windowWidth * 0.25 // 25% of window width
@@ -103,7 +103,7 @@ func main() {
 			if g.DropdownMap.SelectedIndex == 0 {
 				chosenMap = "festival_layout"
 			} else {
-				chosenMap = "test_layout"
+				chosenMap = "festival_layout_new"
 			}
 			g.Sim.UpdateMap(chosenMap)
 			g.Sim.UpdateCrowdSize(g.PeopleCount)
@@ -133,7 +133,7 @@ func main() {
 			if g.DropdownMap.SelectedIndex == 0 {
 				chosenMap = "festival_layout"
 			} else {
-				chosenMap = "test_layout"
+				chosenMap = "festival_layout_new"
 			}
 			g.Sim.UpdateMap(chosenMap)
 			g.Sim.UpdateCrowdSize(g.PeopleCount)

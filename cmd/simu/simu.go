@@ -20,9 +20,9 @@ import (
 
 // Zone colors
 var (
-	EntranceZoneColor = color.RGBA{135, 206, 235, 180} // Light blue
-	MainZoneColor     = color.RGBA{144, 238, 144, 180} // Light green
-	ExitZoneColor     = color.RGBA{255, 182, 193, 180} // Light pink
+	EntranceZoneColor = color.RGBA{135, 206, 235, 1} // Light blue
+	MainZoneColor     = color.RGBA{0, 0, 0, 0}       // Light green
+	ExitZoneColor     = color.RGBA{255, 182, 193, 1} // Light pink
 
 	// POI colors
 	MedicalColor   = color.RGBA{255, 0, 0, 255}     // Red
@@ -119,6 +119,7 @@ type Game struct {
 	PoiImages         map[models.POIType]*ebiten.Image
 	hoveredPos        *models.Position
 	transform         *WorldTransform
+	GrassImage        *ebiten.Image
 }
 
 func NewGame(droneCount, peopleCount, obstacleCount int) *Game {
@@ -127,13 +128,14 @@ func NewGame(droneCount, peopleCount, obstacleCount int) *Game {
 		DroneCount:    droneCount,
 		PeopleCount:   peopleCount,
 		ObstacleCount: obstacleCount,
-		StaticLayer:   ebiten.NewImage(800, 600),
-		DynamicLayer:  ebiten.NewImage(800, 600),
+		StaticLayer:   ebiten.NewImage(1000, 700),
+		DynamicLayer:  ebiten.NewImage(1000, 700),
 		Sim:           simulation.NewSimulation(droneCount, peopleCount, obstacleCount),
-		transform:     NewWorldTransform(800, 600, 30, 20),
+		transform:     NewWorldTransform(1000, 700, 30, 20),
 	}
 
 	g.DroneImage = loadImage("img/drone.png")
+	g.GrassImage = loadImage("img/grass.png")
 	g.PoiImages = map[models.POIType]*ebiten.Image{
 		0: loadImage(assets.POIIcon(0)),
 		1: loadImage(assets.POIIcon(1)),
@@ -246,22 +248,22 @@ func (g *Game) getHoveredDrone(worldX, worldY float64) *drones.Drone {
 func (g *Game) drawMenu(screen *ebiten.Image) {
 	screen.Fill(color.RGBA{30, 30, 50, 255})
 	title := "Festival Surveillance Simulation"
-	ebitenutil.DebugPrintAt(screen, title, 250, 50)
+	ebitenutil.DebugPrintAt(screen, title, 400, 50)
 
 	instructions := "Configure simulation parameters:\n" +
 		"Click fields to edit, press Enter to confirm."
-	ebitenutil.DebugPrintAt(screen, instructions, 200, 100)
+	ebitenutil.DebugPrintAt(screen, instructions, 400, 100)
 
-	ebitenutil.DebugPrintAt(screen, "Number of Drones:", 100, 183)
+	ebitenutil.DebugPrintAt(screen, "Number of Drones:", 255, 183)
 	g.DroneField.Draw(screen)
 
-	ebitenutil.DebugPrintAt(screen, "Number of People:", 350, 183)
+	ebitenutil.DebugPrintAt(screen, "Number of People:", 625, 183)
 	g.PeopleField.Draw(screen)
 
-	ebitenutil.DebugPrintAt(screen, "Map Selection:", 100, 253)
+	ebitenutil.DebugPrintAt(screen, "Map Selection:", 255, 290)
 	g.DropdownMap.Draw(screen)
 
-	ebitenutil.DebugPrintAt(screen, "Protocole Selection:", 350, 253)
+	ebitenutil.DebugPrintAt(screen, "Protocole Selection:", 625, 290)
 	g.DropdownProtocole.Draw(screen)
 
 	g.StartButton.Draw(screen)
@@ -271,10 +273,21 @@ func (g *Game) drawMenu(screen *ebiten.Image) {
 func (g *Game) drawStaticLayer() {
 	g.StaticLayer.Clear()
 
+	staticW, staticH := g.StaticLayer.Size() // normalement 800,600
+	grassW := g.GrassImage.Bounds().Dx()
+	grassH := g.GrassImage.Bounds().Dy()
+
+	for y := 0; y < staticH; y += grassH {
+		for x := 0; x < staticW; x += grassW {
+			op := &ebiten.DrawImageOptions{}
+			op.GeoM.Translate(float64(x), float64(y))
+			g.StaticLayer.DrawImage(g.GrassImage, op)
+		}
+	}
+
 	// Draw zones using world coordinates
 	worldWidth := float64(g.Sim.Map.Width)
 	worldHeight := float64(g.Sim.Map.Height)
-
 	entranceX1, y1 := g.transform.WorldToScreen(0, 0)
 	entranceX2, _ := g.transform.WorldToScreen(worldWidth*0.1, 0)
 	mainX2, _ := g.transform.WorldToScreen(worldWidth*0.9, 0)
@@ -300,7 +313,7 @@ func (g *Game) drawStaticLayer() {
 				screenX, screenY := g.transform.WorldToScreen(pos.X, pos.Y)
 
 				op := &ebiten.DrawImageOptions{}
-				iconScale := 0.07
+				iconScale := assets.PoiScale(poiType)
 				op.GeoM.Scale(iconScale, iconScale)
 				op.GeoM.Translate(-w*iconScale/2, -h*iconScale/2)
 				op.GeoM.Translate(screenX, screenY)
