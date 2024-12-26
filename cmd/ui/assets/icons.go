@@ -43,7 +43,7 @@ func PoiScale(poiType models.POIType) float64 {
 	case 5: // MainStage
 		return 0.25
 	case 6: // SecondaryStage
-		return 0.15
+		return 0.25
 	case 7: // RestArea
 		return 0.20
 	default: //POI pas défini

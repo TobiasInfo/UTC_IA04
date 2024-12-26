@@ -99,28 +99,32 @@ const (
 )
 
 type Game struct {
-	Mode              Mode
-	StartButton       ui.Button
-	StartButtonDebug  ui.Button
-	PauseButton       ui.Button
-	SimButton         ui.Button
-	DroneField        ui.TextField
-	PeopleField       ui.TextField
-	DropdownMap       ui.Dropdown
-	DropdownProtocole ui.Dropdown
-	Sim               *simulation.Simulation
-	StaticLayer       *ebiten.Image
-	DynamicLayer      *ebiten.Image
-	Paused            bool
-	DroneCount        int
-	PeopleCount       int
-	ObstacleCount     int
-	DroneImage        *ebiten.Image
-	PoiImages         map[models.POIType]*ebiten.Image
-	hoveredPos        *models.Position
-	transform         *WorldTransform
-	GrassImage        *ebiten.Image
-	TiledFloorImage   *ebiten.Image
+	Mode                  Mode
+	StartButton           ui.Button
+	StartButtonDebug      ui.Button
+	PauseButton           ui.Button
+	SimButton             ui.Button
+	DroneField            ui.TextField
+	PeopleField           ui.TextField
+	DropdownMap           ui.Dropdown
+	DropdownProtocole     ui.Dropdown
+	Sim                   *simulation.Simulation
+	StaticLayer           *ebiten.Image
+	DynamicLayer          *ebiten.Image
+	Paused                bool
+	DroneCount            int
+	PeopleCount           int
+	ObstacleCount         int
+	DroneImage            *ebiten.Image
+	PoiImages             map[models.POIType]*ebiten.Image
+	hoveredPos            *models.Position
+	transform             *WorldTransform
+	GrassImage            *ebiten.Image
+	TiledFloorImage       *ebiten.Image
+	AttendeeImage         *ebiten.Image
+	AttendeeDeadImage     *ebiten.Image
+	RescuerLookLeftImage  *ebiten.Image
+	RescuerLookRightImage *ebiten.Image
 }
 
 func NewGame(droneCount, peopleCount, obstacleCount int) *Game {
@@ -138,6 +142,10 @@ func NewGame(droneCount, peopleCount, obstacleCount int) *Game {
 	g.DroneImage = loadImage("img/drone-real.png")
 	g.GrassImage = loadImage("img/grass.png")
 	g.TiledFloorImage = loadImage("img/tiledfloor-preview.png")
+	g.AttendeeImage = loadImage("img/attendee-default.png")
+	g.AttendeeDeadImage = loadImage("img/attendee-dead.png")
+	g.RescuerLookLeftImage = loadImage("img/pompier-real-look-left.png")
+	g.RescuerLookRightImage = loadImage("img/pompier-real-look-right.png")
 	g.PoiImages = map[models.POIType]*ebiten.Image{
 		0: loadImage(assets.POIIcon(0)),
 		1: loadImage(assets.POIIcon(1)),
@@ -366,15 +374,15 @@ func (g *Game) drawDynamicLayer() {
 
 			g.DynamicLayer.DrawImage(g.DroneImage, op)
 
-			for _, person := range drone.SeenPeople {
-				personScreenX, personScreenY := g.transform.WorldToScreen(person.Position.X, person.Position.Y)
-				if person.IsInDistress() {
-					drawRectangle(g.DynamicLayer, personScreenX-2.5, personScreenY-2.5, 5, 5, color.RGBA{148, 0, 211, 255})
-				} else {
-					drawRectangle(g.DynamicLayer, personScreenX-2.5, personScreenY-2.5, 5, 5, color.RGBA{255, 255, 0, 255})
-				}
-				seenPeople[person.ID] = true
-			}
+			// for _, person := range drone.SeenPeople {
+			// 	personScreenX, personScreenY := g.transform.WorldToScreen(person.Position.X, person.Position.Y)
+			// 	if person.IsInDistress() {
+			// 		drawRectangle(g.DynamicLayer, personScreenX-2.5, personScreenY-2.5, 5, 5, color.RGBA{148, 0, 211, 255})
+			// 	} else {
+			// 		drawRectangle(g.DynamicLayer, personScreenX-2.5, personScreenY-2.5, 5, 5, color.RGBA{255, 255, 0, 255})
+			// 	}
+			// 	seenPeople[person.ID] = true
+			// }
 		} else {
 			drawCircle(g.DynamicLayer, droneScreenX, droneScreenY, 10, color.RGBA{0, 0, 255, 255})
 		}
@@ -388,17 +396,144 @@ func (g *Game) drawDynamicLayer() {
 
 			screenX, screenY := g.transform.WorldToScreen(rescuer.Position.X, rescuer.Position.Y)
 
-			drawCircle(g.DynamicLayer, screenX, screenY, 6, color.RGBA{0, 255, 0, 255})
+			if rescuer.State == rescue.MovingToPerson && rescuer.Person != nil {
+				if rescuer.Person.Position.X > rescuer.Position.X {
+					if g.RescuerLookRightImage != nil {
+						bounds := g.RescuerLookRightImage.Bounds()
+						w, h := float64(bounds.Dx()), float64(bounds.Dy())
 
-			crossSize := 4.0
-			drawRectangle(g.DynamicLayer,
-				screenX-crossSize, screenY-1,
-				crossSize*2, 2,
-				color.RGBA{255, 0, 0, 255})
-			drawRectangle(g.DynamicLayer,
-				screenX-1, screenY-crossSize,
-				2, crossSize*2,
-				color.RGBA{255, 0, 0, 255})
+						op := &ebiten.DrawImageOptions{}
+						scale := 0.1
+						op.GeoM.Scale(scale, scale)
+						op.GeoM.Translate(-w*scale/2, -h*scale/2)
+						op.GeoM.Translate(screenX, screenY)
+
+						g.DynamicLayer.DrawImage(g.RescuerLookRightImage, op)
+					} else {
+						drawCircle(g.DynamicLayer, screenX, screenY, 6, color.RGBA{0, 255, 0, 255})
+
+						crossSize := 4.0
+						drawRectangle(g.DynamicLayer,
+							screenX-crossSize, screenY-1,
+							crossSize*2, 2,
+							color.RGBA{255, 0, 0, 255})
+						drawRectangle(g.DynamicLayer,
+							screenX-1, screenY-crossSize,
+							2, crossSize*2,
+							color.RGBA{255, 0, 0, 255})
+					}
+
+				} else {
+					if g.RescuerLookLeftImage != nil {
+						bounds := g.RescuerLookLeftImage.Bounds()
+						w, h := float64(bounds.Dx()), float64(bounds.Dy())
+
+						op := &ebiten.DrawImageOptions{}
+						scale := 0.1
+						op.GeoM.Scale(scale, scale)
+						op.GeoM.Translate(-w*scale/2, -h*scale/2)
+						op.GeoM.Translate(screenX, screenY)
+
+						g.DynamicLayer.DrawImage(g.RescuerLookLeftImage, op)
+					} else {
+						drawCircle(g.DynamicLayer, screenX, screenY, 6, color.RGBA{0, 255, 0, 255})
+
+						crossSize := 4.0
+						drawRectangle(g.DynamicLayer,
+							screenX-crossSize, screenY-1,
+							crossSize*2, 2,
+							color.RGBA{255, 0, 0, 255})
+						drawRectangle(g.DynamicLayer,
+							screenX-1, screenY-crossSize,
+							2, crossSize*2,
+							color.RGBA{255, 0, 0, 255})
+					}
+
+				}
+
+			} else {
+				if rescuer.State == rescue.ReturningToBase && (rescuer.HomePoint.X != 0 || rescuer.HomePoint.Y != 0) {
+					if rescuer.HomePoint.X > rescuer.Position.X {
+						if g.RescuerLookRightImage != nil {
+							bounds := g.RescuerLookRightImage.Bounds()
+							w, h := float64(bounds.Dx()), float64(bounds.Dy())
+
+							op := &ebiten.DrawImageOptions{}
+							scale := 0.1
+							op.GeoM.Scale(scale, scale)
+							op.GeoM.Translate(-w*scale/2, -h*scale/2)
+							op.GeoM.Translate(screenX, screenY)
+
+							g.DynamicLayer.DrawImage(g.RescuerLookRightImage, op)
+						} else {
+							drawCircle(g.DynamicLayer, screenX, screenY, 6, color.RGBA{0, 255, 0, 255})
+
+							crossSize := 4.0
+							drawRectangle(g.DynamicLayer,
+								screenX-crossSize, screenY-1,
+								crossSize*2, 2,
+								color.RGBA{255, 0, 0, 255})
+							drawRectangle(g.DynamicLayer,
+								screenX-1, screenY-crossSize,
+								2, crossSize*2,
+								color.RGBA{255, 0, 0, 255})
+						}
+
+					} else {
+						if g.RescuerLookLeftImage != nil {
+							bounds := g.RescuerLookLeftImage.Bounds()
+							w, h := float64(bounds.Dx()), float64(bounds.Dy())
+
+							op := &ebiten.DrawImageOptions{}
+							scale := 0.1
+							op.GeoM.Scale(scale, scale)
+							op.GeoM.Translate(-w*scale/2, -h*scale/2)
+							op.GeoM.Translate(screenX, screenY)
+
+							g.DynamicLayer.DrawImage(g.RescuerLookLeftImage, op)
+						} else {
+							drawCircle(g.DynamicLayer, screenX, screenY, 6, color.RGBA{0, 255, 0, 255})
+
+							crossSize := 4.0
+							drawRectangle(g.DynamicLayer,
+								screenX-crossSize, screenY-1,
+								crossSize*2, 2,
+								color.RGBA{255, 0, 0, 255})
+							drawRectangle(g.DynamicLayer,
+								screenX-1, screenY-crossSize,
+								2, crossSize*2,
+								color.RGBA{255, 0, 0, 255})
+						}
+
+					}
+				}
+			}
+
+			// if g.RescuerImage != nil {
+			// 	bounds := g.RescuerImage.Bounds()
+			// 	w, h := float64(bounds.Dx()), float64(bounds.Dy())
+
+			// 	op := &ebiten.DrawImageOptions{}
+			// 	scale := 0.1
+			// 	op.GeoM.Scale(scale, scale)
+			// 	op.GeoM.Translate(-w*scale/2, -h*scale/2)
+			// 	op.GeoM.Translate(screenX, screenY)
+
+			// 	g.DynamicLayer.DrawImage(g.RescuerImage, op)
+
+			// } else {
+			// 	drawCircle(g.DynamicLayer, screenX, screenY, 6, color.RGBA{0, 255, 0, 255})
+
+			// 	crossSize := 4.0
+			// 	drawRectangle(g.DynamicLayer,
+			// 		screenX-crossSize, screenY-1,
+			// 		crossSize*2, 2,
+			// 		color.RGBA{255, 0, 0, 255})
+			// 	drawRectangle(g.DynamicLayer,
+			// 		screenX-1, screenY-crossSize,
+			// 		2, crossSize*2,
+			// 		color.RGBA{255, 0, 0, 255})
+			// }
 
 			if rescuer.State == rescue.MovingToPerson && rescuer.Person != nil {
 				targetScreenX, targetScreenY := g.transform.WorldToScreen(
@@ -434,15 +569,52 @@ func (g *Game) drawDynamicLayer() {
 
 		screenX, screenY := g.transform.WorldToScreen(person.Position.X, person.Position.Y)
 
-		personColor := color.RGBA{255, 0, 0, 255} // Default red
-		if person.HasReachedPOI() {
-			personColor = color.RGBA{0, 255, 0, 255} // Green for at POI
-		}
-		if person.IsInDistress() {
-			personColor = color.RGBA{0, 0, 0, 255} // Black for distress
+		// personColor := color.RGBA{255, 0, 0, 255} // Default red
+		// if person.HasReachedPOI() {
+		// 	personColor = color.RGBA{0, 255, 0, 255} // Green for at POI
+		// }
+		// if person.IsInDistress() {
+		// 	personColor = color.RGBA{0, 0, 0, 255} // Black for distress
+		// }
+
+		// drawCircle(g.DynamicLayer, screenX, screenY, 3, personColor)
+
+		if !person.IsInDistress() {
+			if g.AttendeeImage != nil {
+				bounds := g.AttendeeImage.Bounds()
+				w, h := float64(bounds.Dx()), float64(bounds.Dy())
+
+				op := &ebiten.DrawImageOptions{}
+				scale := 0.05
+				op.GeoM.Scale(scale, scale)
+				op.GeoM.Translate(-w*scale/2, -h*scale/2)
+				op.GeoM.Translate(screenX, screenY)
+
+				g.DynamicLayer.DrawImage(g.AttendeeImage, op)
+
+			} else {
+				drawCircle(g.DynamicLayer, screenX, screenY, 10, color.RGBA{0, 0, 255, 255})
+			}
+
+		} else {
+			if g.AttendeeDeadImage != nil {
+				bounds := g.AttendeeDeadImage.Bounds()
+				w, h := float64(bounds.Dx()), float64(bounds.Dy())
+
+				op := &ebiten.DrawImageOptions{}
+				scale := 0.05
+				op.GeoM.Scale(scale, scale)
+				op.GeoM.Translate(-w*scale/2, -h*scale/2)
+				op.GeoM.Translate(screenX, screenY)
+
+				g.DynamicLayer.DrawImage(g.AttendeeDeadImage, op)
+
+			} else {
+				drawCircle(g.DynamicLayer, screenX, screenY, 10, color.RGBA{0, 0, 0, 255})
+			}
+
 		}
 
-		drawCircle(g.DynamicLayer, screenX, screenY, 3, personColor)
 	}
 
 	if g.transform.debug {
