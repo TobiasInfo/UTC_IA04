@@ -757,21 +757,19 @@ func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
 	screenWidth := float64(screen.Bounds().Dx())
 	screenHeight := float64(screen.Bounds().Dy())
 
-	metricsWidth := screenWidth * 0.2
-	metricsHeight := screenHeight * 0.3
+	metricsWidth := screenWidth * 0.95
+	metricsHeight := screenHeight * 0.1
 
-	padding := 20.0
+	paddingW := 20.0
+	paddingH := 620.0
 	metrics := ebiten.NewImage(int(metricsWidth), int(metricsHeight))
 	metrics.Fill(color.RGBA{30, 30, 30, 200})
 
 	stats := g.Sim.GetStatistics()
 	text := fmt.Sprintf(
 		"Simulation Metrics\n"+
-			"Total People: %d\n"+
-			"In Distress: %d\n"+
-			"Cases Treated: %d\n"+
-			"Avg Battery: %.1f%%\n"+
-			"Area Coverage: %.1f%%\n",
+			"Total People: %d             "+"In Distress: %d             "+"Cases Treated: %d\n"+
+			"Avg Battery: %.1f%%         "+"Area Coverage: %.1f%%\n",
 		stats.TotalPeople,
 		stats.InDistress,
 		stats.CasesTreated,
@@ -781,8 +779,20 @@ func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
 	ebitenutil.DebugPrintAt(metrics, text, 10, 10)
 
 	opts := &ebiten.DrawImageOptions{}
-	opts.GeoM.Translate(screenWidth-metricsWidth-padding, padding)
+	opts.GeoM.Translate(screenWidth-metricsWidth-paddingW, paddingH)
 	screen.DrawImage(metrics, opts)
+
+	g.drawMetricsWindowButtons(screen)
+}
+
+func (g *Game) drawMetricsWindowButtons(screen *ebiten.Image) {
+	screenWidth := float64(screen.Bounds().Dx())
+	screenHeight := float64(screen.Bounds().Dy())
+
+	metricsWidth := screenWidth * 0.2
+	metricsHeight := screenHeight * 0.02
+
+	padding := 20.0
 
 	buttonWidth := metricsWidth
 	buttonHeight := 40.0
