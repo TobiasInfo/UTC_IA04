@@ -317,6 +317,16 @@ func (g *Game) drawStaticLayer() {
 	op.GeoM.Translate(entranceX1, y1+200.0)
 	g.StaticLayer.DrawImage(g.TiledFloorImage, op)
 
+	debutsortieX, _ := g.transform.WorldToScreen(worldWidth*1.02, 0)
+	op = &ebiten.DrawImageOptions{}
+	op.GeoM.Scale(-1, 1) // Crée la symétrie horizontale
+	op.GeoM.Translate(debutsortieX, y1)
+	g.StaticLayer.DrawImage(g.TiledFloorImage, op)
+	op = &ebiten.DrawImageOptions{}
+	op.GeoM.Scale(-1, 1) // Crée la symétrie horizontale
+	op.GeoM.Translate(debutsortieX, y1+218.0)
+	g.StaticLayer.DrawImage(g.TiledFloorImage, op)
+
 	// drawRectangle(g.StaticLayer, entranceX1, y1, entranceX2-entranceX1, y2-y1, EntranceZoneColor)
 	// drawRectangle(g.StaticLayer, entranceX2, y1, mainX2-entranceX2, y2-y1, MainZoneColor)
 	// drawRectangle(g.StaticLayer, mainX2, y1, exitX2-mainX2, y2-y1, ExitZoneColor)
