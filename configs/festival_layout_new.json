@@ -1,0 +1,161 @@
+{
+    "mapWidth": 30,
+    "mapHeight": 20,
+    "zones": [
+        {
+            "type": 2,
+            "startX": 0,
+            "startY": 0,
+            "endX": 3,
+            "endY": 20,
+            "minPOIs": {
+                "0": 1,
+                "1": 2,
+                "2": 1
+            }
+        },
+        {
+            "type": 1,
+            "startX": 3,
+            "startY": 0,
+            "endX": 27,
+            "endY": 20,
+            "minPOIs": {
+                "5": 2,
+                "6": 2,
+                "4": 4,
+                "3": 6,
+                "2": 6,
+                "7": 4
+            }
+        },
+        {
+            "type": 0,
+            "startX": 27,
+            "startY": 0,
+            "endX": 30,
+            "endY": 20,
+            "minPOIs": {
+                "1": 2,
+                "2": 1,
+                "7": 1
+            }
+        }
+    ],
+    "poiLocations": [
+        {
+            "type": 0,
+            "position": {"x": 2, "y": 10},
+            "capacity": 15,
+            "name": "Entrance Medical Center"
+        },
+        {
+            "type": 0,
+            "position": {"x": 28, "y": 10},
+            "capacity": 15,
+            "name": "Exit Medical Center"
+        },
+        {
+            "type": 1,
+            "position": {"x": 1, "y": 5},
+            "capacity": 5,
+            "name": "Entrance Charging Station A"
+        },
+        {
+            "type": 1,
+            "position": {"x": 1, "y": 15},
+            "capacity": 5,
+            "name": "Entrance Charging Station B"
+        },
+        {
+            "type": 1,
+            "position": {"x": 28, "y": 5},
+            "capacity": 5,
+            "name": "Exit Charging Station A"
+        },
+        {
+            "type": 2,
+            "position": {"x": 15, "y": 5},
+            "capacity": 8,
+            "name": "Central Toilets North"
+        },
+        {
+            "type": 2,
+            "position": {"x": 15, "y": 15},
+            "capacity": 8,
+            "name": "Central Toilets South"
+        },
+        {
+            "type": 2,
+            "position": {"x": 24, "y": 5},
+            "capacity": 8,
+            "name": "Stage Area Toilets North"
+        },
+        {
+            "type": 2,
+            "position": {"x": 24, "y": 15},
+            "capacity": 8,
+            "name": "Stage Area Toilets South"
+        },
+        {
+            "type": 3,
+            "position": {"x": 8, "y": 7},
+            "capacity": 15,
+            "name": "Drinks Stand A"
+        },
+        {
+            "type": 3,
+            "position": {"x": 8, "y": 13},
+            "capacity": 15,
+            "name": "Drinks Stand B"
+        },
+        {
+            "type": 3,
+            "position": {"x": 22, "y": 13},
+            "capacity": 15,
+            "name": "Drinks Stand F"
+        },
+        {
+            "type": 4,
+            "position": {"x": 10, "y": 6},
+            "capacity": 20,
+            "name": "Food Court North A"
+        },
+        {
+            "type": 4,
+            "position": {"x": 10, "y": 14},
+            "capacity": 20,
+            "name": "Food Court South A"
+        },
+        {
+            "type": 4,
+            "position": {"x": 18, "y": 6},
+            "capacity": 20,
+            "name": "Food Court North B"
+        },
+        {
+            "type": 4,
+            "position": {"x": 18, "y": 14},
+            "capacity": 20,
+            "name": "Food Court South B"
+        },
+        {
+            "type": 5,
+            "position": {"x": 13, "y": 10},
+            "capacity": 100,
+            "name": "Main Stage A"
+        },
+        {
+            "type": 5,
+            "position": {"x": 20, "y": 10},
+            "capacity": 100,
+            "name": "Main Stage B"
+        },
+        {
+            "type": 6,
+            "position": {"x": 12, "y": 3},
+            "capacity": 50,
+            "name": "Secondary Stage North"
+        }
+    ]
+}
