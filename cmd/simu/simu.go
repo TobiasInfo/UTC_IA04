@@ -16,6 +16,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
 // Zone colors
@@ -125,6 +126,9 @@ type Game struct {
 	AttendeeDeadImage     *ebiten.Image
 	RescuerLookLeftImage  *ebiten.Image
 	RescuerLookRightImage *ebiten.Image
+	isDensityMapExpanded  bool
+	isDroneGraphExpanded  bool
+	clickCooldown         int
 }
 
 func NewGame(droneCount, peopleCount, obstacleCount int) *Game {
@@ -137,6 +141,7 @@ func NewGame(droneCount, peopleCount, obstacleCount int) *Game {
 		DynamicLayer:  ebiten.NewImage(1000, 700),
 		Sim:           simulation.NewSimulation(droneCount, peopleCount, obstacleCount),
 		transform:     NewWorldTransform(1000, 700, 30, 20),
+		clickCooldown: 0,
 	}
 
 	g.DroneImage = loadImage("img/drone-real.png")
@@ -173,6 +178,11 @@ func (g *Game) Update() error {
 	mx, my := ebiten.CursorPosition()
 	mousePressed := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
 
+	// Decrease cooldown if it's > 0
+	if g.clickCooldown > 0 {
+		g.clickCooldown--
+	}
+
 	var inputRunes []rune
 	inputRunes = ebiten.AppendInputChars(inputRunes)
 
@@ -190,6 +200,57 @@ func (g *Game) Update() error {
 
 		worldX, worldY := g.transform.ScreenToWorld(float64(mx), float64(my))
 		g.updatePOIHover(worldX, worldY)
+
+		// Handle clicks on graphs
+		if mousePressed && g.clickCooldown == 0 {
+			screenWidth := float64(g.DynamicLayer.Bounds().Dx())
+			screenHeight := float64(g.DynamicLayer.Bounds().Dy())
+			baseSize := 120.0
+			bottomPadding := 40.0
+
+			// Calculate base positions
+			centerY := screenHeight - baseSize - bottomPadding
+			leftX := screenWidth/4 - baseSize/2
+			rightX := 3*screenWidth/4 - baseSize/2
+
+			// Check density map click
+			var densitySize float64
+			if g.isDensityMapExpanded {
+				densitySize = 200.0
+			} else {
+				densitySize = baseSize
+			}
+
+			densityX := leftX
+			if g.isDensityMapExpanded {
+				densityX = leftX - (200.0-baseSize)/2
+			}
+
+			if float64(mx) >= densityX && float64(mx) <= densityX+densitySize &&
+				float64(my) >= centerY && float64(my) <= centerY+densitySize {
+				g.isDensityMapExpanded = !g.isDensityMapExpanded
+				g.clickCooldown = 10 // Set cooldown after successful click
+			}
+
+			// Check drone network click
+			var droneSize float64
+			if g.isDroneGraphExpanded {
+				droneSize = 200.0
+			} else {
+				droneSize = baseSize
+			}
+
+			droneX := rightX
+			if g.isDroneGraphExpanded {
+				droneX = rightX - (200.0-baseSize)/2
+			}
+
+			if float64(mx) >= droneX && float64(mx) <= droneX+droneSize &&
+				float64(my) >= centerY && float64(my) <= centerY+droneSize {
+				g.isDroneGraphExpanded = !g.isDroneGraphExpanded
+				g.clickCooldown = 10 // Set cooldown after successful click
+			}
+		}
 
 		if g.Paused {
 			return nil
@@ -209,7 +270,6 @@ func (g *Game) Update() error {
 
 	return nil
 }
-
 func (g *Game) Draw(screen *ebiten.Image) {
 	switch g.Mode {
 	case Menu:
@@ -763,36 +823,236 @@ func (g *Game) drawSimulation(screen *ebiten.Image) {
 	}
 }
 
+func (g *Game) drawDensityMap(screen *ebiten.Image, density models.DensityGrid, x, y, size float64) {
+	baseSize := 120.0     // Smaller default size
+	expandedSize := 300.0 // Size when expanded
+
+	currentSize := baseSize
+	if g.isDensityMapExpanded {
+		currentSize = expandedSize
+	}
+
+	// Draw semi-transparent background
+	bgRect := ebiten.NewImage(int(currentSize), int(currentSize))
+	bgRect.Fill(color.RGBA{40, 40, 40, 180}) // More transparent background
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Translate(x, y)
+	screen.DrawImage(bgRect, op)
+
+	cellSize := currentSize / float64(density.CellSize)
+
+	// Draw density cells
+	for i, row := range density.Grid {
+		for j, value := range row {
+			if value > 0 {
+				cellImg := ebiten.NewImage(int(cellSize-1), int(cellSize-1))
+				cellImg.Fill(color.RGBA{0, uint8(value * 200), 0, 200}) // More transparent
+
+				op := &ebiten.DrawImageOptions{}
+				op.GeoM.Translate(x+float64(j)*cellSize, y+float64(i)*cellSize)
+				screen.DrawImage(cellImg, op)
+			}
+		}
+	}
+
+	// Draw grid lines with reduced opacity
+	for i := 0; i <= density.CellSize; i++ {
+		lineX := x + float64(i)*cellSize
+		lineY := y + float64(i)*cellSize
+		vector.StrokeLine(screen, float32(lineX), float32(y), float32(lineX), float32(y+currentSize), 1, color.RGBA{100, 100, 100, 128}, false)
+		vector.StrokeLine(screen, float32(x), float32(lineY), float32(x+currentSize), float32(lineY), 1, color.RGBA{100, 100, 100, 128}, false)
+	}
+}
+
+func (g *Game) drawDroneNetwork(screen *ebiten.Image, network models.DroneNetwork, x, y, size float64) {
+	baseSize := 120.0
+	expandedSize := 300.0
+
+	currentSize := baseSize
+	if g.isDroneGraphExpanded {
+		currentSize = expandedSize
+	}
+
+	bgRect := ebiten.NewImage(int(currentSize), int(currentSize))
+	bgRect.Fill(color.RGBA{40, 40, 40, 180})
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Translate(x, y)
+	screen.DrawImage(bgRect, op)
+
+	// Draw grid
+	gridSize := 10
+	cellSize := currentSize / float64(gridSize)
+	for i := 0; i <= gridSize; i++ {
+		lineX := x + float64(i)*cellSize
+		lineY := y + float64(i)*cellSize
+		vector.StrokeLine(screen, float32(lineX), float32(y), float32(lineX), float32(y+currentSize), 1, color.RGBA{100, 100, 100, 128}, false)
+		vector.StrokeLine(screen, float32(x), float32(lineY), float32(x+currentSize), float32(lineY), 1, color.RGBA{100, 100, 100, 128}, false)
+	}
+
+	// Draw drone ranges first (under connections)
+	for _, pos := range network.DronePositions {
+		droneX := x + (pos.X/float64(g.Sim.Map.Width))*currentSize
+		droneY := y + (pos.Y/float64(g.Sim.Map.Height))*currentSize
+		rangeRadius := (float64(g.Sim.DroneSeeRange) / float64(g.Sim.Map.Width)) * currentSize
+
+		// Draw range circle outline
+		for angle := 0.0; angle < 2*math.Pi; angle += 0.1 {
+			vector.StrokeLine(screen,
+				float32(droneX+math.Cos(angle)*rangeRadius),
+				float32(droneY+math.Sin(angle)*rangeRadius),
+				float32(droneX+math.Cos(angle+0.1)*rangeRadius),
+				float32(droneY+math.Sin(angle+0.1)*rangeRadius),
+				1, color.RGBA{0, 255, 255, 100}, false)
+		}
+	}
+
+	// Draw connections
+	for i := 0; i < len(network.DroneConnections); i += 2 {
+		start := network.DroneConnections[i]
+		end := network.DroneConnections[i+1]
+
+		startX := x + (start.X/float64(g.Sim.Map.Width))*currentSize
+		startY := y + (start.Y/float64(g.Sim.Map.Height))*currentSize
+		endX := x + (end.X/float64(g.Sim.Map.Width))*currentSize
+		endY := y + (end.Y/float64(g.Sim.Map.Height))*currentSize
+
+		vector.StrokeLine(screen, float32(startX), float32(startY), float32(endX), float32(endY), 2, color.RGBA{0, 255, 255, 180}, false)
+	}
+
+	// Draw rescue connections
+	for i := 0; i < len(network.RescueConnections); i += 2 {
+		start := network.RescueConnections[i]
+		end := network.RescueConnections[i+1]
+
+		startX := x + (start.X/float64(g.Sim.Map.Width))*currentSize
+		startY := y + (start.Y/float64(g.Sim.Map.Height))*currentSize
+		endX := x + (end.X/float64(g.Sim.Map.Width))*currentSize
+		endY := y + (end.Y/float64(g.Sim.Map.Height))*currentSize
+
+		vector.StrokeLine(screen, float32(startX), float32(startY), float32(endX), float32(endY), 2, color.RGBA{255, 0, 0, 180}, false)
+	}
+
+	// Draw drone positions last (on top)
+	for _, pos := range network.DronePositions {
+		droneX := x + (pos.X/float64(g.Sim.Map.Width))*currentSize
+		droneY := y + (pos.Y/float64(g.Sim.Map.Height))*currentSize
+		drawCircle(screen, droneX, droneY, 3, color.RGBA{0, 255, 255, 255})
+	}
+}
+
 func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
 	screenWidth := float64(screen.Bounds().Dx())
 	screenHeight := float64(screen.Bounds().Dy())
 
-	metricsWidth := screenWidth * 0.95
-	metricsHeight := screenHeight * 0.1
+	// Fixed dimensions for graphs with adjusted positioning
+	const (
+		normalSize     = 200.0 // Fixed normal size
+		expandedSize   = 300.0 // Fixed expanded size
+		bottomPadding  = 120.0 // Increased padding from bottom
+		edgePadding    = 20.0  // Consistent padding from edges
+		cooldownFrames = 5     // Frames to wait between clicks
+	)
 
-	paddingW := 20.0
-	paddingH := 620.0
+	// Calculate graph base Y position from bottom of screen
+	graphBaseY := screenHeight - bottomPadding
+
+	// Draw metrics text panel at top
+	metricsWidth := screenWidth * 0.95
+	metricsHeight := 60.0
 	metrics := ebiten.NewImage(int(metricsWidth), int(metricsHeight))
 	metrics.Fill(color.RGBA{30, 30, 30, 200})
 
 	stats := g.Sim.GetStatistics()
 	text := fmt.Sprintf(
-		"Simulation Metrics\n"+
-			"Total People: %d             "+"In Distress: %d             "+"Cases Treated: %d\n"+
-			"Avg Battery: %.1f%%         "+"Area Coverage: %.1f%%\n",
+		"People Metrics:  Total: %d    In Distress: %d    Treated: %d        "+
+			"Drone Metrics:  Battery: %.1f%%    Coverage: %.1f%%",
 		stats.TotalPeople,
 		stats.InDistress,
 		stats.CasesTreated,
 		stats.AverageBattery,
 		stats.AverageCoverage,
 	)
-	ebitenutil.DebugPrintAt(metrics, text, 10, 10)
+	ebitenutil.DebugPrintAt(metrics, text, 20, 20)
 
 	opts := &ebiten.DrawImageOptions{}
-	opts.GeoM.Translate(screenWidth-metricsWidth-paddingW, paddingH)
+	opts.GeoM.Translate(screenWidth-metricsWidth-20, 20)
 	screen.DrawImage(metrics, opts)
 
+	// Calculate current sizes based on expansion state
+	currentDensitySize := normalSize
+	if g.isDensityMapExpanded {
+		currentDensitySize = expandedSize
+	}
+
+	currentDroneSize := normalSize
+	if g.isDroneGraphExpanded {
+		currentDroneSize = expandedSize
+	}
+
+	// Calculate X positions with consistent edge padding
+	leftX := edgePadding
+	rightX := screenWidth - currentDroneSize - edgePadding
+
+	// Calculate Y positions for graphs
+	leftY := graphBaseY - currentDensitySize
+	rightY := graphBaseY - currentDroneSize
+
+	// Draw graphs
+	g.drawDensityMap(screen, stats.PeopleDensity, leftX, leftY, currentDensitySize)
+	g.drawDroneNetwork(screen, stats.DroneNetwork, rightX, rightY, currentDroneSize)
+
+	// Draw titles only once, positioned above graphs
+	densityTitle := "People Density (Click to expand)"
+	droneTitle := "Drone Network (Click to expand)"
+
+	// Position titles with consistent spacing
+	densityTitleY := leftY - 20
+	droneTitleY := rightY - 20
+
+	ebitenutil.DebugPrintAt(screen, densityTitle, int(leftX), int(densityTitleY))
+	ebitenutil.DebugPrintAt(screen, droneTitle, int(rightX), int(droneTitleY))
+
+	// Handle clicks on entire graph areas
+	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) && g.clickCooldown == 0 {
+		mx, my := ebiten.CursorPosition()
+
+		// Define clickable areas for both graphs
+		densityArea := Rectangle{
+			x:      leftX,
+			y:      leftY,
+			width:  currentDensitySize,
+			height: currentDensitySize,
+		}
+
+		droneArea := Rectangle{
+			x:      rightX,
+			y:      rightY,
+			width:  currentDroneSize,
+			height: currentDroneSize,
+		}
+
+		// Check if click is within either graph area
+		if densityArea.Contains(float64(mx), float64(my)) {
+			g.isDensityMapExpanded = !g.isDensityMapExpanded
+			g.clickCooldown = cooldownFrames
+		}
+
+		if droneArea.Contains(float64(mx), float64(my)) {
+			g.isDroneGraphExpanded = !g.isDroneGraphExpanded
+			g.clickCooldown = cooldownFrames
+		}
+	}
+
 	g.drawMetricsWindowButtons(screen)
+}
+
+type Rectangle struct {
+	x, y, width, height float64
+}
+
+func (r Rectangle) Contains(x, y float64) bool {
+	return x >= r.x && x <= r.x+r.width &&
+		y >= r.y && y <= r.y+r.height
 }
 
 func (g *Game) drawMetricsWindowButtons(screen *ebiten.Image) {

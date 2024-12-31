@@ -1,6 +1,3 @@
-// simulation.go
-// This is the complete file to replace your current simulation.go
-
 package simulation
 
 import (
@@ -45,6 +42,16 @@ type Simulation struct {
 	mu                         sync.RWMutex
 	treatedCases               int
 	RescuePoints               map[models.Position]*rescue.RescuePoint
+}
+
+type SimulationStatistics struct {
+	TotalPeople     int
+	InDistress      int
+	CasesTreated    int
+	AverageBattery  float64
+	AverageCoverage float64
+	PeopleDensity   models.DensityGrid
+	DroneNetwork    models.DroneNetwork
 }
 
 // CIMITIERE DES PERSONNES MORTES EN (-10, -10)
@@ -829,11 +836,92 @@ func (s *Simulation) GetCurrentTick() int {
 	return s.currentTick
 }
 
+func (s *Simulation) calculatePeopleDensity() models.DensityGrid {
+	const gridSize = 10 // 10x10 grid
+	grid := make([][]float64, gridSize)
+	for i := range grid {
+		grid[i] = make([]float64, gridSize)
+	}
+
+	cellWidth := float64(s.Map.Width) / float64(gridSize)
+	cellHeight := float64(s.Map.Height) / float64(gridSize)
+
+	for _, person := range s.Persons {
+		if person.Position.X < 0 || person.Position.Y < 0 {
+			continue
+		}
+		gridX := int(person.Position.X / cellWidth)
+		gridY := int(person.Position.Y / cellHeight)
+		if gridX >= 0 && gridX < gridSize && gridY >= 0 && gridY < gridSize {
+			grid[gridY][gridX]++
+		}
+	}
+
+	maxCount := 0.0
+	for _, row := range grid {
+		for _, count := range row {
+			if count > maxCount {
+				maxCount = count
+			}
+		}
+	}
+
+	if maxCount > 0 {
+		for i := range grid {
+			for j := range grid[i] {
+				grid[i][j] /= maxCount
+			}
+		}
+	}
+
+	return models.DensityGrid{
+		Grid:     grid,
+		Width:    s.Map.Width,
+		Height:   s.Map.Height,
+		CellSize: gridSize,
+	}
+}
+
+func (s *Simulation) calculateDroneNetwork() models.DroneNetwork {
+	network := models.DroneNetwork{
+		DronePositions: make([]models.Position, len(s.Drones)),
+	}
+
+	for i, drone := range s.Drones {
+		network.DronePositions[i] = drone.Position
+	}
+
+	for i, drone1 := range s.Drones {
+		for j, drone2 := range s.Drones {
+			if i >= j {
+				continue
+			}
+			dist := drone1.Position.CalculateDistance(drone2.Position)
+			if dist <= float64(s.DroneCommRange) {
+				network.DroneConnections = append(network.DroneConnections, drone1.Position)
+				network.DroneConnections = append(network.DroneConnections, drone2.Position)
+			}
+		}
+	}
+
+	for _, drone := range s.Drones {
+		for _, rp := range s.RescuePoints {
+			dist := drone.Position.CalculateDistance(rp.Position)
+			if dist <= float64(s.DroneCommRange) {
+				network.RescueConnections = append(network.RescueConnections, drone.Position)
+				network.RescueConnections = append(network.RescueConnections, rp.Position)
+			}
+		}
+	}
+
+	return network
+}
+
+// Replace the existing GetStatistics method with this updated version
 func (s *Simulation) GetStatistics() SimulationStatistics {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	// Calculate people metrics
 	totalPeople := len(s.Persons)
 	inDistress := s.CountCrowdMembersInDistress()
 
@@ -850,12 +938,9 @@ func (s *Simulation) GetStatistics() SimulationStatistics {
 		}
 	}
 
-	// Calculate averages safely
 	var avgBattery, coverage float64
 	if droneCount > 0 {
 		avgBattery = totalBattery / float64(droneCount)
-
-		// Coverage calculation
 		totalArea := float64(s.Map.Width * s.Map.Height)
 		droneArea := math.Pi * float64(s.DroneSeeRange*s.DroneSeeRange)
 		coverage = math.Min((float64(droneCount)*droneArea/totalArea)*100, 100)
@@ -864,21 +949,12 @@ func (s *Simulation) GetStatistics() SimulationStatistics {
 	return SimulationStatistics{
 		TotalPeople:     totalPeople,
 		InDistress:      inDistress,
-		CasesTreated:    s.treatedCases, // You'll need to add this field to Simulation struct
+		CasesTreated:    s.treatedCases,
 		AverageBattery:  avgBattery,
 		AverageCoverage: coverage,
+		PeopleDensity:   s.calculatePeopleDensity(),
+		DroneNetwork:    s.calculateDroneNetwork(),
 	}
-}
-
-type SimulationStatistics struct {
-	// People Metrics
-	TotalPeople  int
-	InDistress   int
-	CasesTreated int
-
-	// Drone Metrics
-	AverageBattery  float64
-	AverageCoverage float64
 }
 
 func (s *Simulation) GetPersonsInRange(center models.Position, radius float64) []*persons.Person {
