@@ -473,7 +473,7 @@ func (g *Game) drawDynamicLayer() {
 						w, h := float64(bounds.Dx()), float64(bounds.Dy())
 
 						op := &ebiten.DrawImageOptions{}
-						scale := 0.1
+						scale := 0.05
 						op.GeoM.Scale(scale, scale)
 						op.GeoM.Translate(-w*scale/2, -h*scale/2)
 						op.GeoM.Translate(screenX, screenY)
@@ -499,7 +499,7 @@ func (g *Game) drawDynamicLayer() {
 						w, h := float64(bounds.Dx()), float64(bounds.Dy())
 
 						op := &ebiten.DrawImageOptions{}
-						scale := 0.1
+						scale := 0.05
 						op.GeoM.Scale(scale, scale)
 						op.GeoM.Translate(-w*scale/2, -h*scale/2)
 						op.GeoM.Translate(screenX, screenY)
@@ -529,7 +529,7 @@ func (g *Game) drawDynamicLayer() {
 							w, h := float64(bounds.Dx()), float64(bounds.Dy())
 
 							op := &ebiten.DrawImageOptions{}
-							scale := 0.1
+							scale := 0.05
 							op.GeoM.Scale(scale, scale)
 							op.GeoM.Translate(-w*scale/2, -h*scale/2)
 							op.GeoM.Translate(screenX, screenY)
@@ -555,7 +555,7 @@ func (g *Game) drawDynamicLayer() {
 							w, h := float64(bounds.Dx()), float64(bounds.Dy())
 
 							op := &ebiten.DrawImageOptions{}
-							scale := 0.1
+							scale := 0.05
 							op.GeoM.Scale(scale, scale)
 							op.GeoM.Translate(-w*scale/2, -h*scale/2)
 							op.GeoM.Translate(screenX, screenY)
@@ -1059,23 +1059,23 @@ func (g *Game) drawMetricsWindowButtons(screen *ebiten.Image) {
 	screenWidth := float64(screen.Bounds().Dx())
 	screenHeight := float64(screen.Bounds().Dy())
 
-	metricsWidth := screenWidth * 0.2
-	metricsHeight := screenHeight * 0.02
+	metricsWidth := screenWidth * 0.15
+	metricsHeight := screenHeight * 0.85
 
 	padding := 20.0
 
 	buttonWidth := metricsWidth
-	buttonHeight := 40.0
+	buttonHeight := 25.0
 	buttonSpacing := 10.0
 
 	g.PauseButton.Width = buttonWidth
 	g.PauseButton.Height = buttonHeight
-	g.PauseButton.X = screenWidth - metricsWidth - padding
+	g.PauseButton.X = screenWidth - metricsWidth - padding - 5
 	g.PauseButton.Y = padding + metricsHeight + buttonSpacing
 
 	g.SimButton.Width = buttonWidth
 	g.SimButton.Height = buttonHeight
-	g.SimButton.X = screenWidth - metricsWidth - padding
+	g.SimButton.X = screenWidth - metricsWidth - padding - 5
 	g.SimButton.Y = g.PauseButton.Y + buttonHeight + buttonSpacing
 }
 

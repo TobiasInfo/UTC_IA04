@@ -100,11 +100,17 @@ func main() {
 			}
 
 			var chosenMap string
-			if g.DropdownMap.SelectedIndex == 0 {
-				chosenMap = "festival_layout"
-			} else {
+			switch g.DropdownMap.SelectedIndex {
+			case 0:
+				chosenMap = "festival_layout_1"
+			case 1:
+				chosenMap = "festival_layout_2"
+			case 2:
+				chosenMap = "festival_layout_3"
+			default: //Error
 				chosenMap = "festival_layout_new"
 			}
+
 			g.Sim.UpdateMap(chosenMap)
 			g.Sim.UpdateCrowdSize(g.PeopleCount)
 			g.Sim.UpdateDroneSize(g.DroneCount)
@@ -130,9 +136,14 @@ func main() {
 			}
 
 			var chosenMap string
-			if g.DropdownMap.SelectedIndex == 0 {
-				chosenMap = "festival_layout"
-			} else {
+			switch g.DropdownMap.SelectedIndex {
+			case 0:
+				chosenMap = "festival_layout_1"
+			case 1:
+				chosenMap = "festival_layout_2"
+			case 2:
+				chosenMap = "festival_layout_3"
+			default: //Error
 				chosenMap = "festival_layout_new"
 			}
 			g.Sim.UpdateMap(chosenMap)

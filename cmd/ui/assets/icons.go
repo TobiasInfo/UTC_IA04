@@ -35,7 +35,7 @@ func PoiScale(poiType models.POIType) float64 {
 	case 1: // ChargingStation
 		return 0.20
 	case 2: // Toilet
-		return 0.10
+		return 0.07
 	case 3: // DrinkStand
 		return 0.10
 	case 4: // FoodStand
@@ -43,9 +43,9 @@ func PoiScale(poiType models.POIType) float64 {
 	case 5: // MainStage
 		return 0.25
 	case 6: // SecondaryStage
-		return 0.25
-	case 7: // RestArea
 		return 0.20
+	case 7: // RestArea
+		return 0.15
 	default: //POI pas défini
 		return 0.10
 	}
