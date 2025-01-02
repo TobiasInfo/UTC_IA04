@@ -1,0 +1,196 @@
+{
+    "mapWidth": 30,
+    "mapHeight": 20,
+    "zones": [
+        {
+            "type": 2,
+            "startX": 0,
+            "startY": 0,
+            "endX": 3,
+            "endY": 20,
+            "minPOIs": {
+                "0": 0
+            }
+        },
+        {
+            "type": 1,
+            "startX": 3,
+            "startY": 0,
+            "endX": 27,
+            "endY": 20,
+            "minPOIs": {
+                "0": 6,
+                "1": 6,
+                "2": 6,
+                "3": 6,
+                "4": 4,
+                "5": 2,
+                "6": 2,
+                "7": 4
+            }
+        },
+        {
+            "type": 0,
+            "startX": 27,
+            "startY": 0,
+            "endX": 30,
+            "endY": 20,
+            "minPOIs": {
+                "0": 0
+            }
+        }
+    ],
+    "poiLocations": [
+        {
+            "type": 0,
+            "position": {"x":26, "y": 17},
+            "capacity": 10,
+            "name": "Medical Center"
+        },
+        {
+            "type": 1,
+            "position": {"x": 4, "y": 17},
+            "capacity": 5,
+            "name": "Charging Station A"
+        },
+        {
+            "type": 2,
+            "position": {"x": 7, "y": 17},
+            "capacity": 3,
+            "name": "Toilets A-1"
+        },
+        {
+            "type": 2,
+            "position": {"x": 8, "y": 17},
+            "capacity": 3,
+            "name": "Toilets A-2"
+        },
+        {
+            "type": 2,
+            "position": {"x": 23, "y": 17},
+            "capacity": 3,
+            "name": "Toilets B-1"
+        },
+        {
+            "type": 2,
+            "position": {"x": 22, "y": 17},
+            "capacity": 3,
+            "name": "Toilets B-1"
+        },
+        
+        {
+            "type": 2,
+            "position": {"x": 6, "y": 2},
+            "capacity": 3,
+            "name": "Toilets C-1"
+        },
+        {
+            "type": 2,
+            "position": {"x": 5, "y": 2},
+            "capacity": 3,
+            "name": "Toilets C-2"
+        },
+        {
+            "type": 3,
+            "position": {"x": 5, "y": 9},
+            "capacity": 4,
+            "name": "Drinks Stand A"
+        },
+        {
+            "type": 3,
+            "position": {"x": 14, "y": 9},
+            "capacity": 4,
+            "name": "Drinks Stand B-1"
+        },
+        {
+            "type": 3,
+            "position": {"x": 16, "y": 9},
+            "capacity": 4,
+            "name": "Drinks Stand B-2"
+        },
+        
+        {
+            "type": 3,
+            "position": {"x": 17, "y": 15},
+            "capacity": 4,
+            "name": "Drinks Stand Rest-Area-A"
+        },
+        
+        {
+            "type": 3,
+            "position": {"x": 24, "y": 13},
+            "capacity": 4,
+            "name": "Drinks Stand Rest-Area-B"
+        },
+        
+        {
+            "type": 3,
+            "position": {"x": 25, "y": 2},
+            "capacity": 4,
+            "name": "Drinks Stand Rest-Area-C"
+        },
+        {
+            "type": 4,
+            "position": {"x": 5, "y": 11},
+            "capacity": 4,
+            "name": "Food Court A"
+        },
+        {
+            "type": 4,
+            "position": {"x": 16, "y": 17},
+            "capacity": 4,
+            "name": "Food Court Rest-Area-A"
+        },
+        {
+            "type": 4,
+            "position": {"x": 25, "y": 10},
+            "capacity": 4,
+            "name": "Food Court Rest-Area-B"
+        },
+        {
+            "type": 4,
+            "position": {"x": 23, "y": 2},
+            "capacity": 4,
+            "name": "Food Court Rest-Area-C-1"
+        },
+        {
+            "type": 4,
+            "position": {"x": 24, "y": 6},
+            "capacity": 4,
+            "name": "Food Court Rest-Area-C-2"
+        },
+        {
+            "type": 5,
+            "position": {"x": 15, "y": 1},
+            "capacity": 100,
+            "name": "Main Stage"
+        },
+        {
+            "type": 6,
+            "position": {"x": 10, "y": 11},
+            "capacity": 50,
+            "name": "Secondary Stage A"
+        }
+        ,
+        {
+            "type": 7,
+            "position": {"x":15, "y": 15},
+            "capacity": 14,
+            "name": "Resting Area A"
+        }
+        ,
+        {
+            "type": 7,
+            "position": {"x":23, "y": 11},
+            "capacity": 14,
+            "name": "Resting Area B"
+        }
+        ,
+        {
+            "type": 7,
+            "position": {"x":25, "y": 4},
+            "capacity": 14,
+            "name": "Resting Area C"
+        }
+    ]
+}

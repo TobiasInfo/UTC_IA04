@@ -41,7 +41,7 @@ func PoiScale(poiType models.POIType) float64 {
 	case 4: // FoodStand
 		return 0.10
 	case 5: // MainStage
-		return 0.20
+		return 0.25
 	case 6: // SecondaryStage
 		return 0.20
 	case 7: // RestArea
