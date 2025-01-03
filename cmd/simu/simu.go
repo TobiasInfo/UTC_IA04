@@ -960,11 +960,14 @@ func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
 
 	// Draw metrics text panel at top
 	metricsWidth := screenWidth * 0.95
-	metricsHeight := 67.0
+	metricsHeight := 80.0 // Increased height to accommodate festival time info
 	metrics := ebiten.NewImage(int(metricsWidth), int(metricsHeight))
 	metrics.Fill(color.RGBA{30, 30, 30, 200})
 
 	stats := g.Sim.GetStatistics()
+	festivalTime := g.Sim.GetFestivalTime()
+
+	// Main metrics text
 	text := fmt.Sprintf(
 		"People Metrics:  Total: %d    In Distress: %d    Treated: %d    Dead: %d        "+
 			"Drone Metrics:  Battery: %.1f%%    Coverage: %.1f%%"+"\nCurrent Tick: %d -- Current Time: %s    Remaning Time: %s",
@@ -979,6 +982,24 @@ func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
 		g.Sim.GetRemaningFestivalTime(),
 	)
 	ebitenutil.DebugPrintAt(metrics, text, 20, 20)
+
+	// Festival time information
+	elapsedTime := festivalTime.GetElapsedTime()
+	remainingTime := festivalTime.GetRemainingTime()
+	currentPhase := festivalTime.GetPhase()
+
+	// Calculate progress based on elapsed and remaining time
+	totalTime := elapsedTime + remainingTime
+	progress := float64(elapsedTime) / float64(totalTime) * 100
+
+	timeText := fmt.Sprintf(
+		"Festival Time: %s    Remaining: %s    Progress: %.1f%%    Phase: %s",
+		festivalTime.GetCurrentTime().Format("15:04"),
+		formatDuration(remainingTime),
+		math.Min(progress, 100),
+		currentPhase,
+	)
+	ebitenutil.DebugPrintAt(metrics, timeText, 20, 45)
 
 	opts := &ebiten.DrawImageOptions{}
 	opts.GeoM.Translate(screenWidth-metricsWidth-20, screenHeight*0.89)
@@ -1049,7 +1070,26 @@ func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
 		}
 	}
 
+	// Draw "Festival Ended" overlay if the event has ended
+	if festivalTime.IsEventEnded() {
+		overlay := ebiten.NewImage(int(screenWidth), int(screenHeight))
+		overlay.Fill(color.RGBA{0, 0, 0, 180})
+		screen.DrawImage(overlay, &ebiten.DrawImageOptions{})
+
+		endText := "Festival Has Ended"
+		textWidth := len(endText) * 6 // Approximate width of text
+		textX := int(screenWidth/2) - textWidth/2
+		textY := int(screenHeight / 2)
+		ebitenutil.DebugPrintAt(screen, endText, textX, textY)
+	}
+
 	g.drawMetricsWindowButtons(screen)
+}
+
+func formatDuration(d time.Duration) string {
+	hours := int(d.Hours())
+	minutes := int(d.Minutes()) % 60
+	return fmt.Sprintf("%dh %dm", hours, minutes)
 }
 
 type Rectangle struct {
