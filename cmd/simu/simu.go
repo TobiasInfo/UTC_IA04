@@ -969,11 +969,12 @@ func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
 
 	// Main metrics text
 	text := fmt.Sprintf(
-		"People Metrics:  Total: %d    In Distress: %d    Treated: %d        "+
+		"People Metrics:  Total: %d    In Distress: %d    Treated: %d    Dead: %d       "+
 			"Drone Metrics:  Battery: %.1f%%    Coverage: %.1f%%",
 		stats.TotalPeople,
 		stats.InDistress,
 		stats.CasesTreated,
+		stats.CasesDead,
 		stats.AverageBattery,
 		stats.AverageCoverage,
 	)
