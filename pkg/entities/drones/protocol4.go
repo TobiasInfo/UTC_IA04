@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-func (d *Drone) initProtocol3() {
+func (d *Drone) initProtocol4() {
 	//Calculate Patrol Path.
 	d.Memory.DronePatrolPath = append(d.Memory.DronePatrolPath, models.Position{X: d.MyWatch.CornerBottomLeft.X, Y: d.MyWatch.CornerTopRight.Y})
 	d.Memory.DroneActualTarget = models.Position{X: d.MyWatch.CornerBottomLeft.X, Y: d.MyWatch.CornerTopRight.Y}
@@ -18,7 +18,7 @@ func (d *Drone) initProtocol3() {
 
 /*
 
-Fonctionnement du protocole 3 :
+Fonctionnement du protocole 4 :
 
 Step 0 :
 
@@ -35,11 +35,13 @@ Step 2 :
    - Si aucun RP n'est dans mon rayon de communication.
 		- J'essaye de voir si je peux envoyer l'information à un drone qui est dans mon network.
 			- Un network est un sous-ensemble de drones qui peuvent communiquer entre eux, ils sont chainées et ils forment un sous-graphe.
-		- Si je ne peux pas, je bouge vers le rescue point le plus proche.
-- Je bouge vers le rescue point si je ne peux pas communiquer.
+		- Si je ne peux pas, je prends le drone le plus proche dans mon network en terme de distance d'un RP et je lui transfère la resposnabilité de sauver les personnes.
+
+Step 3 :
+- Je bouge vers le rescue point si je suis le drone le plus proche.
 */
 
-func (d *Drone) ThinkProtocol3() models.Position {
+func (d *Drone) ThinkProtocol4() models.Position {
 	if d.IsCharging {
 		// Drone AFK quand il charge car il est docké.
 		return d.Position
@@ -79,14 +81,15 @@ func (d *Drone) ThinkProtocol3() models.Position {
 				if response.Accepted {
 					d.Memory.Persons.PersonsToSave.Delete(person.ID)
 				} else {
-					if d.debug {
-						fmt.Printf("[DRONE %d] Person %d will not be rescued by RescuePoint %d -- ERROR : %v\n",
-							d.ID, person.ID, response.RescuePointID, response.Error)
-					}
+					fmt.Printf("[DRONE %d] Person %d will not be rescued by RescuePoint %d -- ERROR : %v\n",
+						d.ID, person.ID, response.RescuePointID, response.Error)
 				}
 				return true
 			})
 		}
+
+		dronesDistancesInRP := make(map[*Drone]float64)
+		dronesDistancesInRP[d] = d.Position.CalculateDistance(rp.Position)
 
 		if !canCommunicate {
 			responsabilityTransfered := false
@@ -95,6 +98,7 @@ func (d *Drone) ThinkProtocol3() models.Position {
 				rpFriend := d.GetRescuePoint(friend.Position)
 				friendRpCalculatePosition := rpFriend.Position.CalculateDistance(friend.Position)
 				friendCanCommunicate := friendRpCalculatePosition <= float64(d.DroneCommRange)
+				dronesDistancesInRP[friend] = friendRpCalculatePosition
 				if friendCanCommunicate {
 					d.Memory.Persons.PersonsToSave.Range(func(key, value interface{}) bool {
 						friend.Memory.Persons.PersonsToSave.Store(key, value)
@@ -108,16 +112,30 @@ func (d *Drone) ThinkProtocol3() models.Position {
 			}
 
 			if !responsabilityTransfered {
-				if d.debug {
-					fmt.Printf("[DRONE %d] Responsability not transfered to any drone, moving to RP %d\n", d.ID, rp.ID)
+				// Find the closest drone to the RP
+				closestDrone := d
+				for drone, distance := range dronesDistancesInRP {
+					if distance < dronesDistancesInRP[closestDrone] {
+						closestDrone = drone
+					}
 				}
-				return d.nextStepToPos(rp.Position)
+				if closestDrone.ID == d.ID {
+					fmt.Printf("[DRONE %d] Responsability not transfered to any drone, moving to RP %d\n", d.ID, rp.ID)
+					return d.nextStepToPos(rp.Position)
+				}
+
+				fmt.Printf("[DRONE %d] Responsability transfered to drone %d, moving to RP %d\n", d.ID, closestDrone.ID, rp.ID)
+				d.Memory.Persons.PersonsToSave.Range(func(key, value interface{}) bool {
+					closestDrone.Memory.Persons.PersonsToSave.Store(key, value)
+					return true
+				})
+				d.Memory.Persons.PersonsToSave = sync.Map{}
+				responsabilityTransfered = true
 			}
 		}
 
 	}
-	if d.debug {
-		fmt.Printf("[DRONE-WARNING] - Cannot find any RP. Is your Map Config correct?")
-	}
+
+	fmt.Printf("[DRONE-WARNING] - Cannot find any RP. Is your Map Config correct?")
 	return d.patrolMovementLogic()
 }

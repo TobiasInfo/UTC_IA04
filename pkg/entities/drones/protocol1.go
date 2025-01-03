@@ -7,7 +7,9 @@ import (
 	"fmt"
 )
 
-func (d *Drone) initProtocol1() {}
+func (d *Drone) initProtocol1() {
+	fmt.Printf("[DRONES] - Succeffuly terminated Protocole 1 init.\n")
+}
 
 /*
 
@@ -63,20 +65,25 @@ func (d *Drone) ThinkProtocol1() models.Position {
 				if response.Accepted {
 					d.Memory.Persons.PersonsToSave.Delete(person.ID)
 				} else {
-					fmt.Printf("[DRONE %d] Person %d will not be rescued by RescuePoint %d -- ERROR : %v\n",
-						d.ID, person.ID, response.RescuePointID, response.Error)
+					if d.debug {
+						fmt.Printf("[DRONE %d] Person %d will not be rescued by RescuePoint %d -- ERROR : %v\n",
+							d.ID, person.ID, response.RescuePointID, response.Error)
+					}
 				}
 				return true
 			})
 		}
 
 		if !canCommunicate {
-			fmt.Printf("[DRONE %d] Responsability not transfered to any drone, moving to RP %d\n", d.ID, rp.ID)
+			if d.debug {
+				fmt.Printf("[DRONE %d] Responsability not transfered to any drone, moving to RP %d\n", d.ID, rp.ID)
+			}
 			return d.nextStepToPos(rp.Position)
 		}
 
 	}
-
-	fmt.Printf("[DRONE-WARNING] - Cannot find any RP. Is your Map Config correct?")
+	if d.debug {
+		fmt.Printf("[DRONE-WARNING] - Cannot find any RP. Is your Map Config correct?")
+	}
 	return d.randomMovement()
 }
