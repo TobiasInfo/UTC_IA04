@@ -965,8 +965,6 @@ func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
 	metrics.Fill(color.RGBA{30, 30, 30, 200})
 
 	stats := g.Sim.GetStatistics()
-	festivalTime := g.Sim.GetFestivalTime()
-
 	// Main metrics text
 	text := fmt.Sprintf(
 		"People Metrics:  Total: %d    In Distress: %d    Treated: %d    Dead: %d        "+
@@ -1051,19 +1049,19 @@ func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
 			g.clickCooldown = cooldownFrames
 		}
 	}
-
+	//TODO : A revoir que faire apres ended graph ou just affichage fin for now commented
 	// Draw "Festival Ended" overlay if the event has ended
-	if festivalTime.IsEventEnded() {
-		overlay := ebiten.NewImage(int(screenWidth), int(screenHeight))
-		overlay.Fill(color.RGBA{0, 0, 0, 180})
-		screen.DrawImage(overlay, &ebiten.DrawImageOptions{})
+	// if g.Sim.FestivalState == simulation.Ended {
+	// 	overlay := ebiten.NewImage(int(screenWidth), int(screenHeight))
+	// 	overlay.Fill(color.RGBA{0, 0, 0, 180})
+	// 	screen.DrawImage(overlay, &ebiten.DrawImageOptions{})
 
-		endText := "Festival Has Ended"
-		textWidth := len(endText) * 6 // Approximate width of text
-		textX := int(screenWidth/2) - textWidth/2
-		textY := int(screenHeight / 2)
-		ebitenutil.DebugPrintAt(screen, endText, textX, textY)
-	}
+	// 	endText := "Festival Has Ended"
+	// 	textWidth := len(endText) * 6 // Approximate width of text
+	// 	textX := int(screenWidth/2) - textWidth/2
+	// 	textY := int(screenHeight / 2)
+	// 	ebitenutil.DebugPrintAt(screen, endText, textX, textY)
+	// }
 
 	g.drawMetricsWindowButtons(screen)
 }
