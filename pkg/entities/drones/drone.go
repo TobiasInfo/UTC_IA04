@@ -15,6 +15,10 @@ const (
 	GoingToCharge
 )
 
+type DroneEffectiveNetwork struct {
+	Drones []*Drone
+}
+
 type Drone struct {
 	ID               int
 	DroneSeeRange    int
@@ -23,6 +27,7 @@ type Drone struct {
 	Battery          float64
 	SeenPeople       []*persons.Person
 	DroneInComRange  []*Drone
+	DroneNetwork     []*Drone
 	MapPoi           map[models.POIType][]models.Position
 	IsCharging       bool
 	MedicalTentTimer int
@@ -41,6 +46,7 @@ type Drone struct {
 	GetRescuePoint      func(pos models.Position) *rescue.RescuePoint
 	DroneSeeFunction    func(d *Drone) []*persons.Person
 	DroneInComRangeFunc func(d *Drone) []*Drone
+	GetDroneNetwork     func(d *Drone) DroneEffectiveNetwork
 	// Différents Chans.
 	MoveChan     chan models.MovementRequest
 	ChargingChan chan models.ChargingRequest
@@ -51,6 +57,9 @@ type Drone struct {
 
 	// Drone Memory
 	Memory interfaces.DroneMemory
+
+	//Debug
+	debug bool
 }
 
 // NewSurveillanceDrone crée un nouveau drone
@@ -62,6 +71,7 @@ func NewSurveillanceDrone(id int,
 	droneSeeFunc func(d *Drone) []*persons.Person,
 	droneInComRange func(d *Drone) []*Drone,
 	getRescuePoint func(pos models.Position) *rescue.RescuePoint,
+	getDroneNetwork func(d *Drone) DroneEffectiveNetwork,
 	moveChan chan models.MovementRequest,
 	mapPoi map[models.POIType][]models.Position,
 	chargingChan chan models.ChargingRequest,
@@ -71,9 +81,10 @@ func NewSurveillanceDrone(id int,
 	savePersonByRescuer chan models.RescuePeopleRequest,
 	MapWidth int,
 	MapHeight int,
+	debug bool,
 
 ) Drone {
-	fmt.Printf("[DRONE %d] And now My watch at %v begin !\n", id, myWatch)
+	fmt.Printf("[DRONE %d] And now My watch at %v begin - My protocole is %d !\n", id, myWatch, protocolMode)
 	return Drone{
 		ID:                  id,
 		Position:            position,
@@ -83,8 +94,10 @@ func NewSurveillanceDrone(id int,
 		DroneCommRange:      droneCommunicationRange,
 		DroneSeeFunction:    droneSeeFunc,
 		DroneInComRangeFunc: droneInComRange,
+		GetDroneNetwork:     getDroneNetwork,
 		SeenPeople:          []*persons.Person{},
 		DroneInComRange:     []*Drone{},
+		DroneNetwork:        []*Drone{},
 		MoveChan:            moveChan,
 		MapPoi:              mapPoi,
 		ChargingChan:        chargingChan,
@@ -104,6 +117,7 @@ func NewSurveillanceDrone(id int,
 		DroneState:          NoDefinedState,
 		GetRescuePoint:      getRescuePoint,
 		Memory:              interfaces.DroneMemory{},
+		debug:               debug,
 	}
 }
 
@@ -115,6 +129,8 @@ func (d *Drone) InitProtocol() {
 		d.initProtocol2()
 	case 3:
 		d.initProtocol3()
+	case 4:
+		d.initProtocol4()
 	}
 }
 
@@ -189,7 +205,19 @@ func (d *Drone) Think() models.Position {
 	case 2:
 		return d.ThinkProtocol2()
 	case 3:
+		// Récupérer le network pour le protocole 3
+		d.DroneNetwork = d.GetDroneNetwork(d).Drones
+		if d.debug {
+			fmt.Printf("[DRONE %d] - Drone Network : %v\n", d.ID, d.DroneNetwork)
+		}
 		return d.ThinkProtocol3()
+	case 4:
+		// Récupérer le network pour le protocole 4
+		d.DroneNetwork = d.GetDroneNetwork(d).Drones
+		if d.debug {
+			fmt.Printf("[DRONE %d] - Drone Network : %v\n", d.ID, d.DroneNetwork)
+		}
+		return d.ThinkProtocol4()
 	default:
 		return d.randomMovement()
 	}
@@ -197,7 +225,7 @@ func (d *Drone) Think() models.Position {
 
 func (d *Drone) Myturn() {
 	// Cannot communicate with other drones if charging
-	d.ReceiveInfo()
+	// d.ReceiveInfo()
 
 	if d.tryCharging() {
 		return
@@ -213,7 +241,7 @@ func (d *Drone) Myturn() {
 	}
 
 	moved := d.Move(target)
-	if !moved {
+	if !moved && d.debug {
 		fmt.Printf("Drone %d could not move to %v\n", d.ID, target)
 	}
 }

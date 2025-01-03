@@ -18,7 +18,7 @@ func main() {
 
 	// Window dimensions
 	windowWidth := 1000.0
-	windowHeight := 700.0
+	windowHeight := 750.0
 
 	// UI element dimensions
 	fieldWidth := windowWidth * 0.25 // 25% of window width
@@ -75,7 +75,7 @@ func main() {
 		Y:             secondRow,
 		Width:         fieldWidth,
 		Height:        fieldHeight,
-		Options:       []string{"Protocole test 1", "Protocole test 2", "Protocole test 3"},
+		Options:       []string{"Protocole test 1", "Protocole test 2", "Protocole test 3", "Protocole test 4"},
 		SelectedIndex: 0,
 		OnSelect: func(index int) {
 			println("Selected Protocol:", index+1)

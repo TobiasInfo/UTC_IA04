@@ -24,61 +24,73 @@ const (
 	ReturningToBase
 )
 
-func (rp *RescuePoint) updateRescuers() {
-	for {
-		for index := range rp.Rescuers {
-			rescuer := rp.Rescuers[index]
-			if rescuer.State == MovingToPerson {
-				// Faire bouger jusqu'à la personne et mettre le rescuer en inactif
-				if rescuer.Position.CalculateDistance(rescuer.Person.Position) <= 1 {
-					rescueResponse := make(chan models.RescuePeopleResponse)
-					rp.SavePersonByRescuer <- models.RescuePeopleRequest{
-						PersonID:      rescuer.Person.ID,
-						RescuerID:     rescuer.ID,
-						RescuePointID: rp.ID,
-						ResponseChan:  rescueResponse,
-					}
-
-					select {
-					case response := <-rescueResponse:
-						if response.Authorized {
-							fmt.Printf("[RESCUER] Successfully healed person %d\n", rescuer.Person.ID)
-						}
-					case <-time.After(1 * time.Second):
-						fmt.Printf("[RESCUER] Timeout while waiting for response for person %d\n", rescuer.Person.ID)
-					}
-
-					personID := rescuer.Person.ID
-
-					rp.ActiveMissions.Delete(rescuer.Person.ID)
-					for i, _ := range rp.Rescuers {
-						tempRescuer := rp.Rescuers[i]
-						if tempRescuer.Person != nil {
-							if tempRescuer.Person.ID == personID {
-								tempRescuer.Person = nil
-								tempRescuer.State = ReturningToBase
-							}
-						}
-					}
-				} else {
-					// Move one step closer to person
-					rescuer.Position = stepTowards(rescuer.Position, rescuer.Person.Position)
-				}
-			}
-			if rescuer.State == ReturningToBase {
-				// Faire bouger jusqu'à la base et mettre le rescuer en inactif
-				if rescuer.Position.CalculateDistance(rescuer.HomePoint) <= 1 {
-					rescuer.State = Idle
-					rescuer.Person = nil
-					rescuer.Position = models.Position{X: rescuer.HomePoint.X, Y: rescuer.HomePoint.Y}
-					rescuer.Active = false
-				} else {
-					rescuer.Position = stepTowards(rescuer.Position, rescuer.HomePoint)
-				}
+func (rp *RescuePoint) UpdateRescuers() {
+	if rp.debug {
+		fmt.Printf("[RESCUE POINT - %d] Updating rescuers\n", rp.ID)
+	}
+	for index := range rp.Rescuers {
+		rescuer := rp.Rescuers[index]
+		if rescuer.Person != nil {
+			if rescuer.Person.Position.X == -1 || rescuer.Person.Position.Y == -1 || rescuer.Person.IsDead() {
+				rescuer.Person = nil
+				rescuer.State = ReturningToBase
 			}
 		}
-		time.Sleep(200 * time.Millisecond)
+		if rescuer.State == MovingToPerson {
+			// Faire bouger jusqu'à la personne et mettre le rescuer en inactif
+			if rescuer.Position.CalculateDistance(rescuer.Person.Position) <= 1 {
+				rescueResponse := make(chan models.RescuePeopleResponse)
+				rp.SavePersonByRescuer <- models.RescuePeopleRequest{
+					PersonID:      rescuer.Person.ID,
+					RescuerID:     rescuer.ID,
+					RescuePointID: rp.ID,
+					ResponseChan:  rescueResponse,
+				}
+
+				select {
+				case response := <-rescueResponse:
+					if response.Authorized {
+						if rp.debug {
+							fmt.Printf("[RESCUER] Successfully healed person %d\n", rescuer.Person.ID)
+						}
+					}
+				case <-time.After(1 * time.Second):
+					fmt.Printf("[RESCUER] Timeout while waiting for response for person %d\n", rescuer.Person.ID)
+				}
+
+				personID := rescuer.Person.ID
+
+				rp.ActiveMissions.Delete(rescuer.Person.ID)
+				for i, _ := range rp.Rescuers {
+					tempRescuer := rp.Rescuers[i]
+					if tempRescuer.Person != nil {
+						if tempRescuer.Person.ID == personID {
+							tempRescuer.Person = nil
+							tempRescuer.State = ReturningToBase
+						}
+					}
+				}
+			} else {
+				// Move one step closer to person
+				rescuer.Position = stepTowards(rescuer.Position, rescuer.Person.Position)
+			}
+		}
+		if rescuer.State == ReturningToBase {
+			// Faire bouger jusqu'à la base et mettre le rescuer en inactif
+			if rescuer.Position.CalculateDistance(rescuer.HomePoint) <= 1 {
+				rescuer.State = Idle
+				rescuer.Person = nil
+				rescuer.Position = models.Position{X: rescuer.HomePoint.X, Y: rescuer.HomePoint.Y}
+				rescuer.Active = false
+			} else {
+				rescuer.Position = stepTowards(rescuer.Position, rescuer.HomePoint)
+			}
+		}
 	}
+	//for {
+	//
+	//	//time.Sleep(200 * time.Millisecond)
+	//}
 }
 
 func stepTowards(from models.Position, to models.Position) models.Position {

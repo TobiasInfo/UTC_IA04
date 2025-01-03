@@ -19,6 +19,7 @@ type RescuePoint struct {
 	SavePersonByRescuer  chan models.RescuePeopleRequest
 	ActiveMissions       sync.Map // map[int]bool // PersonID -> isBeingRescued
 	AllRescuePoints      []*RescuePoint
+	debug                bool
 }
 
 type RescueRequest struct {
@@ -34,7 +35,7 @@ type RescueResponse struct {
 	Error         error
 }
 
-func NewRescuePoint(id int, position models.Position, savePersonByRescuer chan models.RescuePeopleRequest) *RescuePoint {
+func NewRescuePoint(id int, position models.Position, savePersonByRescuer chan models.RescuePeopleRequest, debug bool) *RescuePoint {
 	fmt.Printf("[RP] New RescuePoint created at position (%.0f, %.0f)\n", position.X, position.Y)
 	return &RescuePoint{
 		ID:                   id,
@@ -46,14 +47,16 @@ func NewRescuePoint(id int, position models.Position, savePersonByRescuer chan m
 		ResponseChan:         make(chan RescueResponse),
 		AllRescuePoints:      make([]*RescuePoint, 0),
 		SavePersonByRescuer:  savePersonByRescuer,
+		debug:                debug,
 	}
 }
 
 func (rp *RescuePoint) Start() {
 	rp.startWithRecover(rp.handleRequests, "handleRequests")
 	rp.startWithRecover(rp.isPersonBeingRescuedByThisRp, "isPersonBeingRescuedByThisRp")
-	rp.startWithRecover(rp.updateRescuers, "updateRescuers")
 	rp.startWithRecover(rp.handleRPRequests, "handleRPRequests")
+
+	//rp.startWithRecover(rp.updateRescuers, "updateRescuers")
 }
 
 func (rp *RescuePoint) startWithRecover(f func(), name string) {
@@ -151,7 +154,9 @@ func (rp *RescuePoint) handleRequests() {
 			RescuePointID: rp.ID,
 		}
 
-		fmt.Printf("[RP] Mission assigned to RescuePoint %d to Rescue Person : %d by Drone %d\n", rp.ID, req.PersonID, req.DroneSenderID)
+		if rp.debug {
+			fmt.Printf("[RP] Mission assigned to RescuePoint %d to Rescue Person : %d by Drone %d\n", rp.ID, req.PersonID, req.DroneSenderID)
+		}
 	}
 }
 
@@ -176,7 +181,9 @@ func (rp *RescuePoint) handleRPRequests() {
 			RescuePointID: rp.ID,
 		}
 
-		fmt.Printf("[RP] Mission assigned to RescuePoint %d to Rescue Person : %d by Drone %d\n", rp.ID, req.PersonID, req.DroneSenderID)
+		if rp.debug {
+			fmt.Printf("[RP] Mission assigned to RescuePoint %d to Rescue Person : %d by Drone %d\n", rp.ID, req.PersonID, req.DroneSenderID)
+		}
 	}
 }
 
@@ -251,6 +258,9 @@ func (rp *RescuePoint) assignMission(rescuer *Rescuer, req RescueRequest) {
 		ID:       req.PersonID,
 		Position: req.Position,
 	}
-	fmt.Printf("[RESCUE POINT %d] Rescuer %d assigned to person %d at position (%.0f, %.0f)\n",
-		rp.ID, rescuer.ID, req.PersonID, req.Position.X, req.Position.Y)
+
+	if rp.debug {
+		fmt.Printf("[RESCUE POINT %d] Rescuer %d assigned to person %d at position (%.0f, %.0f)\n",
+			rp.ID, rescuer.ID, req.PersonID, req.Position.X, req.Position.Y)
+	}
 }

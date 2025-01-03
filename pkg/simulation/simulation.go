@@ -545,8 +545,8 @@ func (s *Simulation) createDrones(n int) {
 				}
 				//fmt.Println("Position : ", position)
 				for _, member := range cell.Persons {
-					probaDetection := 1.0
-					//probaDetection := max(0, 1.0-distance/float64(s.DroneSeeRange)-(float64(nbPersDetected)*0.03))
+					//probaDetection := 1.0
+					probaDetection := max(0, 1.0-distance/float64(s.DroneSeeRange)-(float64(nbPersDetected)*0.03))
 					if rand.Float64() < probaDetection {
 						//fmt.Printf("Drone %d (%.2f, %.2f) sees person %d (%.2f, %.2f) \n", d.ID, d.Position.X, d.Position.Y, member.ID, member.Position.X, member.Position.Y)
 						droneInformations = append(droneInformations, member)
@@ -593,6 +593,10 @@ func (s *Simulation) createDrones(n int) {
 		return closest
 	}
 
+	getDroneNetwork := func(d *drones.Drone) drones.DroneEffectiveNetwork {
+		return s.calculateSingleDroneNetwork(d)
+	}
+
 	positionsDrone := goDronesZones(n, s.Map.Width, s.Map.Height)
 
 	for i := 0; i < n; i++ {
@@ -601,10 +605,12 @@ func (s *Simulation) createDrones(n int) {
 		d := drones.NewSurveillanceDrone(i, models.Position{X: float64((zone[0][0] + zone[1][0]) / 2), Y: float64((zone[0][1] + zone[1][1]) / 2)},
 			models.MyWatch{CornerBottomLeft: models.Position{X: float64(zone[0][0]), Y: float64(zone[0][1])}, CornerTopRight: models.Position{X: float64(zone[1][0]), Y: float64(zone[1][1])}},
 			battery, s.DroneSeeRange, s.DroneCommRange,
-			droneSeeFunction, droneInComRange, droneGetRescuePoint, s.MoveChan,
-			s.poiMap, s.ChargingChan, s.MedicalDeliveryChan,
+			droneSeeFunction, droneInComRange, droneGetRescuePoint, getDroneNetwork,
+			s.MoveChan, s.poiMap, s.ChargingChan, s.MedicalDeliveryChan,
 			s.SavePersonChan, DEFAULT_PROTOCOL_MODE, // Use the constant here
-			s.SavePeopleByRescuerChan, s.Map.Width, s.Map.Height)
+			s.SavePeopleByRescuerChan, s.Map.Width, s.Map.Height,
+			s.debug)
+		d.InitProtocol()
 		s.Drones = append(s.Drones, d)
 		s.Map.AddDrone(&s.Drones[len(s.Drones)-1])
 	}
@@ -692,7 +698,7 @@ func (s *Simulation) Update() {
 
 	wg.Wait()
 
-	var wgDrone sync.WaitGroup
+	var wgDroneRecive sync.WaitGroup
 
 	// Update drones every tick
 	updatedDrones := make(map[int]struct{})
@@ -706,6 +712,22 @@ func (s *Simulation) Update() {
 
 	for _, idx := range droneIndexes {
 		if _, exists := updatedDrones[s.Drones[idx].ID]; !exists {
+			wgDroneRecive.Add(1)
+			updatedDrones[s.Drones[idx].ID] = struct{}{}
+			go func(d *drones.Drone) {
+				defer wgDroneRecive.Done()
+				d.ReceiveInfo()
+			}(&s.Drones[idx])
+		}
+	}
+
+	wgDroneRecive.Wait()
+
+	var wgDrone sync.WaitGroup
+	updatedDrones = make(map[int]struct{})
+
+	for _, idx := range droneIndexes {
+		if _, exists := updatedDrones[s.Drones[idx].ID]; !exists {
 			wgDrone.Add(1)
 			updatedDrones[s.Drones[idx].ID] = struct{}{}
 			go func(d *drones.Drone) {
@@ -716,6 +738,18 @@ func (s *Simulation) Update() {
 	}
 
 	wgDrone.Wait()
+
+	var rpWg sync.WaitGroup
+
+	for i, _ := range s.RescuePoints {
+		rpWg.Add(1)
+		go func(rp *rescue.RescuePoint) {
+			defer rpWg.Done()
+			rp.UpdateRescuers()
+		}(s.RescuePoints[i])
+	}
+
+	rpWg.Wait()
 
 	if s.debug {
 		for index, cell := range s.Map.Cells {
@@ -1017,7 +1051,7 @@ func (s *Simulation) InitializeRescuePoints() {
 	fmt.Printf("[SIMULATION] Initializing RescuePoints\n")
 	// Créer un rescue point pour chaque tente médicale
 	for i, pos := range s.poiMap[models.MedicalTent] {
-		rp := rescue.NewRescuePoint(i, pos, s.SavePeopleByRescuerChan)
+		rp := rescue.NewRescuePoint(i, pos, s.SavePeopleByRescuerChan, s.debug)
 		s.RescuePoints[pos] = rp
 	}
 
@@ -1034,4 +1068,35 @@ func (s *Simulation) InitializeRescuePoints() {
 	}
 
 	fmt.Printf("[SIMULATION] Initialized %d rescue points\n", len(s.RescuePoints))
+}
+
+func (s *Simulation) calculateSingleDroneNetwork(targetDrone *drones.Drone) drones.DroneEffectiveNetwork {
+	network := drones.DroneEffectiveNetwork{
+		Drones: []*drones.Drone{},
+	}
+
+	visited := make(map[int]bool)
+
+	// DFS function to find all connected drones
+	var dfs func(currentDrone *drones.Drone)
+	dfs = func(currentDrone *drones.Drone) {
+		visited[currentDrone.ID] = true
+
+		// Add all directly connected drones
+		for i, otherDrone := range s.Drones {
+			if otherDrone.ID == currentDrone.ID {
+				continue
+			}
+
+			dist := currentDrone.Position.CalculateDistance(otherDrone.Position)
+			if dist <= float64(s.DroneCommRange) && !visited[otherDrone.ID] {
+				network.Drones = append(network.Drones, &s.Drones[i])
+				dfs(&otherDrone) //Explorer recursivement les drones connectés à ce drone
+			}
+		}
+	}
+
+	dfs(targetDrone)
+
+	return network
 }

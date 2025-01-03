@@ -176,3 +176,42 @@ func (d *Drone) closestPOI(poiType models.POIType) (models.Position, float64) {
 	}
 	return closestPOI, minDistance
 }
+
+func (d *Drone) patrolMovementLogic() models.Position {
+	currentX := int(math.Round(d.Position.X))
+	currentY := int(math.Round(d.Position.Y))
+	maxX := min(int(math.Round(d.MyWatch.CornerTopRight.X)), d.MapWidth)
+	maxY := min(int(math.Round(d.MyWatch.CornerTopRight.Y)), d.MapHeight)
+	minX := max(int(math.Round(d.MyWatch.CornerBottomLeft.X)), 0)
+	minY := max(int(math.Round(d.MyWatch.CornerBottomLeft.Y)), 0)
+
+	// Si on est hors limites, retourner au point de départ
+	if currentX >= maxX || currentY >= maxY || currentX < minX || currentY < minY {
+		return d.nextStepToPos(models.Position{X: float64(minX), Y: float64(minY)})
+	}
+
+	// Détermine la direction en fonction de la position X
+	if currentX%2 == 0 {
+		// Colonnes paires : monter
+		if currentY < maxY-1 {
+			return d.nextStepToPos(models.Position{X: float64(currentX), Y: float64(currentY + 1)})
+		}
+		// En haut de la colonne : se déplacer à droite si possible
+		if currentX < maxX-1 {
+			return d.nextStepToPos(models.Position{X: float64(currentX + 1), Y: float64(currentY)})
+		}
+		// Sinon, retourner au début
+		return d.nextStepToPos(models.Position{X: float64(minX), Y: float64(minY)})
+	} else {
+		// Colonnes impaires : descendre
+		if currentY > minY {
+			return d.nextStepToPos(models.Position{X: float64(currentX), Y: float64(currentY - 1)})
+		}
+		// En bas de la colonne : se déplacer à droite si possible
+		if currentX < maxX-1 {
+			return d.nextStepToPos(models.Position{X: float64(currentX + 1), Y: float64(currentY)})
+		}
+		// Sinon, retourner au début
+		return d.nextStepToPos(models.Position{X: float64(minX), Y: float64(minY)})
+	}
+}
