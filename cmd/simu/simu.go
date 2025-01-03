@@ -13,6 +13,7 @@ import (
 	"image/color"
 	"math"
 	"os"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -178,13 +179,13 @@ func (g *Game) Update() error {
 	mx, my := ebiten.CursorPosition()
 	mousePressed := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
 
+	var inputRunes []rune
+	inputRunes = ebiten.AppendInputChars(inputRunes)
+
 	// Decrease cooldown if it's > 0
 	if g.clickCooldown > 0 {
 		g.clickCooldown--
 	}
-
-	var inputRunes []rune
-	inputRunes = ebiten.AppendInputChars(inputRunes)
 
 	switch g.Mode {
 	case Menu:
@@ -253,6 +254,7 @@ func (g *Game) Update() error {
 		}
 
 		if g.Paused {
+			time.Sleep(time.Millisecond * 90)
 			return nil
 		}
 		g.Sim.Update()
@@ -958,7 +960,7 @@ func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
 
 	// Draw metrics text panel at top
 	metricsWidth := screenWidth * 0.95
-	metricsHeight := 60.0
+	metricsHeight := 67.0
 	metrics := ebiten.NewImage(int(metricsWidth), int(metricsHeight))
 	metrics.Fill(color.RGBA{30, 30, 30, 200})
 
@@ -975,7 +977,7 @@ func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
 	ebitenutil.DebugPrintAt(metrics, text, 20, 20)
 
 	opts := &ebiten.DrawImageOptions{}
-	opts.GeoM.Translate(screenWidth-metricsWidth-20, 20)
+	opts.GeoM.Translate(screenWidth-metricsWidth-20, screenHeight*0.89)
 	screen.DrawImage(metrics, opts)
 
 	// Calculate current sizes based on expansion state
