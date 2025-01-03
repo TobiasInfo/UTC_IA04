@@ -18,6 +18,13 @@ const (
 	DEFAULT_PROTOCOL_MODE        = 3
 )
 
+type FestivalState int
+
+const (
+	Active FestivalState = iota
+	Ended
+)
+
 type Simulation struct {
 	Map                        *Map
 	DroneSeeRange              int
@@ -36,18 +43,22 @@ type Simulation struct {
 	debug                      bool
 	hardDebug                  bool
 	currentTick                int
+	festivalTotalTicks         int
 	DefaultDistressProbability float64
 	festivalTime               *FestivalTime
 	poiMap                     map[models.POIType][]models.Position
 	mu                         sync.RWMutex
 	treatedCases               int
+	deadCases                  int
 	RescuePoints               map[models.Position]*rescue.RescuePoint
+	FestivalState              FestivalState
 }
 
 type SimulationStatistics struct {
 	TotalPeople     int
 	InDistress      int
 	CasesTreated    int
+	CasesDead       int
 	AverageBattery  float64
 	AverageCoverage float64
 	PeopleDensity   models.DensityGrid
@@ -69,11 +80,14 @@ func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 		debug:                   false,
 		hardDebug:               false,
 		currentTick:             0,
+		festivalTotalTicks:      1000,
+		deadCases:               0,
 		festivalTime:            NewFestivalTime(),
 		poiMap:                  make(map[models.POIType][]models.Position),
 		MedicalDeliveryChan:     make(chan models.MedicalDeliveryRequest),
 		SavePeopleByRescuerChan: make(chan models.RescuePeopleRequest),
 		RescuePoints:            make(map[models.Position]*rescue.RescuePoint),
+		FestivalState:           Active,
 	}
 	s.Initialize(numDrones, numCrowdMembers, numObstacles)
 	go s.handleMovementRequests()
@@ -322,6 +336,7 @@ func (s *Simulation) handleDeadPerson() {
 		if entity != nil {
 			s.mu.Lock()
 			s.Map.MoveEntity(entity, models.Position{X: -10, Y: -10})
+			s.deadCases++
 			s.mu.Unlock()
 			req.ResponseChan <- models.DeadResponse{Authorized: true}
 		} else {
@@ -546,7 +561,7 @@ func (s *Simulation) createDrones(n int) {
 				//fmt.Println("Position : ", position)
 				for _, member := range cell.Persons {
 					//probaDetection := 1.0
-					probaDetection := max(0, 1.0-distance/float64(s.DroneSeeRange)-(float64(nbPersDetected)*0.03))
+					probaDetection := max(0, 1.0/float64(s.DroneSeeRange)-(float64(nbPersDetected)*0.03))
 					if rand.Float64() < probaDetection {
 						//fmt.Printf("Drone %d (%.2f, %.2f) sees person %d (%.2f, %.2f) \n", d.ID, d.Position.X, d.Position.Y, member.ID, member.Position.X, member.Position.Y)
 						droneInformations = append(droneInformations, member)
@@ -653,9 +668,22 @@ func (s *Simulation) createInitialCrowd(n int) {
 }
 
 func (s *Simulation) Update() {
-	if s.festivalTime.IsEventEnded() {
+	// SI 1000 Ticks fin du festival
+	if s.currentTick == s.festivalTotalTicks {
+		fmt.Println("End of festival")
+
+		for i := range s.Persons {
+			p := &s.Persons[i]
+			path := models.FindPath(p.Position, models.Position{X: (float64(s.Map.Width)/10)*9 + 0.1, Y: p.Position.Y}, s.Map.Width, s.Map.Height, make(map[models.Position]bool))
+			p.CurrentPath = path
+			s.Persons[i].SeekingExit = true
+		}
+	}
+
+	if s.FestivalState == Ended {
 		return
 	}
+
 	time.Sleep(200 * time.Millisecond)
 	if s.hardDebug {
 		fmt.Println("New Tick")
@@ -694,6 +722,29 @@ func (s *Simulation) Update() {
 				}(&s.Persons[idx])
 			}
 		}
+	}
+
+	allPeopleAreOut := true
+	for i := range s.Persons {
+		if s.Persons[i].StillInSim {
+			allPeopleAreOut = false
+			break
+		}
+	}
+
+	allDronesAreCharging := true
+	if allPeopleAreOut {
+		for i := range s.Drones {
+			s.Drones[i].DroneState = drones.FinalGoingToDock
+			if !s.Drones[i].IsCharging {
+				allDronesAreCharging = false
+			}
+		}
+
+	}
+
+	if allDronesAreCharging && allPeopleAreOut {
+		s.FestivalState = Ended
 	}
 
 	wg.Wait()
@@ -989,6 +1040,7 @@ func (s *Simulation) GetStatistics() SimulationStatistics {
 		TotalPeople:     totalPeople,
 		InDistress:      inDistress,
 		CasesTreated:    s.treatedCases,
+		CasesDead:       s.deadCases,
 		AverageBattery:  avgBattery,
 		AverageCoverage: coverage,
 		PeopleDensity:   s.calculatePeopleDensity(),
@@ -1099,4 +1151,19 @@ func (s *Simulation) calculateSingleDroneNetwork(targetDrone *drones.Drone) dron
 	dfs(targetDrone)
 
 	return network
+}
+
+func (s *Simulation) GetRealFestivalTime() string {
+	timeBegin := time.Date(2025, time.June, 1, 12, 0, 0, 0, time.UTC)
+	return timeBegin.Add(time.Minute * time.Duration(s.currentTick)).Format("15:04")
+}
+
+func (s *Simulation) GetRemaningFestivalTime() string {
+	timeBegin := time.Date(2025, time.June, 1, 12, 0, 0, 0, time.UTC)
+	timeNow := timeBegin.Add(time.Minute * time.Duration(s.currentTick))
+	timeEnd := timeBegin.Add(time.Minute * time.Duration(s.festivalTotalTicks))
+	if s.currentTick >= s.festivalTotalTicks {
+		return "Festival ended"
+	}
+	return timeEnd.Sub(timeNow).String()
 }

@@ -35,6 +35,7 @@ type Person struct {
 	debug                   bool
 	hardDebug               bool
 	HasReceivedMedical      bool
+	SeekingExit             bool
 	TreatmentTime           time.Duration
 	AssignedDroneID         *int
 }
@@ -51,6 +52,7 @@ func NewCrowdMember(id int, position models.Position, distressProbability float6
 		InDistress:              false,
 		Dead:                    false,
 		StillInSim:              true,
+		SeekingExit:             false,
 		DistressProbability:     distressProbability,
 		Lifespan:                lifespan,
 		width:                   width,
@@ -82,6 +84,22 @@ func (p *Person) IsAssigned() bool {
 }
 
 func (c *Person) Myturn() {
+	if c.SeekingExit && !c.InDistress {
+		if len(c.CurrentPath) == 0 {
+			exitPos := models.Position{X: (float64(c.width)/10)*9 + 0.1, Y: c.Position.Y}
+			if exitPos.CalculateDistance(c.Position) < 1 {
+				c.Exit()
+				return
+			}
+
+			path := models.FindPath(c.Position, exitPos, c.width, c.height, make(map[models.Position]bool))
+			c.CurrentPath = path
+		}
+		c.goTo()
+		//fmt.Printf("Person %d is seeking exit - Position of Exit is : %v \n", c.ID, exitZone)
+		return
+	}
+
 	if c.hardDebug {
 		fmt.Printf("Person %d executing turn - Current State: %v, Position: %v\n",
 			c.ID, c.State.CurrentState, c.Position)
@@ -153,6 +171,27 @@ func (c *Person) UpdatePosition(obstacles map[models.Position]bool) bool {
 		return false
 	}
 
+	if len(c.CurrentPath) > 0 {
+		nextPos := c.CurrentPath[0]
+		//fmt.Printf("Person %d attempting to move to {%.2f, %.2f}\n", c.ID, nextPos.X, nextPos.Y)
+
+		if c.tryMove(nextPos) {
+			//fmt.Printf("Person %d successfully moved\n", c.ID)
+			c.CurrentPath = c.CurrentPath[1:]
+			return true
+		} else {
+			//fmt.Printf("Person %d movement failed, clearing path\n", c.ID)
+			c.CurrentPath = []models.Position{}
+			return false
+		}
+	}
+
+	fmt.Printf("Person %d has no valid moves\n", c.ID)
+	return false
+}
+
+func (c *Person) goTo() bool {
+	//fmt.Printf("Person %d UpdatePosition starting with path length: %d\n", c.ID, len(c.CurrentPath))
 	if len(c.CurrentPath) > 0 {
 		nextPos := c.CurrentPath[0]
 		//fmt.Printf("Person %d attempting to move to {%.2f, %.2f}\n", c.ID, nextPos.X, nextPos.Y)
@@ -353,7 +392,9 @@ func (c *Person) UpdateHealth() {
 			(1.0 - c.Profile.MalaiseResistance) *
 			(1.0 - c.Profile.StaminaLevel)
 
-		if rand.Float64() < effectiveProbability {
+		randNum := rand.Float64() * 20
+
+		if randNum < effectiveProbability {
 			c.InDistress = true
 		}
 		c.CurrentDistressDuration = 0

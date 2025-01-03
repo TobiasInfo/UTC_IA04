@@ -13,6 +13,7 @@ type DroneState int
 const (
 	NoDefinedState DroneState = iota
 	GoingToCharge
+	FinalGoingToDock
 )
 
 type DroneEffectiveNetwork struct {

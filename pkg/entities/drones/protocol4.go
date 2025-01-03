@@ -12,8 +12,9 @@ func (d *Drone) initProtocol4() {
 	//Calculate Patrol Path.
 	d.Memory.DronePatrolPath = append(d.Memory.DronePatrolPath, models.Position{X: d.MyWatch.CornerBottomLeft.X, Y: d.MyWatch.CornerTopRight.Y})
 	d.Memory.DroneActualTarget = models.Position{X: d.MyWatch.CornerBottomLeft.X, Y: d.MyWatch.CornerTopRight.Y}
+	d.Memory.ReturningToStart = false
 
-	fmt.Printf("[DRONES] - Succeffuly terminated Protocole 3 init.\n")
+	fmt.Printf("[DRONES] - Succeffuly terminated Protocole 4 init.\n")
 }
 
 /*
