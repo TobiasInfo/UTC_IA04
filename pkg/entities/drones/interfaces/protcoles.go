@@ -8,6 +8,7 @@ import (
 type DroneMemory struct {
 	DronePatrolPath   []models.Position
 	DroneActualTarget models.Position
+	ReturningToStart  bool
 	Persons           struct {
 		PersonsToSave sync.Map // map[int]*persons.Person // PersonID -> isBeingRescued
 	}

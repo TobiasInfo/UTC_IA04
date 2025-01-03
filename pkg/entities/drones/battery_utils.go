@@ -9,7 +9,7 @@ import (
 // BatteryManagement gère la batterie du drone et retourne la position de recharge si nécessaire
 func (d *Drone) BatteryManagement() (models.Position, bool) {
 	closestStation, minDistance := d.closestPOI(models.ChargingStation)
-	if d.Battery <= minDistance+5 || d.DroneState == GoingToCharge {
+	if d.Battery <= minDistance+5 || d.DroneState == GoingToCharge || d.DroneState == FinalGoingToDock {
 		step := d.nextStepToPos(closestStation)
 		d.DroneState = GoingToCharge
 		return step, true
@@ -18,12 +18,15 @@ func (d *Drone) BatteryManagement() (models.Position, bool) {
 }
 
 func (d *Drone) tryCharging() bool {
-	if d.DroneState != GoingToCharge && !d.IsCharging {
+	if d.DroneState != GoingToCharge && d.DroneState != FinalGoingToDock && !d.IsCharging {
 		return false
 	}
 
 	if d.IsCharging {
 		d.Battery += 5
+		if d.DroneState == FinalGoingToDock {
+			return true
+		}
 		if d.Battery >= 80+rand.Float64()*20 {
 			d.IsCharging = false
 			d.DroneState = NoDefinedState

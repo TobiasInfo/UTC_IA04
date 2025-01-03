@@ -12,6 +12,7 @@ func (d *Drone) initProtocol2() {
 	//Calculate Patrol Path.
 	d.Memory.DronePatrolPath = append(d.Memory.DronePatrolPath, models.Position{X: d.MyWatch.CornerBottomLeft.X, Y: d.MyWatch.CornerTopRight.Y})
 	d.Memory.DroneActualTarget = models.Position{X: d.MyWatch.CornerBottomLeft.X, Y: d.MyWatch.CornerTopRight.Y}
+	d.Memory.ReturningToStart = false
 
 	fmt.Printf("[DRONES] - Succeffuly terminated Protocole 2 init.\n")
 }

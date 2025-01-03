@@ -190,6 +190,14 @@ func (d *Drone) patrolMovementLogic() models.Position {
 		return d.nextStepToPos(models.Position{X: float64(minX), Y: float64(minY)})
 	}
 
+	if d.Position.CalculateDistance(models.Position{X: float64(minX), Y: float64(minY)}) < 1 {
+		d.Memory.ReturningToStart = false
+	}
+
+	if d.Memory.ReturningToStart {
+		return d.nextStepToPos(models.Position{X: float64(minX), Y: float64(minY)})
+	}
+
 	// Détermine la direction en fonction de la position X
 	if currentX%2 == 0 {
 		// Colonnes paires : monter
@@ -201,6 +209,7 @@ func (d *Drone) patrolMovementLogic() models.Position {
 			return d.nextStepToPos(models.Position{X: float64(currentX + 1), Y: float64(currentY)})
 		}
 		// Sinon, retourner au début
+		d.Memory.ReturningToStart = true
 		return d.nextStepToPos(models.Position{X: float64(minX), Y: float64(minY)})
 	} else {
 		// Colonnes impaires : descendre
@@ -212,6 +221,7 @@ func (d *Drone) patrolMovementLogic() models.Position {
 			return d.nextStepToPos(models.Position{X: float64(currentX + 1), Y: float64(currentY)})
 		}
 		// Sinon, retourner au début
+		d.Memory.ReturningToStart = true
 		return d.nextStepToPos(models.Position{X: float64(minX), Y: float64(minY)})
 	}
 }
