@@ -383,7 +383,7 @@ func (c *Person) UpdateHealth() {
 	}
 
 	if c.InDistress {
-		//c.CurrentDistressDuration++
+		c.CurrentDistressDuration++
 		if c.CurrentDistressDuration >= c.Lifespan {
 			c.Die()
 		}
