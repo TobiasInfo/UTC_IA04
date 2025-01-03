@@ -7,17 +7,23 @@ import (
 	"UTC_IA04/pkg/entities/rescue"
 	"UTC_IA04/pkg/models"
 	"fmt"
+	"image/color"
 	"math"
 	"math/rand"
+	"strconv"
 	"sync"
 	"time"
+
+	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
+	"gonum.org/v1/plot/vg"
 )
 
 const (
 	LIFESPAN                     = 200
 	DEFAULT_DISTRESS_PROBABILITY = 0.1
-	DEFAULT_PROTOCOL_MODE        = 3
-	FESTIVALTICKS                = 300
+	DEFAULT_PROTOCOL_MODE        = 4
+	FESTIVALTICKS                = 500
 )
 
 type FestivalState int
@@ -54,6 +60,7 @@ type Simulation struct {
 	deadCases                  int
 	RescuePoints               map[models.Position]*rescue.RescuePoint
 	FestivalState              FestivalState
+	SimulationRescueStats      SimulationRescueStats
 }
 
 type SimulationStatistics struct {
@@ -65,6 +72,12 @@ type SimulationStatistics struct {
 	AverageCoverage float64
 	PeopleDensity   models.DensityGrid
 	DroneNetwork    models.DroneNetwork
+}
+
+type SimulationRescueStats struct {
+	personsInDistress map[int]int
+	personsRescued    map[int]int
+	avgRescueTime     map[int][]int
 }
 
 // CIMITIERE DES PERSONNES MORTES EN (-10, -10)
@@ -90,6 +103,11 @@ func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 		SavePeopleByRescuerChan: make(chan models.RescuePeopleRequest),
 		RescuePoints:            make(map[models.Position]*rescue.RescuePoint),
 		FestivalState:           Active,
+		SimulationRescueStats: SimulationRescueStats{
+			personsInDistress: make(map[int]int),
+			personsRescued:    make(map[int]int),
+			avgRescueTime:     make(map[int][]int),
+		},
 	}
 	s.Initialize(numDrones, numCrowdMembers, numObstacles)
 	go s.handleMovementRequests()
@@ -154,6 +172,10 @@ func (s *Simulation) handleSavePersonByRescuer() {
 			}
 			continue
 		}
+
+		// ON SAUVE LES PERSONNES ICI
+		s.SimulationRescueStats.personsRescued[s.currentTick]++
+		s.SimulationRescueStats.avgRescueTime[s.currentTick] = append(s.SimulationRescueStats.avgRescueTime[s.currentTick], personToSave.CurrentDistressDuration)
 
 		personToSave.InDistress = false
 		s.mu.Lock()
@@ -497,48 +519,6 @@ func (s *Simulation) initializeDefaultObstacles(nObstacles int) {
 	s.buildPOIMap()
 }
 
-// func (s *Simulation) createDrones(numDrones int) {
-// 	s.mu.Lock()
-// 	defer s.mu.Unlock()
-
-// 	for i := 0; i < numDrones; i++ {
-// 		watch := models.MyWatch{
-// 			CornerBottomLeft: models.Position{X: float64(i * s.Map.Width / numDrones), Y: 0},
-// 			CornerTopRight: models.Position{
-// 				X: float64((i + 1) * s.Map.Width / numDrones),
-// 				Y: float64(s.Map.Height),
-// 			},
-// 		}
-
-// 		drone := drones.NewSurveillanceDrone(
-// 			i,
-// 			models.Position{
-// 				X: float64(i*s.Map.Width/numDrones) + float64(s.Map.Width/(2*numDrones)),
-// 				Y: float64(s.Map.Height / 2),
-// 			},
-// 			watch,
-// 			100.0,
-// 			s.DroneSeeRange,
-// 			s.DroneCommRange,
-// 			s.getDroneSeeFunction(i),
-// 			s.getDroneInComRangeFunction(i),
-// 			s.MoveChan,
-// 			s.poiMap,
-// 			s.ChargingChan,
-// 			s.MedicalDeliveryChan,
-// 			s.SavePersonChan,
-// 			DEFAULT_PROTOCOL_MODE,
-// 			s.SavePeopleByRescuerChan,
-// 			s.Map.Width,
-// 			s.Map.Height,
-// 			s, // Passer la simulation elle-même
-// 		)
-
-// 		s.Drones = append(s.Drones, drone)
-// 		s.Map.AddDrone(&s.Drones[len(s.Drones)-1])
-// 	}
-// }
-
 func (s *Simulation) createDrones(n int) {
 	droneSeeFunction := func(d *drones.Drone) []*persons.Person {
 		currentCell := d.Position
@@ -627,11 +607,16 @@ func (s *Simulation) createDrones(n int) {
 			s.SavePersonChan, DEFAULT_PROTOCOL_MODE, // Use the constant here
 			s.SavePeopleByRescuerChan, s.Map.Width, s.Map.Height,
 			s.debug)
-		d.InitProtocol()
 		s.Drones = append(s.Drones, d)
 		s.Map.AddDrone(&s.Drones[len(s.Drones)-1])
 	}
 
+}
+
+func (s *Simulation) InitDronesProtocols() {
+	for i := range s.Drones {
+		s.Drones[i].InitProtocol()
+	}
 }
 
 func goDronesZones(N int, W, H int) [][2][2]int {
@@ -682,6 +667,18 @@ func (s *Simulation) Update() {
 		}
 	}
 
+	var rpWg sync.WaitGroup
+
+	for i, _ := range s.RescuePoints {
+		rpWg.Add(1)
+		go func(rp *rescue.RescuePoint) {
+			defer rpWg.Done()
+			rp.UpdateRescuers()
+		}(s.RescuePoints[i])
+	}
+
+	rpWg.Wait()
+
 	if s.FestivalState == Ended {
 		return
 	}
@@ -726,6 +723,8 @@ func (s *Simulation) Update() {
 		}
 	}
 
+	wg.Wait()
+
 	allPeopleAreOut := true
 	for i := range s.Persons {
 		if s.Persons[i].StillInSim {
@@ -747,9 +746,14 @@ func (s *Simulation) Update() {
 
 	if allDronesAreCharging && allPeopleAreOut {
 		s.FestivalState = Ended
+		s.PlotRescueStats()
 	}
 
-	wg.Wait()
+	for i := range s.Persons {
+		if s.Persons[i].InDistress {
+			s.SimulationRescueStats.personsInDistress[s.currentTick]++
+		}
+	}
 
 	var wgDroneRecive sync.WaitGroup
 
@@ -791,18 +795,6 @@ func (s *Simulation) Update() {
 	}
 
 	wgDrone.Wait()
-
-	var rpWg sync.WaitGroup
-
-	for i, _ := range s.RescuePoints {
-		rpWg.Add(1)
-		go func(rp *rescue.RescuePoint) {
-			defer rpWg.Done()
-			rp.UpdateRescuers()
-		}(s.RescuePoints[i])
-	}
-
-	rpWg.Wait()
 
 	if s.debug {
 		for index, cell := range s.Map.Cells {
@@ -1168,4 +1160,95 @@ func (s *Simulation) GetRemaningFestivalTime() string {
 		return "Festival ended"
 	}
 	return timeEnd.Sub(timeNow).String()
+}
+
+func (s *Simulation) PlotRescueStats() {
+	// Préparer les données pour le plotting
+	ticks := make([]float64, 0)
+	distressData := make([]float64, 0)
+	rescuedData := make([]float64, 0)
+	avgRescueTimeData := make([]float64, 0)
+
+	// Parcourir tous les ticks de 0 au tick actuel
+	for i := 0; i <= s.currentTick; i++ {
+		ticks = append(ticks, float64(i))
+
+		// Nombre de personnes en détresse pour ce tick
+		distressCount := float64(s.SimulationRescueStats.personsInDistress[i])
+		distressData = append(distressData, distressCount)
+
+		// Nombre de personnes sauvées pour ce tick
+		rescuedCount := float64(s.SimulationRescueStats.personsRescued[i])
+		rescuedData = append(rescuedData, rescuedCount)
+
+		// Temps moyen de sauvetage pour ce tick
+		var avgTime float64
+		if rescueTimes := s.SimulationRescueStats.avgRescueTime[i]; len(rescueTimes) > 0 {
+			sum := 0
+			for _, time := range rescueTimes {
+				sum += time
+			}
+			avgTime = float64(sum) / float64(len(rescueTimes))
+		}
+		avgRescueTimeData = append(avgRescueTimeData, avgTime)
+	}
+
+	// Premier graphique pour les personnes en détresse et sauvées
+	p1 := plot.New()
+	p1.Title.Text = "Festival Rescue Statistics - People"
+	p1.X.Label.Text = "Ticks"
+	p1.Y.Label.Text = "Number of People"
+
+	// Ligne pour les personnes en détresse
+	distressLine, err := plotter.NewLine(createXYs(ticks, distressData))
+	if err == nil {
+		distressLine.Color = color.RGBA{R: 255, A: 255} // Rouge
+		distressLine.Width = vg.Points(1)
+		p1.Add(distressLine)
+		p1.Legend.Add("In Distress", distressLine)
+	}
+
+	// Ligne pour les personnes sauvées
+	rescuedLine, err := plotter.NewLine(createXYs(ticks, rescuedData))
+	if err == nil {
+		rescuedLine.Color = color.RGBA{G: 255, A: 255} // Vert
+		rescuedLine.Width = vg.Points(1)
+		p1.Add(rescuedLine)
+		p1.Legend.Add("Rescued", rescuedLine)
+	}
+
+	// Sauvegarder le premier graphique
+	if err := p1.Save(8*vg.Inch, 4*vg.Inch, "rescue_stats_people_"+strconv.Itoa(s.festivalTotalTicks)+".png"); err != nil {
+		fmt.Printf("Error saving people plot: %v\n", err)
+	}
+
+	// Deuxième graphique pour le temps moyen de sauvetage
+	p2 := plot.New()
+	p2.Title.Text = "Festival Rescue Statistics - Average Rescue Time"
+	p2.X.Label.Text = "Ticks"
+	p2.Y.Label.Text = "Time (ticks)"
+
+	// Ligne pour le temps moyen de sauvetage
+	avgTimeLine, err := plotter.NewLine(createXYs(ticks, avgRescueTimeData))
+	if err == nil {
+		avgTimeLine.Color = color.RGBA{B: 255, A: 255} // Bleu
+		avgTimeLine.Width = vg.Points(1)
+		p2.Add(avgTimeLine)
+		p2.Legend.Add("Avg Rescue Time", avgTimeLine)
+	}
+
+	// Sauvegarder le deuxième graphique
+	if err := p2.Save(8*vg.Inch, 4*vg.Inch, "rescue_stats_time_"+strconv.Itoa(s.festivalTotalTicks)+".png"); err != nil {
+		fmt.Printf("Error saving time plot: %v\n", err)
+	}
+}
+
+// Fonction utilitaire pour créer les points XY
+func createXYs(x, y []float64) plotter.XYs {
+	pts := make(plotter.XYs, len(x))
+	for i := range pts {
+		pts[i].X = x[i]
+		pts[i].Y = y[i]
+	}
+	return pts
 }

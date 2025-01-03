@@ -82,8 +82,10 @@ func (d *Drone) ThinkProtocol4() models.Position {
 				if response.Accepted {
 					d.Memory.Persons.PersonsToSave.Delete(person.ID)
 				} else {
-					fmt.Printf("[DRONE %d] Person %d will not be rescued by RescuePoint %d -- ERROR : %v\n",
-						d.ID, person.ID, response.RescuePointID, response.Error)
+					if d.debug {
+						fmt.Printf("[DRONE %d] Person %d will not be rescued by RescuePoint %d -- ERROR : %v\n",
+							d.ID, person.ID, response.RescuePointID, response.Error)
+					}
 				}
 				return true
 			})
@@ -121,11 +123,14 @@ func (d *Drone) ThinkProtocol4() models.Position {
 					}
 				}
 				if closestDrone.ID == d.ID {
-					fmt.Printf("[DRONE %d] Responsability not transfered to any drone, moving to RP %d\n", d.ID, rp.ID)
+					if d.debug {
+						fmt.Printf("[DRONE %d] Responsability not transfered to any drone, moving to RP %d\n", d.ID, rp.ID)
+					}
 					return d.nextStepToPos(rp.Position)
 				}
-
-				fmt.Printf("[DRONE %d] Responsability transfered to drone %d, moving to RP %d\n", d.ID, closestDrone.ID, rp.ID)
+				if d.debug {
+					fmt.Printf("[DRONE %d] Responsability transfered to drone %d, moving to RP %d\n", d.ID, closestDrone.ID, rp.ID)
+				}
 				d.Memory.Persons.PersonsToSave.Range(func(key, value interface{}) bool {
 					closestDrone.Memory.Persons.PersonsToSave.Store(key, value)
 					return true
@@ -136,7 +141,8 @@ func (d *Drone) ThinkProtocol4() models.Position {
 		}
 
 	}
-
-	fmt.Printf("[DRONE-WARNING] - Cannot find any RP. Is your Map Config correct?")
+	if d.debug {
+		fmt.Printf("[DRONE-WARNING] - Cannot find any RP. Is your Map Config correct?")
+	}
 	return d.patrolMovementLogic()
 }

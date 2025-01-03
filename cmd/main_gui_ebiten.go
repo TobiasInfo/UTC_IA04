@@ -115,6 +115,7 @@ func main() {
 			g.Sim.UpdateCrowdSize(g.PeopleCount)
 			g.Sim.UpdateDroneSize(g.DroneCount)
 			g.Sim.UpdateDroneProtocole(g.DropdownProtocole.SelectedIndex + 1)
+			g.Sim.InitDronesProtocols()
 
 			g.Mode = game.Simulation
 		},
@@ -150,6 +151,7 @@ func main() {
 			g.Sim.UpdateCrowdSize(g.PeopleCount)
 			g.Sim.UpdateDroneSize(g.DroneCount)
 			g.Sim.UpdateDroneProtocole(g.DropdownProtocole.SelectedIndex + 1)
+			g.Sim.InitDronesProtocols()
 
 			g.Mode = game.SimulationDebug
 		},

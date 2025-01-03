@@ -220,6 +220,7 @@ func (d *Drone) Think() models.Position {
 		}
 		return d.ThinkProtocol4()
 	default:
+		fmt.Printf("[DRONE %d] - Protocole non défini\n", d.ID)
 		return d.randomMovement()
 	}
 }
@@ -248,7 +249,7 @@ func (d *Drone) Myturn() {
 }
 
 func (d *Drone) UpdateProtocole(newprot int) {
-	if newprot != 1 && newprot != 2 && newprot != 3 {
+	if newprot != 1 && newprot != 2 && newprot != 3 && newprot != 4 {
 		return
 	}
 	if d.ProtocolMode == newprot {

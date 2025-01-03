@@ -429,6 +429,7 @@ func (c *Person) Die() {
 
 	c.Position.X = -10
 	c.Position.Y = -10
+	c.StillInSim = false
 	//fmt.Printf("Person %d has been removed from simulation\n", c.ID)
 }
 
