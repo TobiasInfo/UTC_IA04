@@ -17,6 +17,7 @@ const (
 	LIFESPAN                     = 200
 	DEFAULT_DISTRESS_PROBABILITY = 0.1
 	DEFAULT_PROTOCOL_MODE        = 3
+	FESTIVALTICKS                = 300
 )
 
 type FestivalState int
@@ -81,7 +82,7 @@ func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 		debug:                   false,
 		hardDebug:               false,
 		currentTick:             0,
-		festivalTotalTicks:      1000,
+		festivalTotalTicks:      FESTIVALTICKS,
 		deadCases:               0,
 		festivalTime:            NewFestivalTime(),
 		poiMap:                  make(map[models.POIType][]models.Position),
