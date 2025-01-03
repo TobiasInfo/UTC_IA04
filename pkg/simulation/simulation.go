@@ -270,6 +270,11 @@ func (s *Simulation) handleMovementRequests() {
 			continue
 		}
 
+		if req.NewPosition.X < 0 || req.NewPosition.Y < 0 || req.NewPosition.X >= float64(s.Map.Width) || req.NewPosition.Y >= float64(s.Map.Height) {
+			req.ResponseChan <- models.MovementResponse{Authorized: false, Reason: "Position is out of bounds"}
+			continue
+		}
+
 		if req.MemberType == "drone" {
 			// Pour les drones, ignorer les obstacles
 			s.mu.Lock()

@@ -1,11 +1,11 @@
 package drones
 
 import (
+	"UTC_IA04/pkg/entities/drones/interfaces"
 	"UTC_IA04/pkg/entities/persons"
 	"UTC_IA04/pkg/entities/rescue"
 	"UTC_IA04/pkg/models"
 	"fmt"
-	"sync"
 )
 
 type DroneState int
@@ -16,41 +16,41 @@ const (
 )
 
 type Drone struct {
-	ID                      int
-	DroneSeeRange           int
-	DroneCommRange          int
-	Position                models.Position
-	Battery                 float64
-	DroneSeeFunction        func(d *Drone) []*persons.Person
-	DroneInComRangeFunc     func(d *Drone) []*Drone
-	ReportedZonesByCentrale []models.Position
-	SeenPeople              []*persons.Person
-	DroneInComRange         []*Drone
-	MoveChan                chan models.MovementRequest
-	MapPoi                  map[models.POIType][]models.Position
-	ChargingChan            chan models.ChargingRequest
-	IsCharging              bool
-	MedicalDeliveryChan     chan models.MedicalDeliveryRequest
-	MedicalTentTimer        int
-	DeploymentTimer         int
-	PeopleToSave            *persons.Person
-	Objectif                models.Position
-	HasMedicalGear          bool
-	SavePersonChan          chan models.SavePersonRequest
-	ProtocolMode            int      // 1 = protocol 1, 2 = protocol 2, 3 = protocol 3
-	Rescuer                 *Rescuer // For protocol 3, the spawned rescuer
-	SavePersonByRescuer     chan models.RescuePeopleRequest
-	MapWidth                int
-	MapHeight               int
-	DroneState              DroneState
-	MyWatch                 models.MyWatch
-	ProtocolStruct          struct {
-		PersonsToSave sync.Map // map[int]*persons.Person // PersonID -> isBeingRescued
-	}
-	GetRescuePoint func(pos models.Position) *rescue.RescuePoint
-	// Simulation              interface {
-	// 	GetRescuePoint(pos models.Position) *rescue.RescuePoint
-	// }
+	ID               int
+	DroneSeeRange    int
+	DroneCommRange   int
+	Position         models.Position
+	Battery          float64
+	SeenPeople       []*persons.Person
+	DroneInComRange  []*Drone
+	MapPoi           map[models.POIType][]models.Position
+	IsCharging       bool
+	MedicalTentTimer int
+	DeploymentTimer  int
+	PeopleToSave     *persons.Person
+	Objectif         models.Position
+	HasMedicalGear   bool
+	ProtocolMode     int      // 1 = protocol 1, 2 = protocol 2, 3 = protocol 3
+	Rescuer          *Rescuer // For protocol 3, the spawned rescuer
+	MapWidth         int
+	MapHeight        int
+	//
+	DroneState DroneState
+	MyWatch    models.MyWatch
+	// Fonctions factorisé
+	GetRescuePoint      func(pos models.Position) *rescue.RescuePoint
+	DroneSeeFunction    func(d *Drone) []*persons.Person
+	DroneInComRangeFunc func(d *Drone) []*Drone
+	// Différents Chans.
+	MoveChan     chan models.MovementRequest
+	ChargingChan chan models.ChargingRequest
+	// Enlever les chans qui ne sont pas utilisés
+	MedicalDeliveryChan chan models.MedicalDeliveryRequest
+	SavePersonChan      chan models.SavePersonRequest
+	SavePersonByRescuer chan models.RescuePeopleRequest
+
+	// Drone Memory
+	Memory interfaces.DroneMemory
 }
 
 // NewSurveillanceDrone crée un nouveau drone
@@ -75,35 +75,35 @@ func NewSurveillanceDrone(id int,
 ) Drone {
 	fmt.Printf("[DRONE %d] And now My watch at %v begin !\n", id, myWatch)
 	return Drone{
-		ID:                      id,
-		Position:                position,
-		MyWatch:                 myWatch,
-		Battery:                 battery,
-		DroneSeeRange:           droneSeeRange,
-		DroneCommRange:          droneCommunicationRange,
-		DroneSeeFunction:        droneSeeFunc,
-		DroneInComRangeFunc:     droneInComRange,
-		ReportedZonesByCentrale: []models.Position{},
-		SeenPeople:              []*persons.Person{},
-		DroneInComRange:         []*Drone{},
-		MoveChan:                moveChan,
-		MapPoi:                  mapPoi,
-		ChargingChan:            chargingChan,
-		IsCharging:              false,
-		MedicalDeliveryChan:     medicalDeliveryChan,
-		MedicalTentTimer:        0,
-		DeploymentTimer:         1,
-		PeopleToSave:            nil,
-		Objectif:                models.Position{},
-		HasMedicalGear:          false,
-		SavePersonChan:          savePersonChan,
-		ProtocolMode:            protocolMode,
-		Rescuer:                 nil,
-		SavePersonByRescuer:     savePersonByRescuer,
-		MapWidth:                MapWidth,
-		MapHeight:               MapHeight,
-		DroneState:              NoDefinedState,
-		GetRescuePoint:          getRescuePoint,
+		ID:                  id,
+		Position:            position,
+		MyWatch:             myWatch,
+		Battery:             battery,
+		DroneSeeRange:       droneSeeRange,
+		DroneCommRange:      droneCommunicationRange,
+		DroneSeeFunction:    droneSeeFunc,
+		DroneInComRangeFunc: droneInComRange,
+		SeenPeople:          []*persons.Person{},
+		DroneInComRange:     []*Drone{},
+		MoveChan:            moveChan,
+		MapPoi:              mapPoi,
+		ChargingChan:        chargingChan,
+		IsCharging:          false,
+		MedicalDeliveryChan: medicalDeliveryChan,
+		MedicalTentTimer:    0,
+		DeploymentTimer:     1,
+		PeopleToSave:        nil,
+		Objectif:            models.Position{},
+		HasMedicalGear:      false,
+		SavePersonChan:      savePersonChan,
+		ProtocolMode:        protocolMode,
+		Rescuer:             nil,
+		SavePersonByRescuer: savePersonByRescuer,
+		MapWidth:            MapWidth,
+		MapHeight:           MapHeight,
+		DroneState:          NoDefinedState,
+		GetRescuePoint:      getRescuePoint,
+		Memory:              interfaces.DroneMemory{},
 	}
 }
 
@@ -204,10 +204,14 @@ func (d *Drone) Myturn() {
 	}
 
 	target := d.Think()
+
 	if target.X == d.Position.X && target.Y == d.Position.Y {
+		// La réflexion et la pérception coute 0.25 en batterie tous le temps
+		// Le Mouvement coûte 2 fois +.
 		d.Battery -= 0.25
 		return
 	}
+
 	moved := d.Move(target)
 	if !moved {
 		fmt.Printf("Drone %d could not move to %v\n", d.ID, target)
