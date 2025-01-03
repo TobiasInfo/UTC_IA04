@@ -41,6 +41,7 @@ type Simulation struct {
 	poiMap                     map[models.POIType][]models.Position
 	mu                         sync.RWMutex
 	treatedCases               int
+	casesDead                  int
 	RescuePoints               map[models.Position]*rescue.RescuePoint
 }
 
@@ -48,6 +49,7 @@ type SimulationStatistics struct {
 	TotalPeople     int
 	InDistress      int
 	CasesTreated    int
+	CasesDead       int
 	AverageBattery  float64
 	AverageCoverage float64
 	PeopleDensity   models.DensityGrid
@@ -69,6 +71,7 @@ func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 		debug:                   false,
 		hardDebug:               false,
 		currentTick:             0,
+		casesDead:               0,
 		festivalTime:            NewFestivalTime(),
 		poiMap:                  make(map[models.POIType][]models.Position),
 		MedicalDeliveryChan:     make(chan models.MedicalDeliveryRequest),
@@ -322,6 +325,7 @@ func (s *Simulation) handleDeadPerson() {
 		if entity != nil {
 			s.mu.Lock()
 			s.Map.MoveEntity(entity, models.Position{X: -10, Y: -10})
+			s.casesDead++
 			s.mu.Unlock()
 			req.ResponseChan <- models.DeadResponse{Authorized: true}
 		} else {
@@ -546,7 +550,7 @@ func (s *Simulation) createDrones(n int) {
 				//fmt.Println("Position : ", position)
 				for _, member := range cell.Persons {
 					//probaDetection := 1.0
-					probaDetection := max(0, 1.0-distance/float64(s.DroneSeeRange)-(float64(nbPersDetected)*0.03))
+					probaDetection := max(0, 1.0-distance/float64(s.DroneSeeRange)-(float64(nbPersDetected)*0.02))
 					if rand.Float64() < probaDetection {
 						//fmt.Printf("Drone %d (%.2f, %.2f) sees person %d (%.2f, %.2f) \n", d.ID, d.Position.X, d.Position.Y, member.ID, member.Position.X, member.Position.Y)
 						droneInformations = append(droneInformations, member)
@@ -989,6 +993,7 @@ func (s *Simulation) GetStatistics() SimulationStatistics {
 		TotalPeople:     totalPeople,
 		InDistress:      inDistress,
 		CasesTreated:    s.treatedCases,
+		CasesDead:       s.casesDead,
 		AverageBattery:  avgBattery,
 		AverageCoverage: coverage,
 		PeopleDensity:   s.calculatePeopleDensity(),

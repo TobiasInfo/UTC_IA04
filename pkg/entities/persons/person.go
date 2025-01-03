@@ -353,7 +353,10 @@ func (c *Person) UpdateHealth() {
 			(1.0 - c.Profile.MalaiseResistance) *
 			(1.0 - c.Profile.StaminaLevel)
 
-		if rand.Float64() < effectiveProbability {
+		randNumb := rand.Float64() * 30
+
+		if randNumb < (effectiveProbability) {
+			fmt.Printf("Person %d is in distress -- Distress Probability: %.2f, Malaise Resistance: %.2f, Stamina Level: %.2f, effective probability: %.4f, probability was : %.4f\n", c.ID, c.DistressProbability, c.Profile.MalaiseResistance, c.Profile.StaminaLevel, effectiveProbability, randNumb)
 			c.InDistress = true
 		}
 		c.CurrentDistressDuration = 0
