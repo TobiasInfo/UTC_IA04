@@ -14,6 +14,7 @@ import (
 )
 
 const (
+	LIFESPAN                     = 200
 	DEFAULT_DISTRESS_PROBABILITY = 0.1
 	DEFAULT_PROTOCOL_MODE        = 3
 )
@@ -661,7 +662,7 @@ func (s *Simulation) createInitialCrowd(n int) {
 	for i := 0; i < n; i++ {
 		member := persons.NewCrowdMember(i,
 			models.Position{X: 0, Y: float64(rand.Intn(s.Map.Height))},
-			s.DefaultDistressProbability, 200, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan, s.ExitChan)
+			s.DefaultDistressProbability, LIFESPAN, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan, s.ExitChan)
 		s.Persons = append(s.Persons, member)
 		s.Map.AddCrowdMember(&s.Persons[len(s.Persons)-1])
 	}
@@ -871,7 +872,7 @@ func (s *Simulation) UpdateCrowdSize(newSize int) {
 		for i := currentSize; i < newSize; i++ {
 			member := persons.NewCrowdMember(i,
 				models.Position{X: 0, Y: float64(rand.Intn(s.Map.Height))},
-				s.DefaultDistressProbability, 20, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan, s.ExitChan)
+				s.DefaultDistressProbability, LIFESPAN, s.Map.Width, s.Map.Height, s.MoveChan, s.DeadChan, s.ExitChan)
 			s.Persons = append(s.Persons, member)
 			s.Map.AddCrowdMember(&s.Persons[len(s.Persons)-1])
 		}

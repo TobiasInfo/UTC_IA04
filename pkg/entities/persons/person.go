@@ -385,6 +385,8 @@ func (c *Person) UpdateHealth() {
 	if c.InDistress {
 		c.CurrentDistressDuration++
 		if c.CurrentDistressDuration >= c.Lifespan {
+			// fmt.Printf("[Person %d] Dying at duration %d\n",
+			// 	c.ID, c.CurrentDistressDuration)
 			c.Die()
 		}
 	} else {
