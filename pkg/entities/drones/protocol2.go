@@ -3,15 +3,9 @@ package drones
 import (
 	"UTC_IA04/pkg/entities/persons"
 	"UTC_IA04/pkg/models"
-	"sync"
 )
 
-type Protocol2 struct {
-	PersonsToSave sync.Map // map[int]bool // PersonID -> isBeingRescued
-}
-
 func (d *Drone) initProtocol2() {
-	d.ProtocolStruct = Protocol2{}
 }
 
 func (d *Drone) ThinkProtocol2() models.Position {

@@ -5,17 +5,20 @@ import (
 	"UTC_IA04/pkg/entities/rescue"
 	"UTC_IA04/pkg/models"
 	"fmt"
+	"math"
 	"sync"
 )
 
-type Protocol3 struct {
-	PersonsToSave sync.Map // map[int]bool // *Person -> isBeingRescued
-}
-
 func (d *Drone) initProtocol3() {
-	d.ProtocolStruct = Protocol3{
-		PersonsToSave: sync.Map{},
+	//Calculate Patrol Path.
+	d.Memory.DronePatrolPath = append(d.Memory.DronePatrolPath, models.Position{X: d.MyWatch.CornerBottomLeft.X, Y: d.MyWatch.CornerTopRight.Y})
+	d.Memory.DroneActualTarget = models.Position{X: d.MyWatch.CornerBottomLeft.X, Y: d.MyWatch.CornerTopRight.Y}
+
+	for i := range int(d.MyWatch.CornerTopRight.X - d.MyWatch.CornerBottomLeft.X) {
+		fmt.Print("i, ", i)
 	}
+
+	fmt.Printf("[DRONES] - Succeffuly terminated Protocole 3 init.")
 }
 
 /*
@@ -43,26 +46,26 @@ func (d *Drone) ThinkProtocol3() models.Position {
 
 	for _, person := range d.SeenPeople {
 		if person.IsInDistress() {
-			d.ProtocolStruct.PersonsToSave.Store(person.ID, person)
+			d.Memory.Persons.PersonsToSave.Store(person.ID, person)
 		}
 	}
 
 	isEmpty := true
-	d.ProtocolStruct.PersonsToSave.Range(func(_, _ interface{}) bool {
+	d.Memory.Persons.PersonsToSave.Range(func(_, _ interface{}) bool {
 		isEmpty = false
 		return false
 	})
 
 	if isEmpty {
 		// Je patrouille
-		return d.randomMovement()
+		return d.patrolMovementLogic()
 	}
 
 	if rp := d.GetRescuePoint(d.Position); rp != nil {
 		canCommunicate := rp.Position.CalculateDistance(d.Position) <= float64(d.DroneCommRange)
 		if canCommunicate {
 			//var idPersonsToDelete []int
-			d.ProtocolStruct.PersonsToSave.Range(func(key, value interface{}) bool {
+			d.Memory.Persons.PersonsToSave.Range(func(key, value interface{}) bool {
 				person := value.(*persons.Person)
 				respChan := make(chan rescue.RescueResponse)
 				rp.RequestChan <- rescue.RescueRequest{
@@ -73,7 +76,7 @@ func (d *Drone) ThinkProtocol3() models.Position {
 				}
 				response := <-respChan
 				if response.Accepted {
-					d.ProtocolStruct.PersonsToSave.Delete(person.ID)
+					d.Memory.Persons.PersonsToSave.Delete(person.ID)
 				} else {
 					fmt.Printf("[DRONE %d] Person %d will not be rescued by RescuePoint %d -- ERROR : %v\n",
 						d.ID, person.ID, response.RescuePointID, response.Error)
@@ -89,11 +92,11 @@ func (d *Drone) ThinkProtocol3() models.Position {
 				rpFriend := d.GetRescuePoint(friend.Position)
 				friendCanCommunicate := rpFriend.Position.CalculateDistance(friend.Position) <= float64(d.DroneCommRange)
 				if friendCanCommunicate {
-					d.ProtocolStruct.PersonsToSave.Range(func(key, value interface{}) bool {
-						friend.ProtocolStruct.PersonsToSave.Store(key, value)
+					d.Memory.Persons.PersonsToSave.Range(func(key, value interface{}) bool {
+						friend.Memory.Persons.PersonsToSave.Store(key, value)
 						return true
 					})
-					d.ProtocolStruct.PersonsToSave = sync.Map{}
+					d.Memory.Persons.PersonsToSave = sync.Map{}
 					responsabilityTransfered = true
 					break
 				}
@@ -108,30 +111,45 @@ func (d *Drone) ThinkProtocol3() models.Position {
 
 	}
 
-	// fmt.Printf("[DRONE %d] Person %d is in distress and not assigned\n", d.ID, person.ID)
-	// if rp := d.GetRescuePoint(person.Position); rp != nil {
-	// 	// Je bouge vers le rescue point si je ne peux pas communiquer.
-	// 	respChan := make(chan rescue.RescueResponse)
-	// 	rp.RequestChan <- rescue.RescueRequest{
-	// 		PersonID:     person.ID,
-	// 		Position:     person.Position,
-	// 		ResponseChan: respChan,
-	// 	}
+	fmt.Printf("[DRONE-WARNING] - Cannot find any RP. Is your Map Config correct?")
+	return d.patrolMovementLogic()
+}
 
-	// 	fmt.Printf("[RP] Request sent to RescuePoint %d\n", rp.ID)
+func (d *Drone) patrolMovementLogic() models.Position {
+	currentX := int(math.Round(d.Position.X))
+	currentY := int(math.Round(d.Position.Y))
+	maxX := min(int(math.Round(d.MyWatch.CornerTopRight.X)), d.MapWidth)
+	maxY := min(int(math.Round(d.MyWatch.CornerTopRight.Y)), d.MapHeight)
+	minX := max(int(math.Round(d.MyWatch.CornerBottomLeft.X)), 0)
+	minY := max(int(math.Round(d.MyWatch.CornerBottomLeft.Y)), 0)
 
-	// 	response := <-respChan
+	// Si on est hors limites, retourner au point de départ
+	if currentX >= maxX || currentY >= maxY || currentX < minX || currentY < minY {
+		return d.nextStepToPos(models.Position{X: float64(minX), Y: float64(minY)})
+	}
 
-	// 	fmt.Printf("[RP] Response received from RescuePoint %d: %v\n", rp.ID, response)
-	// 	if response.Accepted {
-	// 		person.AssignedDroneID = &d.ID // Marquer comme pris en charge
-	// 		fmt.Printf("[DRONE %d] Person %d will be rescued by RescuePoint %d\n",
-	// 			d.ID, person.ID, response.RescuePointID)
-	// 	} else {
-	// 		fmt.Printf("[DRONE %d] Person %d will not be rescued by RescuePoint %d\n",
-	// 			d.ID, person.ID, response.RescuePointID)
-	// 	}
-	// }
-
-	return d.randomMovement()
+	// Détermine la direction en fonction de la position X
+	if currentX%2 == 0 {
+		// Colonnes paires : monter
+		if currentY < maxY-1 {
+			return d.nextStepToPos(models.Position{X: float64(currentX), Y: float64(currentY + 1)})
+		}
+		// En haut de la colonne : se déplacer à droite si possible
+		if currentX < maxX-1 {
+			return d.nextStepToPos(models.Position{X: float64(currentX + 1), Y: float64(currentY)})
+		}
+		// Sinon, retourner au début
+		return d.nextStepToPos(models.Position{X: float64(minX), Y: float64(minY)})
+	} else {
+		// Colonnes impaires : descendre
+		if currentY > minY {
+			return d.nextStepToPos(models.Position{X: float64(currentX), Y: float64(currentY - 1)})
+		}
+		// En bas de la colonne : se déplacer à droite si possible
+		if currentX < maxX-1 {
+			return d.nextStepToPos(models.Position{X: float64(currentX + 1), Y: float64(currentY)})
+		}
+		// Sinon, retourner au début
+		return d.nextStepToPos(models.Position{X: float64(minX), Y: float64(minY)})
+	}
 }
