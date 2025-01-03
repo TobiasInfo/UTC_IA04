@@ -36,7 +36,7 @@ type Person struct {
 	hardDebug               bool
 	HasReceivedMedical      bool
 	TreatmentTime           time.Duration
-	AssignedDroneID        *int
+	AssignedDroneID         *int
 }
 
 func NewCrowdMember(id int, position models.Position, distressProbability float64, lifespan int, width int, height int, moveChan chan models.MovementRequest, deadChan chan models.DeadRequest, exitChan chan models.ExitRequest) Person {
@@ -78,7 +78,7 @@ func NewCrowdMember(id int, position models.Position, distressProbability float6
 }
 
 func (p *Person) IsAssigned() bool {
-    return p.AssignedDroneID != nil
+	return p.AssignedDroneID != nil
 }
 
 func (c *Person) Myturn() {
@@ -291,11 +291,11 @@ func (c *Person) getRandomZonePosition(zone string) models.Position {
 
 	switch zone {
 	case "entrance":
-		x = rand.Float64() * float64(c.width) / 3
+		x = rand.Float64() * float64(c.width) / 10
 	case "main":
-		x = float64(c.width)/3 + rand.Float64()*float64(c.width)/3
+		x = float64(c.width)/10 + rand.Float64()*float64(c.width)*8/10
 	case "exit":
-		x = float64(c.width)*2/3 + rand.Float64()*float64(c.width)/3
+		x = float64(c.width)*8/10 + rand.Float64()*float64(c.width)/10
 	}
 
 	y = rand.Float64() * float64(c.height)
@@ -307,19 +307,19 @@ func (c *Person) getZoneEntryPoint(zone string) models.Position {
 
 	switch zone {
 	case "main":
-		return models.Position{X: float64(c.width) / 3, Y: y}
+		return models.Position{X: float64(c.width) / 10, Y: y}
 	case "exit":
-		return models.Position{X: float64(c.width) * 2 / 3, Y: y}
+		return models.Position{X: float64(c.width) * 9 / 10, Y: y}
 	default:
 		return models.Position{X: 0, Y: y}
 	}
 }
 
 func (c *Person) determineCurrentZone() string {
-	zoneWidth := float64(c.width) / 3
+	zoneWidth := float64(c.width) / 10
 	if c.Position.X < zoneWidth {
 		return "entrance"
-	} else if c.Position.X < zoneWidth*2 {
+	} else if c.Position.X < zoneWidth*9 {
 		return "main"
 	}
 	return "exit"
