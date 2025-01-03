@@ -31,7 +31,7 @@ func (rp *RescuePoint) UpdateRescuers() {
 	for index := range rp.Rescuers {
 		rescuer := rp.Rescuers[index]
 		if rescuer.Person != nil {
-			if rescuer.Person.Position.X == -1 || rescuer.Person.Position.Y == -1 || rescuer.Person.IsDead() {
+			if rescuer.Person.Position.X == -10 || rescuer.Person.Position.Y == -10 || rescuer.Person.IsDead() {
 				rescuer.Person = nil
 				rescuer.State = ReturningToBase
 			}
