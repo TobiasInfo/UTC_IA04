@@ -983,24 +983,6 @@ func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
 	)
 	ebitenutil.DebugPrintAt(metrics, text, 20, 20)
 
-	// Festival time information
-	elapsedTime := festivalTime.GetElapsedTime()
-	remainingTime := festivalTime.GetRemainingTime()
-	currentPhase := festivalTime.GetPhase()
-
-	// Calculate progress based on elapsed and remaining time
-	totalTime := elapsedTime + remainingTime
-	progress := float64(elapsedTime) / float64(totalTime) * 100
-
-	timeText := fmt.Sprintf(
-		"Festival Time: %s    Remaining: %s    Progress: %.1f%%    Phase: %s",
-		festivalTime.GetCurrentTime().Format("15:04"),
-		formatDuration(remainingTime),
-		math.Min(progress, 100),
-		currentPhase,
-	)
-	ebitenutil.DebugPrintAt(metrics, timeText, 20, 45)
-
 	opts := &ebiten.DrawImageOptions{}
 	opts.GeoM.Translate(screenWidth-metricsWidth-20, screenHeight*0.89)
 	screen.DrawImage(metrics, opts)
