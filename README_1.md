@@ -199,13 +199,122 @@ Les métriques opérationnelles comprennent :
 - Efficacité des protocoles de coordination
 - Couverture spatiale des interventions
 
-## Sorties et Données Générées
+# Sorties et Données Générées
 
-Chaque session de simulation produit :
-- Statistiques complètes d'intervention
-- Métriques de performance réseau
-- Analyses temporelles des incidents
-- Cartes de chaleur de couverture
-- Graphiques comparatifs des protocoles
+## Configuration des Tests
 
-Les données sont automatiquement sauvegardées dans le répertoire du projet à la fin de chaque simulation pour permettre une analyse ultérieure détaillée.
+Le système effectue une analyse exhaustive en testant toutes les combinaisons possibles des paramètres suivants :
+
+### Paramètres Variables
+- **Nombre de drones** : 2, 5, et 10 drones
+  - 2 drones représente une couverture minimale
+  - 5 drones offre une couverture moyenne
+  - 10 drones permet une couverture intensive
+  
+- **Nombre de festivaliers** : 200, 500, et 1000 personnes
+  - 200 personnes simule un petit événement
+  - 500 personnes représente un événement moyen
+  - 1000 personnes teste le système en charge élevée
+
+- **Protocoles** : 1, 2, 3, et 4
+  - Protocole 1 : système baseline avec communication simple
+  - Protocole 2 : ajout de la patrouille structurée
+  - Protocole 3 : introduction du réseau de communication
+  - Protocole 4 : optimisation du réseau et des décisions
+
+- **Configurations de carte** : 
+  - festival_layout_1 : configuration avec point de secours sur le côté
+  - festival_layout_2 : configuration avec deux points de secours
+  - festival_layout_3 : configuration avec point de secours central
+
+Au total, cela représente 108 configurations différentes (3 x 3 x 4 x 3 = 108 configurations), chacune exécutée 5 fois pour assurer la fiabilité statistique.
+
+## Structure des Résultats
+
+Le programme génère un dossier `results` organisé comme suit :
+
+```text
+results/
+├── 2d_200p_p1_festival_layout_1/    # Configuration minimale, protocole 1, carte 1
+├── 2d_200p_p1_festival_layout_2/
+├── ...
+├── 5d_500p_p2_festival_layout_1/    # Configuration moyenne, protocole 2
+├── 5d_500p_p2_festival_layout_2/
+├── ...
+└── 10d_1000p_p4_festival_layout_3/  # Configuration maximale, protocole 4, carte 3
+```
+
+Chaque dossier de configuration contient :
+```text
+configuration_folder/
+├── run_1_metrics.txt            # Données de la première exécution
+├── run_2_metrics.txt
+├── run_3_metrics.txt
+├── run_4_metrics.txt
+├── run_5_metrics.txt
+├── metrics.txt                  # Moyennes et analyses statistiques
+├── rescue_stats_people.png      # Graphique temporel des sauvetages
+└── rescue_stats_time.png        # Graphique des temps de réponse
+```
+
+## Métriques Analysées
+
+### Par Exécution (run_X_metrics.txt)
+Chaque fichier d'exécution enregistre :
+```text
+Run X Results
+================
+Total People: [nombre]
+People in Distress: [nombre]
+Cases Treated: [nombre]
+Cases Dead: [nombre]
+Average Battery: [pourcentage]%
+Average Coverage: [pourcentage]%
+Runtime: [durée]
+Total Ticks: [nombre]
+```
+
+### Analyse Globale (metrics.txt)
+Le fichier de synthèse comprend :
+```text
+Simulation Results (Averaged over 5 runs)
+=====================================
+Total People: [moyenne]
+People in Distress: [moyenne]
+Cases Treated: [moyenne]
+Cases Dead: [moyenne]
+Average Battery: [moyenne]%
+Average Coverage: [moyenne]%
+Average Runtime: [durée moyenne]
+Total Ticks: [moyenne]
+
+Performance Metrics:
+- Treatment Success Rate: [pourcentage]%
+- Mortality Rate: [pourcentage]%
+- Average Response Time: [durée]
+```
+
+## Visualisations Générées
+
+### Graphique de Sauvetages (rescue_stats_people.png)
+Ce graphique présente deux courbes principales :
+- En rouge : l'évolution du nombre de personnes en détresse
+- En vert : l'évolution du nombre de personnes sauvées
+L'axe des abscisses représente le temps de simulation en ticks, permettant d'observer les moments critiques et l'efficacité des interventions.
+
+### Graphique des Temps de Réponse (rescue_stats_time.png)
+Ce graphique montre une courbe bleue représentant l'évolution du temps moyen de sauvetage au cours de la simulation. Il permet d'évaluer si le système maintient son efficacité même sous charge.
+
+## Analyse Comparative
+
+Cette batterie complète de tests permet d'analyser :
+- L'influence du nombre de drones sur l'efficacité de la surveillance
+- L'impact du nombre de festivaliers sur les performances du système
+- Les améliorations apportées par chaque protocole
+- L'effet des différentes configurations de carte sur l'efficacité des sauvetages
+
+Les résultats permettent de déterminer les configurations optimales selon différents critères :
+- Minimisation du temps de réponse moyen
+- Maximisation du taux de sauvetage
+- Optimisation du rapport coût (nombre de drones) / efficacité
+- Adaptation à différentes tailles d'événements
