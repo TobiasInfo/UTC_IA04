@@ -1,10 +1,20 @@
 # Système Multi-Drones pour la Sécurité d'Événements Festifs
 
-## Introduction : Un Festival Sous Haute Surveillance
+## Table des Matières
+1. [Introduction](#introduction)
+2. [Architecture du Projet](#architecture-du-projet)
+3. [Modélisation des Agents](#modélisation-des-agents)
+4. [Interface Graphique de Simulation](#interface-graphique-de-simulation)
+5. [Analyse par Lots et Résultats](#analyse-par-lots-et-résultats)
 
-Les festivals de grande envergure représentent des défis majeurs en termes de sécurité et de gestion des urgences médicales. Dans ces environnements dynamiques où des milliers de personnes se rassemblent, la rapidité d'intervention en cas de malaise ou d'incident est cruciale. Notre système propose une approche novatrice : une flotte de drones autonomes travaillant en synergie avec des équipes de secours au sol pour assurer une surveillance continue et une intervention rapide.
+## Introduction
 
-Dans cet écosystème complexe, trois types d'agents interagissent constamment : les festivaliers, avec leurs comportements et besoins variés, les drones de surveillance, équipés de systèmes de détection sophistiqués, et les équipes de secours, prêtes à intervenir sur le terrain. Cette simulation modélise leurs interactions dans un environnement festival réaliste, permettant d'étudier et d'optimiser les stratégies d'intervention.
+Les festivals de grande envergure présentent des défis majeurs en termes de sécurité et de gestion des urgences médicales. Notre système propose une approche innovante : une flotte de drones autonomes collaborant avec des équipes de secours au sol pour assurer une surveillance continue et une intervention rapide.
+
+Dans cet écosystème, trois types d'agents interagissent constamment :
+- Les festivaliers, avec leurs comportements et besoins variés
+- Les drones de surveillance, équipés de systèmes de détection sophistiqués
+- Les équipes de secours, prêtes à intervenir sur le terrain
 
 ## Architecture du Projet
 
@@ -32,19 +42,52 @@ UTC_IA04/
 │   └── simulation/             # Moteur de simulation
 └── vendor/                     # Dépendances externes
 ```
-## Les Acteurs du Système
+## Environnement et Interactions
 
-### Les Festivaliers : Des Comportements Humains Complexes
+### Le Terrain du Festival
 
-Les festivaliers constituent le cœur vivant de notre simulation. Chaque participant est modélisé comme un agent autonome doté d'une personnalité unique qui influence ses décisions et ses actions. Nous avons identifié quatre profils psychologiques distincts :
+L'environnement de simulation reproduit fidèlement la configuration d'un festival avec trois zones distinctes :
 
-L'Aventurier (Adventurous) se caractérise par une grande mobilité et une tendance à explorer l'ensemble du site. Moins sensible à la densité de la foule, il présente néanmoins un risque accru de fatigue dû à son activité intense.
+La zone d'entrée constitue le point d'accès principal des festivaliers. Elle joue un rôle crucial dans la gestion des flux de participants.
 
-Le Prudent (Cautious) privilégie les zones calmes et maintient une distance confortable avec les autres participants. Son comportement méthodique réduit les risques de malaise, mais peut limiter son expérience du festival.
+La zone principale concentre l'essentiel des activités et des points d'intérêt. Elle est parsemée de différents POI (Points of Interest) :
+- Scènes de spectacle
+- Stands de restauration et de boissons
+- Zones de repos
+- Installations sanitaires
+- Postes de secours
+- Stations de recharge pour les drones
 
-Le Social recherche activement les zones animées et les rassemblements. Sa tendance à suivre la foule influence significativement ses déplacements, créant des dynamiques de groupe intéressantes à observer.
+La zone de sortie permet aux participants de quitter le site de manière fluide et contrôlée.
 
-L'Indépendant se démarque par son autonomie dans ses choix de déplacement et d'activités. Moins influencé par les mouvements de foule, il suit son propre parcours sur le site.
+### Dynamique Temporelle
+
+Le temps dans la simulation s'écoule de manière accélérée, avec un ratio de 1:60 (une seconde réelle équivaut à une minute simulée). Cette compression temporelle permet d'observer l'évolution complète d'un festival tout en maintenant une granularité suffisante pour l'analyse des interventions d'urgence.
+
+## Modélisation des Agents
+
+### Festivaliers
+Chaque festivalier possède un profil psychologique qui influence son comportement :
+
+1. **L'Aventurier (Adventurous)**
+   - Grande mobilité
+   - Exploration active
+   - Risque accru de fatigue
+
+2. **Le Prudent (Cautious)**
+   - Préfère les zones calmes
+   - Maintient ses distances
+   - Comportement méthodique
+
+3. **Le Social**
+   - Recherche les rassemblements
+   - Suit les mouvements de foule
+   - Interactions fréquentes
+
+4. **L'Indépendant**
+   - Autonome dans ses choix
+   - Peu influencé par la foule
+   - Parcours personnalisé
 
 Chaque festivalier possède également un niveau d'énergie qui évolue au fil du temps et des activités. Le système modélise la fatigue et les risques de malaise selon la formule :
 
@@ -52,8 +95,11 @@ Chaque festivalier possède également un niveau d'énergie qui évolue au fil d
 P(malaise) = P_base x (1 - Resistance_Malaise) x (1 - Niveau_Energie)
 où P_base = 0.005
 ```
+### Les Équipes de Secours : L'Interface Humaine
 
-### Les Protocoles de Communication des Drones
+Les sauveteurs représentent le lien crucial entre la surveillance automatisée et l'intervention humaine. Basés dans des postes de secours stratégiquement positionnés, ils réagissent aux alertes transmises par les drones pour porter assistance aux festivaliers en détresse.
+
+### Protocoles de Communication des Drones
 
 #### Protocole 1 : Système de Base
 
@@ -114,54 +160,29 @@ Le protocole 4 complète le protocole 3 avec ces mécanismes d'optimisation :
 - Transfert intelligent des cas selon la topologie du réseau
 - Prise en compte de la distance au point de secours dans les décisions
 
-### Les Équipes de Secours : L'Interface Humaine
 
-Les sauveteurs représentent le lien crucial entre la surveillance automatisée et l'intervention humaine. Basés dans des postes de secours stratégiquement positionnés, ils réagissent aux alertes transmises par les drones pour porter assistance aux festivaliers en détresse.
+## Interface Graphique de Simulation
 
-## Environnement et Interactions
+### Configuration Initiale
+Pour lancer la simulation :
+1. Cloner le projet :
+```bash
+git clone https://github.com/TobiasInfo/UTC_IA04
+cd UTC_IA04/cmd
+go run ./main_gui_ebiten.go
+```
 
-### Le Terrain du Festival
+### Écran d'Accueil
+L'interface permet de configurer :
+- Le nombre de drones détermine la capacité de surveillance du système. Un équilibre doit être trouvé entre une couverture suffisante et une utilisation efficiente des ressources.
 
-L'environnement de simulation reproduit fidèlement la configuration d'un festival avec trois zones distinctes :
+- La population initiale de festivaliers influence directement la complexité des interactions et la charge sur le système de surveillance.
 
-La zone d'entrée constitue le point d'accès principal des festivaliers. Elle joue un rôle crucial dans la gestion des flux de participants.
+- La sélection de la carte définit la disposition physique du festival, avec ses zones et points d'intérêt spécifiques.
 
-La zone principale concentre l'essentiel des activités et des points d'intérêt. Elle est parsemée de différents POI (Points of Interest) :
-- Scènes de spectacle
-- Stands de restauration et de boissons
-- Zones de repos
-- Installations sanitaires
-- Postes de secours
-- Stations de recharge pour les drones
+- Le choix du protocole de communication des drones impacte significativement leur efficacité collective.
 
-La zone de sortie permet aux participants de quitter le site de manière fluide et contrôlée.
-
-### Dynamique Temporelle
-
-Le temps dans la simulation s'écoule de manière accélérée, avec un ratio de 1:60 (une seconde réelle équivaut à une minute simulée). Cette compression temporelle permet d'observer l'évolution complète d'un festival tout en maintenant une granularité suffisante pour l'analyse des interventions d'urgence.
-
-## Utilisation du Système
-
-### Lancement et Configuration
-
-L'interface de simulation offre un contrôle précis sur les paramètres de l'expérience. Pour démarrer, l'utilisateur doit :
-
-1. Télécharger le projet depuis le dépôt GitHub (https://github.com/TobiasInfo/UTC_IA04)
-2. Naviguer vers le répertoire d'exécution : `cd XXX\UTC_IA04\cmd`
-3. Lancer l'application : `go run .\main_gui_ebiten.go`
-
-L'écran d'accueil permet de configurer les paramètres essentiels de la simulation :
-
-Le nombre de drones détermine la capacité de surveillance du système. Un équilibre doit être trouvé entre une couverture suffisante et une utilisation efficiente des ressources.
-
-La population initiale de festivaliers influence directement la complexité des interactions et la charge sur le système de surveillance.
-
-La sélection de la carte définit la disposition physique du festival, avec ses zones et points d'intérêt spécifiques.
-
-Le choix du protocole de communication des drones impacte significativement leur efficacité collective.
-
-### Interface de Simulation
-
+### Vue Principale
 L'interface graphique, développée avec le moteur Ebiten, offre une visualisation claire et interactive de la simulation. Elle se compose de plusieurs éléments clés :
 
 La vue principale présente une représentation en temps réel du festival. Les festivaliers, les drones et les points d'intérêt sont représentés par des icônes distinctives. Les drones affichent leur champ de vision sous forme d'un cercle d'ombre, permettant de visualiser la couverture de surveillance.
@@ -177,29 +198,11 @@ La carte de densité (à gauche) représente la distribution des festivaliers su
 
 Le graphe de réseau (à droite) illustre les communications entre drones et leur connexion avec les points de secours. Il permet de comprendre la topologie du réseau et d'identifier d'éventuelles zones de faible couverture.
 
-### Métriques et Analyses
 
-Le système collecte et analyse en temps réel de nombreuses métriques :
+## Analyse par Lots et Résultats
 
-Les métriques de population incluent :
-- Le nombre total de participants
-- Les cas de détresse actifs
-- Les interventions réussies
-- Les cas non traités à temps
+Cette section présente l'analyse exhaustive du système via des simulations non graphiques.
 
-Les métriques opérationnelles comprennent :
-- Le niveau moyen de batterie des drones
-- Le pourcentage de couverture du terrain
-- L'efficacité des communications
-- Les temps de réponse aux incidents
-
-À la fin de chaque simulation, le système génère des graphiques d'analyse détaillés :
-- Évolution temporelle des cas de détresse
-- Temps de réponse pour chaque intervention
-- Efficacité des protocoles de coordination
-- Couverture spatiale des interventions
-
-# Sorties et Données Générées
 
 ## Configuration des Tests
 
@@ -293,7 +296,6 @@ Performance Metrics:
 - Mortality Rate: [pourcentage]%
 - Average Response Time: [durée]
 ```
-
 ## Visualisations Générées
 
 ### Graphique de Sauvetages (rescue_stats_people.png)
@@ -305,16 +307,8 @@ L'axe des abscisses représente le temps de simulation en ticks, permettant d'ob
 ### Graphique des Temps de Réponse (rescue_stats_time.png)
 Ce graphique montre une courbe bleue représentant l'évolution du temps moyen de sauvetage au cours de la simulation. Il permet d'évaluer si le système maintient son efficacité même sous charge.
 
-## Analyse Comparative
-
-Cette batterie complète de tests permet d'analyser :
-- L'influence du nombre de drones sur l'efficacité de la surveillance
-- L'impact du nombre de festivaliers sur les performances du système
-- Les améliorations apportées par chaque protocole
-- L'effet des différentes configurations de carte sur l'efficacité des sauvetages
-
-Les résultats permettent de déterminer les configurations optimales selon différents critères :
-- Minimisation du temps de réponse moyen
-- Maximisation du taux de sauvetage
-- Optimisation du rapport coût (nombre de drones) / efficacité
-- Adaptation à différentes tailles d'événements
+Cette analyse complète permet d'optimiser :
+- Le dimensionnement de la flotte de drones
+- Le choix du protocole selon le contexte
+- Le positionnement des points de secours
+- L'allocation des ressources d'intervention
