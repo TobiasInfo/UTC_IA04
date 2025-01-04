@@ -21,7 +21,7 @@ func (tf *TextField) Draw(screen *ebiten.Image) {
 	// Different color when active
 	bgColor := color.RGBA{255, 255, 255, 255}
 	if tf.IsActive {
-		bgColor = color.RGBA{230, 230, 255, 255} // Slightly tinted when active
+		bgColor = color.RGBA{230, 230, 255, 255}
 	}
 	field.Fill(bgColor)
 
@@ -31,7 +31,6 @@ func (tf *TextField) Draw(screen *ebiten.Image) {
 
 	ebitenutil.DebugPrintAt(screen, tf.Text, int(tf.X+5), int(tf.Y+5))
 
-	// Draw a small border around the field to make it stand out
 	border := ebiten.NewImage(int(tf.Width), int(tf.Height))
 	borderColor := color.RGBA{0, 0, 0, 255}
 	for i := 0; i < int(tf.Width); i++ {
@@ -51,18 +50,15 @@ func (tf *TextField) Update(mx, my float64, pressed bool, inputChars []rune, ent
 	} else if pressed {
 		tf.IsActive = false
 	}
-
 	if tf.IsActive {
 		for _, char := range inputChars {
 			if char >= '0' && char <= '9' {
 				tf.Text += string(char)
 			}
 		}
-
 		if ebiten.IsKeyPressed(ebiten.KeyBackspace) && len(tf.Text) > 0 {
 			tf.Text = tf.Text[:len(tf.Text)-1]
 		}
-
 		if enterPressed {
 			value, err := strconv.Atoi(tf.Text)
 			if err == nil && tf.OnEnter != nil {

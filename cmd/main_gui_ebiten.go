@@ -11,16 +11,14 @@ import (
 
 func main() {
 	g := game.NewGame(
-		0, // default drone count
-		1, // default people count
-		1, // default obstacle count
+		0,
+		1,
+		1,
 	)
 
-	// Window dimensions
 	windowWidth := 1000.0
 	windowHeight := 750.0
 
-	// UI element dimensions
 	fieldWidth := windowWidth * 0.25 // 25% of window width
 	fieldHeight := 30.0
 
@@ -82,7 +80,6 @@ func main() {
 		},
 	}
 
-	// Buttons
 	buttonWidth := fieldWidth
 	g.StartButton = ui.Button{
 		X:      leftColumn,
@@ -91,7 +88,6 @@ func main() {
 		Height: fieldHeight * 1.5,
 		Text:   "Start Simulation",
 		OnClick: func() {
-			// Parse current values from the text fields
 			if val, err := strconv.Atoi(g.DroneField.Text); err == nil {
 				g.DroneCount = val
 			}
@@ -124,7 +120,7 @@ func main() {
 	g.StartButtonDebug = ui.Button{
 		X:       rightColumn,
 		Y:       buttonRow,
-		Width:   buttonWidth * 1.25, // Slightly wider for debug button
+		Width:   buttonWidth * 1.25,
 		Height:  fieldHeight * 1.5,
 		Text:    "Start Simulation (Debug Mode)",
 		Couleur: color.RGBA{255, 0, 0, 255},
@@ -144,7 +140,7 @@ func main() {
 				chosenMap = "festival_layout_2"
 			case 2:
 				chosenMap = "festival_layout_3"
-			default: //Error
+			default:
 				chosenMap = "festival_layout_new"
 			}
 			g.Sim.UpdateMap(chosenMap)
@@ -186,9 +182,7 @@ func main() {
 	}
 
 	ebiten.SetWindowSize(int(windowWidth), int(windowHeight))
-	//ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeDisabled)
-	//ebiten.SetWindowResizable(false)
 	ebiten.SetWindowTitle("Simulation Drones")
 	if err := ebiten.RunGame(g); err != nil {
 		panic(err)

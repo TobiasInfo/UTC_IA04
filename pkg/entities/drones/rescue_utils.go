@@ -67,7 +67,6 @@ func (d *Drone) handlePersonRescue() models.Position {
 	return d.Position
 }
 
-// handleActiveObjective gère un objectif actif
 func (d *Drone) handleActiveObjective() models.Position {
 	if d.Position.X == d.Objectif.X && d.Position.Y == d.Objectif.Y {
 		medicalTentPos, _ := d.closestPOI(models.MedicalTent)
@@ -148,10 +147,7 @@ func (d *Drone) UpdateRescuer() {
 	}
 
 	if rescuer.State == 0 {
-		// Moving towards person
-		// 13.0, 7.0 -- 13.5, 7.5
 		if rescuer.Position.CalculateDistance(rescuer.Person.Position) <= 1 {
-			// Save the person
 			fmt.Printf("[RESCUER] Saving person %d\n", rescuer.Person.ID)
 			rescuer.Person.AssignedDroneID = nil
 

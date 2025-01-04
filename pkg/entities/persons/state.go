@@ -36,22 +36,19 @@ func NewStateData() StateData {
 func (s *StateData) UpdateState(person *Person) {
 	s.TimeInState++
 
-	// If person is in distress, override other states
 	if person.InDistress {
 		s.CurrentState = InDistress
-		s.TargetPOI = nil // Clear any POI target
+		s.TargetPOI = nil
 		return
 	}
 
 	switch s.CurrentState {
 	case Exploring:
-		// Check if person needs rest
 		if person.Profile.StaminaLevel <= person.Profile.RestThreshold {
 			s.CurrentState = SeekingPOI
 			s.TargetPOI = poiTypePtr(models.RestArea)
 			s.TimeInState = 0
 		} else {
-			// Chance to seek POI based on interests and pattern
 			for poiType, interest := range person.ZonePreference.POIPreferences {
 				if interest > 0.7 && rand.Float64() < interest {
 					s.CurrentState = SeekingPOI
@@ -63,18 +60,16 @@ func (s *StateData) UpdateState(person *Person) {
 		}
 
 	case SeekingPOI:
-		// If reached POI, transition to InQueue
 		if person.HasReachedPOI() {
 			s.CurrentState = InQueue
 			s.TimeInState = 0
-		} else if s.TimeInState > 50 { // If taking too long to reach POI
+		} else if s.TimeInState > 50 {
 			s.CurrentState = Exploring
 			s.TargetPOI = nil
 			s.TimeInState = 0
 		}
 
 	case Resting:
-		// After sufficient rest, return to exploring
 		if s.TimeInState > 50 && person.Profile.StaminaLevel > 0.8 {
 			s.CurrentState = Exploring
 			s.TimeInState = 0
@@ -83,7 +78,6 @@ func (s *StateData) UpdateState(person *Person) {
 		}
 
 	case InQueue:
-		// After using POI, return to exploring
 		if s.TimeInState > 20 {
 			person.Profile.StaminaLevel = 0.8
 
@@ -93,9 +87,6 @@ func (s *StateData) UpdateState(person *Person) {
 		}
 
 	case InDistress:
-
-		// Stay in distress until rescued
-		// No state change possible until rescue
 		return
 	}
 }

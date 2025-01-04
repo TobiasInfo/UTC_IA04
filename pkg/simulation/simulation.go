@@ -80,8 +80,6 @@ type SimulationRescueStats struct {
 	AvgRescueTime     map[int][]int
 }
 
-// CIMITIERE DES PERSONNES MORTES EN (-10, -10)
-
 func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 	s := &Simulation{
 		Map:                     GetMap(30, 20),
@@ -122,7 +120,6 @@ func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 
 func (s *Simulation) handleSavePersonByRescuer() {
 	for req := range s.SavePeopleByRescuerChan {
-		// Trouver le drone correspondant au RescuerID
 		var rp *rescue.RescuePoint
 		for i := range s.RescuePoints {
 			if s.RescuePoints[i].ID == req.RescuePointID {
@@ -173,9 +170,10 @@ func (s *Simulation) handleSavePersonByRescuer() {
 			continue
 		}
 
-		// ON SAUVE LES PERSONNES ICI
 		s.SimulationRescueStats.PersonsRescued[s.currentTick]++
-		s.SimulationRescueStats.AvgRescueTime[s.currentTick] = append(s.SimulationRescueStats.AvgRescueTime[s.currentTick], personToSave.CurrentDistressDuration)
+		s.SimulationRescueStats.AvgRescueTime[s.currentTick] = append(
+			s.SimulationRescueStats.AvgRescueTime[s.currentTick],
+			personToSave.CurrentDistressDuration)
 
 		personToSave.InDistress = false
 		s.mu.Lock()
@@ -215,9 +213,6 @@ func (s *Simulation) handleSavePerson() {
 								person.State.CurrentState = 2
 								person.Profile.StaminaLevel = 1.0
 								person.State.UpdateState(person)
-								if s.debug {
-									fmt.Printf("Person %d has been healed!\n", person.ID)
-								}
 								break
 							}
 						}
@@ -234,7 +229,6 @@ func (s *Simulation) handleSavePerson() {
 
 func (s *Simulation) handleMedicalDelivery() {
 	for req := range s.MedicalDeliveryChan {
-		// s.mu.Lock()
 		authorized := false
 		for _, drone := range s.Drones {
 			if drone.ID == req.DroneID {
@@ -246,7 +240,6 @@ func (s *Simulation) handleMedicalDelivery() {
 				}
 			}
 		}
-		// s.mu.Unlock()
 		req.ResponseChan <- models.MedicalDeliveryResponse{
 			Authorized: authorized,
 			Reason:     map[bool]string{true: "Medical delivered", false: "Delivery failed"}[authorized],
@@ -321,13 +314,11 @@ func (s *Simulation) handleMovementRequests() {
 		}
 
 		if req.MemberType == "drone" {
-			// Pour les drones, ignorer les obstacles
 			s.mu.Lock()
 			s.Map.MoveEntity(entity, req.NewPosition)
 			s.mu.Unlock()
 			req.ResponseChan <- models.MovementResponse{Authorized: true, Reason: "Drones can move above obstacles"}
 		} else {
-			// Pour les personnes, vérifier les obstacles
 			if !s.Map.IsBlocked(req.NewPosition) {
 				s.mu.Lock()
 				s.Map.MoveEntity(entity, req.NewPosition)
@@ -399,14 +390,12 @@ func (s *Simulation) handleExitRequest() {
 
 func (s *Simulation) Initialize(numDrones, numCrowdMembers, numObstacles int) {
 	fmt.Println("Initializing simulation")
-	// @TODO : Récupérer la distress depuis la config.
 	s.DefaultDistressProbability = DEFAULT_DISTRESS_PROBABILITY
 
 	configPath := "configs/empty_layout.json"
 	config, err := LoadFestivalConfig(configPath)
 	if err != nil {
 		fmt.Printf("Warning: Could not load empty config from %s: %v\n", configPath, err)
-		fmt.Println("Using default obstacle initialization...")
 		s.initializeDefaultObstacles(numObstacles)
 	} else {
 		fmt.Println("Successfully loaded empty configuration!")
@@ -420,13 +409,7 @@ func (s *Simulation) Initialize(numDrones, numCrowdMembers, numObstacles int) {
 			s.buildPOIMap()
 		}
 	}
-
-	// Initialiser les POIs
-	//s.initializePOIs()
-
-	// Initialiser les RescuePoints après les POIs
 	s.InitializeRescuePoints()
-
 	s.createDrones(numDrones)
 	s.createInitialCrowd(numCrowdMembers)
 	s.festivalTime.Start()
@@ -439,7 +422,6 @@ func (s *Simulation) UpdateMap(nomConfig string) {
 	config, err := LoadFestivalConfig(configPath)
 	if err != nil {
 		fmt.Printf("Warning: Could not load festival config from %s: %v\n", configPath, err)
-		fmt.Println("Using default obstacle initialization...")
 		s.initializeDefaultObstacles(0)
 	} else {
 		fmt.Println("Successfully loaded festival configuration!")
@@ -524,8 +506,6 @@ func (s *Simulation) createDrones(n int) {
 		currentCell := d.Position
 		rangeDrone := s.DroneSeeRange
 
-		//fmt.Printf("RangeDrone : %d\n", rangeDrone)
-
 		Vector := models.Vector{X: currentCell.X, Y: currentCell.Y}
 		cercleValuesFloat, _ := Vector.GenerateCircleValues(rangeDrone)
 
@@ -535,17 +515,10 @@ func (s *Simulation) createDrones(n int) {
 		for z := 0; z < len(cercleValuesFloat); z++ {
 			positionInCercle := cercleValuesFloat[z]
 			position := models.Position{X: d.Position.X + positionInCercle.X, Y: d.Position.Y + positionInCercle.Y}
-			distance := currentCell.CalculateDistance(position)
 			if cell, exists := s.Map.Cells[position]; exists {
-				if s.debug {
-					fmt.Printf("Distance : %.2f\n", distance)
-				}
-				//fmt.Println("Position : ", position)
 				for _, member := range cell.Persons {
-					//probaDetection := 1.0
 					probaDetection := max(0, 1.0/float64(s.DroneSeeRange)-(float64(nbPersDetected)*0.03))
 					if rand.Float64() < probaDetection {
-						//fmt.Printf("Drone %d (%.2f, %.2f) sees person %d (%.2f, %.2f) \n", d.ID, d.Position.X, d.Position.Y, member.ID, member.Position.X, member.Position.Y)
 						droneInformations = append(droneInformations, member)
 						nbPersDetected++
 					}
@@ -558,15 +531,12 @@ func (s *Simulation) createDrones(n int) {
 	droneInComRange := func(d *drones.Drone) []*drones.Drone {
 		rangeDrone := s.DroneCommRange
 		droneInformations := make([]*drones.Drone, 0)
-
 		for i := range s.Drones {
 			drone := &s.Drones[i]
 			if drone == d {
 				continue
 			}
-
 			dist := drone.Position.CalculateDistance(d.Position)
-
 			if dist <= float64(rangeDrone) {
 				droneInformations = append(droneInformations, drone)
 			}
@@ -578,7 +548,6 @@ func (s *Simulation) createDrones(n int) {
 	droneGetRescuePoint := func(pos models.Position) *rescue.RescuePoint {
 		var closest *rescue.RescuePoint
 		minDist := math.Inf(1)
-
 		for _, rp := range s.RescuePoints {
 			dist := pos.CalculateDistance(rp.Position)
 			if dist < minDist {
@@ -604,7 +573,7 @@ func (s *Simulation) createDrones(n int) {
 			battery, s.DroneSeeRange, s.DroneCommRange,
 			droneSeeFunction, droneInComRange, droneGetRescuePoint, getDroneNetwork,
 			s.MoveChan, s.poiMap, s.ChargingChan, s.MedicalDeliveryChan,
-			s.SavePersonChan, DEFAULT_PROTOCOL_MODE, // Use the constant here
+			s.SavePersonChan, DEFAULT_PROTOCOL_MODE,
 			s.SavePeopleByRescuerChan, s.Map.Width, s.Map.Height,
 			s.debug)
 		s.Drones = append(s.Drones, d)
@@ -655,13 +624,17 @@ func (s *Simulation) createInitialCrowd(n int) {
 }
 
 func (s *Simulation) Update() {
-	// SI 1000 Ticks fin du festival
 	if s.currentTick == s.festivalTotalTicks {
 		fmt.Println("End of festival")
 
 		for i := range s.Persons {
 			p := &s.Persons[i]
-			path := models.FindPath(p.Position, models.Position{X: (float64(s.Map.Width)/10)*9 + 0.1, Y: p.Position.Y}, s.Map.Width, s.Map.Height, make(map[models.Position]bool))
+			path := models.FindPath(p.Position, models.Position{
+				X: (float64(s.Map.Width)/10)*9 + 0.1,
+				Y: p.Position.Y},
+				s.Map.Width,
+				s.Map.Height,
+				make(map[models.Position]bool))
 			p.CurrentPath = path
 			s.Persons[i].SeekingExit = true
 		}
@@ -690,9 +663,7 @@ func (s *Simulation) Update() {
 	s.currentTick++
 	var wg sync.WaitGroup
 
-	// Update persons every 10 ticks
 	if s.currentTick%1 == 0 {
-		//fmt.Printf("\n=== TICK %d: PEOPLE SHOULD MOVE ===\n", s.currentTick)
 		updatedPersons := make(map[int]struct{})
 		personIndexes := make([]int, len(s.Persons))
 		for i := range personIndexes {
@@ -708,7 +679,7 @@ func (s *Simulation) Update() {
 				wg.Add(1)
 				go func(p *persons.Person) {
 					defer wg.Done()
-					if p.IsAlive() && p.StillInSim {
+					if !p.IsDead() && p.StillInSim {
 						if p.CurrentPOI != nil && p.TargetPOIPosition == nil {
 							if pos := s.getNearestPOI(p.Position, *p.CurrentPOI); pos != nil {
 								p.SetTargetPOI(*p.CurrentPOI, *pos)
@@ -757,7 +728,6 @@ func (s *Simulation) Update() {
 
 	var wgDroneRecive sync.WaitGroup
 
-	// Update drones every tick
 	updatedDrones := make(map[int]struct{})
 	droneIndexes := make([]int, len(s.Drones))
 	for i := range droneIndexes {
@@ -795,16 +765,6 @@ func (s *Simulation) Update() {
 	}
 
 	wgDrone.Wait()
-
-	if s.debug {
-		for index, cell := range s.Map.Cells {
-			for _, member := range cell.Persons {
-				fmt.Printf("%v - Person %d is at position (%.2f, %.2f) -- Current Cell = (%.2f, %.2f) \n",
-					index, member.ID, member.Position.X, member.Position.Y, cell.Position.X, cell.Position.Y)
-			}
-		}
-	}
-
 }
 
 func (s *Simulation) UpdateDroneSize(newSize int) {
@@ -819,7 +779,6 @@ func (s *Simulation) UpdateDroneSize(newSize int) {
 	currentSize := len(s.Drones)
 
 	if newSize > currentSize {
-		// Ajout des nouveaux drones
 		s.createDrones(newSize - currentSize)
 	} else if newSize < currentSize {
 		dronesToRemove := currentSize - newSize
@@ -827,15 +786,8 @@ func (s *Simulation) UpdateDroneSize(newSize int) {
 			if len(s.Drones) == 0 {
 				break
 			}
-
-			// On prend la dernière personne de la liste
 			droneToRemove := s.Drones[len(s.Drones)-1]
-
-			// On la retire de la carte
 			s.Map.RemoveEntity(droneToRemove)
-			//s.Map.DeleteEntity(droneToRemove)
-
-			// On la retire de la liste des personnes
 			s.Drones = s.Drones[:len(s.Drones)-1]
 		}
 	}
@@ -844,7 +796,6 @@ func (s *Simulation) UpdateDroneSize(newSize int) {
 func (s *Simulation) UpdateDroneProtocole(newprot int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
 	for i := range s.Drones {
 		s.Drones[i].UpdateProtocole(newprot)
 	}
@@ -853,7 +804,6 @@ func (s *Simulation) UpdateDroneProtocole(newprot int) {
 func (s *Simulation) UpdateCrowdSize(newSize int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
 	if newSize == len(s.Persons) {
 		fmt.Println("[CrowMember] - No change needed, current size is equal to new size")
 		return
@@ -870,23 +820,14 @@ func (s *Simulation) UpdateCrowdSize(newSize int) {
 			s.Map.AddCrowdMember(&s.Persons[len(s.Persons)-1])
 		}
 	} else if newSize < currentSize {
-		// Retrait des personnes en excès
 		personsToRemove := currentSize - newSize
 
-		// On commence par la fin de la liste pour éviter les problèmes d'index
 		for i := 0; i < personsToRemove; i++ {
 			if len(s.Persons) == 0 {
 				break
 			}
-
-			// On prend la dernière personne de la liste
 			personToRemove := s.Persons[len(s.Persons)-1]
-
-			// On la retire de la carte
 			s.Map.RemoveEntity(personToRemove)
-			//s.Map.DeleteEntity(personToRemove)
-
-			// On la retire de la liste des personnes
 			s.Persons = s.Persons[:len(s.Persons)-1]
 		}
 	}
@@ -904,24 +845,12 @@ func (s *Simulation) CountCrowdMembersInDistress() int {
 	return count
 }
 
-func (s *Simulation) GetFestivalTime() *FestivalTime {
-	return s.festivalTime
-}
-
-func (s *Simulation) SetDebug(debug bool) {
-	s.debug = debug
-}
-
-func (s *Simulation) SetHardDebug(debug bool) {
-	s.hardDebug = debug
-}
-
 func (s *Simulation) GetCurrentTick() int {
 	return s.currentTick
 }
 
 func (s *Simulation) calculatePeopleDensity() models.DensityGrid {
-	const gridSize = 10 // 10x10 grid
+	const gridSize = 10
 	grid := make([][]float64, gridSize)
 	for i := range grid {
 		grid[i] = make([]float64, gridSize)
@@ -1001,7 +930,6 @@ func (s *Simulation) calculateDroneNetwork() models.DroneNetwork {
 	return network
 }
 
-// Replace the existing GetStatistics method with this updated version
 func (s *Simulation) GetStatistics() SimulationStatistics {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -1042,20 +970,6 @@ func (s *Simulation) GetStatistics() SimulationStatistics {
 	}
 }
 
-func (s *Simulation) GetPersonsInRange(center models.Position, radius float64) []*persons.Person {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	var result []*persons.Person
-	for _, cell := range s.Map.Cells {
-		dist := center.CalculateDistance(cell.Position)
-		if dist <= radius {
-			result = append(result, cell.Persons...)
-		}
-	}
-	return result
-}
-
 func (s *Simulation) GetAvailablePOIs() map[models.POIType][]models.Position {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -1068,34 +982,8 @@ func (s *Simulation) GetAvailablePOIs() map[models.POIType][]models.Position {
 	return result
 }
 
-func (s *Simulation) GetPersonPauseInMap(p *persons.Person) models.Position {
-	for _, cell := range s.Map.Cells {
-		for _, member := range cell.Persons {
-			if member.ID == p.ID {
-				return cell.Position
-				//fmt.Printf("Person %d is at position (%.2f, %.2f) -- Current Cell = (%.2f, %.2f) \n", member.ID, member.Position.X, member.Position.Y, cell.Position.X, cell.Position.Y)
-			}
-		}
-	}
-	return models.Position{X: -1, Y: -1}
-}
-
-func (s *Simulation) GetDronePauseInMap(p *drones.Drone) models.Position {
-	for _, cell := range s.Map.Cells {
-		for _, member := range cell.Drones {
-			if member.ID == p.ID {
-				return cell.Position
-				//fmt.Printf("Person %d is at position (%.2f, %.2f) -- Current Cell = (%.2f, %.2f) \n", member.ID, member.Position.X, member.Position.Y, cell.Position.X, cell.Position.Y)
-			}
-		}
-	}
-	return models.Position{X: -1, Y: -1}
-}
-
-// InitializeRescuePoints initialise les points de sauvetage pour chaque tente médicale
 func (s *Simulation) InitializeRescuePoints() {
 	fmt.Printf("[SIMULATION] Initializing RescuePoints\n")
-	// Créer un rescue point pour chaque tente médicale
 	for i, pos := range s.poiMap[models.MedicalTent] {
 		rp := rescue.NewRescuePoint(i, pos, s.SavePeopleByRescuerChan, s.debug)
 		s.RescuePoints[pos] = rp
@@ -1123,12 +1011,10 @@ func (s *Simulation) calculateSingleDroneNetwork(targetDrone *drones.Drone) dron
 
 	visited := make(map[int]bool)
 
-	// DFS function to find all connected drones
 	var dfs func(currentDrone *drones.Drone)
 	dfs = func(currentDrone *drones.Drone) {
 		visited[currentDrone.ID] = true
 
-		// Add all directly connected drones
 		for i, otherDrone := range s.Drones {
 			if otherDrone.ID == currentDrone.ID {
 				continue
@@ -1137,13 +1023,11 @@ func (s *Simulation) calculateSingleDroneNetwork(targetDrone *drones.Drone) dron
 			dist := currentDrone.Position.CalculateDistance(otherDrone.Position)
 			if dist <= float64(s.DroneCommRange) && !visited[otherDrone.ID] {
 				network.Drones = append(network.Drones, &s.Drones[i])
-				dfs(&otherDrone) //Explorer recursivement les drones connectés à ce drone
+				dfs(&otherDrone)
 			}
 		}
 	}
-
 	dfs(targetDrone)
-
 	return network
 }
 
@@ -1163,25 +1047,20 @@ func (s *Simulation) GetRemaningFestivalTime() string {
 }
 
 func (s *Simulation) PlotRescueStats() {
-	// Préparer les données pour le plotting
 	ticks := make([]float64, 0)
 	distressData := make([]float64, 0)
 	rescuedData := make([]float64, 0)
 	AvgRescueTimeData := make([]float64, 0)
 
-	// Parcourir tous les ticks de 0 au tick actuel
 	for i := 0; i <= s.currentTick; i++ {
 		ticks = append(ticks, float64(i))
 
-		// Nombre de personnes en détresse pour ce tick
 		distressCount := float64(s.SimulationRescueStats.PersonsInDistress[i])
 		distressData = append(distressData, distressCount)
 
-		// Nombre de personnes sauvées pour ce tick
 		rescuedCount := float64(s.SimulationRescueStats.PersonsRescued[i])
 		rescuedData = append(rescuedData, rescuedCount)
 
-		// Temps moyen de sauvetage pour ce tick
 		var avgTime float64
 		if rescueTimes := s.SimulationRescueStats.AvgRescueTime[i]; len(rescueTimes) > 0 {
 			sum := 0
@@ -1193,7 +1072,6 @@ func (s *Simulation) PlotRescueStats() {
 		AvgRescueTimeData = append(AvgRescueTimeData, avgTime)
 	}
 
-	// Premier graphique pour les personnes en détresse et sauvées
 	p1 := plot.New()
 	p1.Title.Text = "Festival Rescue Statistics - People"
 	p1.X.Label.Text = "Ticks"
@@ -1237,13 +1115,11 @@ func (s *Simulation) PlotRescueStats() {
 		p2.Legend.Add("Avg Rescue Time", avgTimeLine)
 	}
 
-	// Sauvegarder le deuxième graphique
 	if err := p2.Save(8*vg.Inch, 4*vg.Inch, "rescue_stats_time_"+strconv.Itoa(s.festivalTotalTicks)+".png"); err != nil {
 		fmt.Printf("Error saving time plot: %v\n", err)
 	}
 }
 
-// Fonction utilitaire pour créer les points XY
 func createXYs(x, y []float64) plotter.XYs {
 	pts := make(plotter.XYs, len(x))
 	for i := range pts {

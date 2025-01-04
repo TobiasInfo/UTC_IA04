@@ -37,10 +37,9 @@ type Drone struct {
 	Objectif         models.Position
 	HasMedicalGear   bool
 	ProtocolMode     int      // 1 = protocol 1, 2 = protocol 2, 3 = protocol 3
-	Rescuer          *Rescuer // For protocol 3, the spawned rescuer
+	Rescuer          *Rescuer 
 	MapWidth         int
 	MapHeight        int
-	//
 	DroneState DroneState
 	MyWatch    models.MyWatch
 	// Fonctions factorisé
@@ -51,19 +50,13 @@ type Drone struct {
 	// Différents Chans.
 	MoveChan     chan models.MovementRequest
 	ChargingChan chan models.ChargingRequest
-	// Enlever les chans qui ne sont pas utilisés
 	MedicalDeliveryChan chan models.MedicalDeliveryRequest
 	SavePersonChan      chan models.SavePersonRequest
 	SavePersonByRescuer chan models.RescuePeopleRequest
-
-	// Drone Memory
 	Memory interfaces.DroneMemory
-
-	//Debug
 	debug bool
 }
 
-// NewSurveillanceDrone crée un nouveau drone
 func NewSurveillanceDrone(id int,
 	position models.Position,
 	myWatch models.MyWatch,
@@ -138,7 +131,6 @@ func (d *Drone) Move(target models.Position) bool {
 	if d.Battery <= 0 {
 		return false
 	}
-	//fmt.Printf("[DRONE %d] Moving from (%.0f, %.0f) to (%.0f, %.0f)\n", d.ID, d.Position.X, d.Position.Y, target.X, target.Y)
 
 	responseChan := make(chan models.MovementResponse)
 	d.MoveChan <- models.MovementRequest{MemberID: d.ID, MemberType: "drone", NewPosition: target, ResponseChan: responseChan}
@@ -159,7 +151,6 @@ func (d *Drone) Move(target models.Position) bool {
 }
 
 func (d *Drone) ReceiveInfo() {
-	// Le code est le même pour protocole 1, 2 ou 3, on récupère juste les infos
 	seenPeople := d.DroneSeeFunction(d)
 	droneInComRange := d.DroneInComRangeFunc(d)
 
@@ -193,7 +184,6 @@ func (d *Drone) GetAllReachableDrones() []*Drone {
 }
 
 func (d *Drone) Think() models.Position {
-	// Handle battery management first
 	pos, goCharging := d.BatteryManagement()
 	if goCharging {
 		return pos
@@ -205,7 +195,6 @@ func (d *Drone) Think() models.Position {
 	case 2:
 		return d.ThinkProtocol2()
 	case 3:
-		// Récupérer le network pour le protocole 3
 		d.DroneNetwork = d.GetDroneNetwork(d).Drones
 		if d.debug {
 			fmt.Printf("[DRONE %d] - Drone Network : %v\n", d.ID, d.DroneNetwork)
@@ -225,8 +214,6 @@ func (d *Drone) Think() models.Position {
 }
 
 func (d *Drone) Myturn() {
-	// Cannot communicate with other drones if charging
-	// d.ReceiveInfo()
 
 	if d.tryCharging() {
 		return
@@ -235,8 +222,6 @@ func (d *Drone) Myturn() {
 	target := d.Think()
 
 	if target.X == d.Position.X && target.Y == d.Position.Y {
-		// La réflexion et la pérception coute 0.25 en batterie tous le temps
-		// Le Mouvement coûte 2 fois +.
 		d.Battery -= 0.25
 		return
 	}

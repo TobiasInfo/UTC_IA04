@@ -6,7 +6,6 @@ import (
 	"math/rand"
 )
 
-// BatteryManagement gère la batterie du drone et retourne la position de recharge si nécessaire
 func (d *Drone) BatteryManagement() (models.Position, bool) {
 	closestStation, minDistance := d.closestPOI(models.ChargingStation)
 	if d.Battery <= minDistance+5 || d.DroneState == GoingToCharge || d.DroneState == FinalGoingToDock {

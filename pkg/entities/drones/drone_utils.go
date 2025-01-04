@@ -61,14 +61,12 @@ func (d *Drone) randomMovement() models.Position {
 }
 
 func (d *Drone) isValidPosition(pos models.Position) bool {
-	// Vérifier les limites de la carte
 	if pos.X <= 0 || pos.Y <= 0 ||
 		math.Round(pos.X) > float64(d.MapWidth) ||
 		math.Round(pos.Y) > float64(d.MapHeight) {
 		return false
 	}
 
-	// Vérifier les limites de la watch
 	if pos.X <= d.MyWatch.CornerBottomLeft.X || pos.Y <= d.MyWatch.CornerBottomLeft.Y ||
 		pos.X >= d.MyWatch.CornerTopRight.X || pos.Y >= d.MyWatch.CornerTopRight.Y {
 		return false
@@ -86,10 +84,6 @@ func calculateDirectionScore(d *Drone, pos models.Position) float64 {
 			score += 3.0
 		}
 	}
-
-	//for _, drone := range d.DroneInComRange {
-	//	score -= 1.0 / (pos.CalculateDistance(drone.Position) + 1)
-	//}
 	return score
 }
 

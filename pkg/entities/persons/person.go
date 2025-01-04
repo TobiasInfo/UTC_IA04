@@ -96,7 +96,6 @@ func (c *Person) Myturn() {
 			c.CurrentPath = path
 		}
 		c.goTo()
-		//fmt.Printf("Person %d is seeking exit - Position of Exit is : %v \n", c.ID, exitZone)
 		return
 	}
 
@@ -119,21 +118,15 @@ func (c *Person) Myturn() {
 		return
 	}
 
-	// Create obstacles map for pathfinding
 	obstacles := make(map[models.Position]bool)
-	// This would typically be populated with actual obstacle positions from the simulation
 
 	switch c.State.CurrentState {
 	case Exploring:
-		//fmt.Printf("Person %d is exploring\n", c.ID)
 		c.UpdatePosition(obstacles)
-		//fmt.Printf("Person %d movement result: %v\n", c.ID, moved)
 	case SeekingPOI:
-		//fmt.Printf("Person %d is seeking POI\n", c.ID)
 		if c.CurrentPOI == nil {
 			for poiType := range c.ZonePreference.POIPreferences {
 				if c.ZonePreference.ShouldVisitPOI(poiType) {
-					// The actual POI position will be set by the simulation
 					c.CurrentPOI = &poiType
 					break
 				}
@@ -149,23 +142,15 @@ func (c *Person) Myturn() {
 			c.CurrentPOI = nil
 			c.TargetPOIPosition = nil
 		}
-
-	case InQueue:
-		//fmt.Printf("Person %d is in queue\n", c.ID)
-
 	}
 }
 
 func (c *Person) UpdatePosition(obstacles map[models.Position]bool) bool {
-	//fmt.Printf("Person %d UpdatePosition starting with path length: %d\n", c.ID, len(c.CurrentPath))
-
 	if len(c.CurrentPath) == 0 {
-		//fmt.Printf("Person %d generating new path\n", c.ID)
 		c.generateNewPath(obstacles)
 	}
 
 	if c.HasReachedPOI() {
-		//fmt.Printf("Person %d at POI, handling hover\n", c.ID)
 		c.State.CurrentState = Resting
 		c.State.TimeInState = 0
 		return false
@@ -173,14 +158,10 @@ func (c *Person) UpdatePosition(obstacles map[models.Position]bool) bool {
 
 	if len(c.CurrentPath) > 0 {
 		nextPos := c.CurrentPath[0]
-		//fmt.Printf("Person %d attempting to move to {%.2f, %.2f}\n", c.ID, nextPos.X, nextPos.Y)
-
 		if c.tryMove(nextPos) {
-			//fmt.Printf("Person %d successfully moved\n", c.ID)
 			c.CurrentPath = c.CurrentPath[1:]
 			return true
 		} else {
-			//fmt.Printf("Person %d movement failed, clearing path\n", c.ID)
 			c.CurrentPath = []models.Position{}
 			return false
 		}
@@ -191,17 +172,13 @@ func (c *Person) UpdatePosition(obstacles map[models.Position]bool) bool {
 }
 
 func (c *Person) goTo() bool {
-	//fmt.Printf("Person %d UpdatePosition starting with path length: %d\n", c.ID, len(c.CurrentPath))
 	if len(c.CurrentPath) > 0 {
 		nextPos := c.CurrentPath[0]
-		//fmt.Printf("Person %d attempting to move to {%.2f, %.2f}\n", c.ID, nextPos.X, nextPos.Y)
 
 		if c.tryMove(nextPos) {
-			//fmt.Printf("Person %d successfully moved\n", c.ID)
 			c.CurrentPath = c.CurrentPath[1:]
 			return true
 		} else {
-			//fmt.Printf("Person %d movement failed, clearing path\n", c.ID)
 			c.CurrentPath = []models.Position{}
 			return false
 		}
@@ -218,8 +195,6 @@ func (c *Person) tryMove(target models.Position) bool {
 	}
 
 	for {
-		//fmt.Printf("Trying to move person %d to %v\n", c.ID, target)
-
 		if c.Position.X == target.X && c.Position.Y == target.Y {
 			return false
 		}
@@ -231,7 +206,6 @@ func (c *Person) tryMove(target models.Position) bool {
 		if response.Authorized {
 			c.Position.X = target.X
 			c.Position.Y = target.Y
-			//fmt.Printf("Person %d moved to %v\n", c.ID, c.Position)
 			return true
 		}
 
@@ -255,7 +229,6 @@ func (c *Person) shouldLeavePOI() bool {
 		return true
 	}
 
-	// Additional factors that might make someone leave earlier:
 	// 1. Low stamina
 	if c.Profile.StaminaLevel < 0.3 {
 		return rand.Float64() < 0.8
@@ -300,28 +273,20 @@ func (c *Person) hoverNearPOI(obstacles map[models.Position]bool) bool {
 }
 
 func (c *Person) generateNewPath(obstacles map[models.Position]bool) {
-	//fmt.Printf("Person %d generating path - POI: %v, Target POI Pos: %v\n",c.ID, c.CurrentPOI, c.TargetPOIPosition)
-
 	var targetPos models.Position
 
 	if c.CurrentPOI != nil && c.TargetPOIPosition != nil {
 		targetPos = *c.TargetPOIPosition
-		//fmt.Printf("Person %d targeting POI at {%.2f, %.2f}\n", c.ID, targetPos.X, targetPos.Y)
 	} else {
 		currentZone := c.determineCurrentZone()
 		targetZone := c.ZonePreference.GetNextZone(currentZone, c.EntryTime)
-		//fmt.Printf("Person %d in zone %s, targeting zone %s\n", c.ID, currentZone, targetZone)
-
 		if targetZone == currentZone {
 			targetPos = c.getRandomZonePosition(targetZone)
 		} else {
 			targetPos = c.getZoneEntryPoint(targetZone)
 		}
-		//fmt.Printf("Person %d generated target position {%.2f, %.2f}\n", c.ID, targetPos.X, targetPos.Y)
 	}
-
 	path := models.FindPath(c.Position, targetPos, c.width, c.height, obstacles)
-	//fmt.Printf("Person %d path generated with %d steps\n", c.ID, len(path))
 	c.CurrentPath = path
 }
 
@@ -385,8 +350,6 @@ func (c *Person) UpdateHealth() {
 	if c.InDistress {
 		c.CurrentDistressDuration++
 		if c.CurrentDistressDuration >= c.Lifespan {
-			// fmt.Printf("[Person %d] Dying at duration %d\n",
-			// 	c.ID, c.CurrentDistressDuration)
 			c.Die()
 		}
 	} else {
@@ -404,7 +367,7 @@ func (c *Person) UpdateHealth() {
 }
 
 func (c *Person) Die() {
-	if !c.IsAlive() {
+	if c.IsDead() {
 		return
 	}
 
@@ -419,18 +382,14 @@ func (c *Person) Die() {
 		ResponseChan: responseChan,
 	}
 
-	//fmt.Printf("Person %d requesting removal from map\n", c.ID)
-
 	response := <-responseChan
 	if !response.Authorized {
-		//fmt.Printf("Person %d removal not authorized\n", c.ID)
 		return
 	}
 
 	c.Position.X = -10
 	c.Position.Y = -10
 	c.StillInSim = false
-	//fmt.Printf("Person %d has been removed from simulation\n", c.ID)
 }
 
 func (c *Person) Exit() {
@@ -441,26 +400,20 @@ func (c *Person) Exit() {
 		ResponseChan: responseChan,
 	}
 
-	//fmt.Printf("Person %d requesting removal from map\n", c.ID)
-
 	response := <-responseChan
 	if !response.Authorized {
-		//fmt.Printf("Person %d removal not authorized\n", c.ID)
 		return
 	}
 
 	c.Position.X = -1
 	c.Position.Y = -1
 	c.StillInSim = false
-	//fmt.Printf("Person %d has been removed from simulation\n", c.ID)
 }
 
 func (c *Person) HasReachedPOI() bool {
 	if c.CurrentPOI == nil || c.TargetPOIPosition == nil {
 		return false
 	}
-
-	// Check if we're within interaction range of the POI (2 units)
 	dist := c.Position.CalculateDistance(*c.TargetPOIPosition)
 	return dist <= 2.0
 }
@@ -475,32 +428,12 @@ func (c *Person) IsDead() bool {
 	return c.Dead
 }
 
-func (c *Person) IsAlive() bool {
-	return c.Dead == false
-}
-
 func (c *Person) GetTimeSinceEntry() time.Duration {
 	return time.Since(c.EntryTime)
 }
 
-func (c *Person) GetTimeInCurrentZone() time.Duration {
-	return time.Since(c.LastZoneChange)
-}
-
-func (c *Person) IsReadyToLeave() bool {
-	return c.GetTimeSinceEntry() >= c.ZonePreference.ExitTime
-}
-
 func (c *Person) GetCurrentZone() string {
 	return c.determineCurrentZone()
-}
-
-func (c *Person) GetID() int {
-	return c.ID
-}
-
-func (c *Person) GetPosition() models.Position {
-	return c.Position
 }
 
 func (c *Person) IsInDistress() bool {

@@ -37,7 +37,6 @@ var (
 	RestAreaColor  = color.RGBA{46, 139, 87, 255}   // Sea green
 )
 
-// WorldTransform handles coordinate conversion between simulation and screen space
 type WorldTransform struct {
 	screenWidth, screenHeight float64
 	worldWidth, worldHeight   float64
@@ -230,7 +229,7 @@ func (g *Game) Update() error {
 			if float64(mx) >= densityX && float64(mx) <= densityX+densitySize &&
 				float64(my) >= centerY && float64(my) <= centerY+densitySize {
 				g.isDensityMapExpanded = !g.isDensityMapExpanded
-				g.clickCooldown = 10 // Set cooldown after successful click
+				g.clickCooldown = 10
 			}
 
 			// Check drone network click
@@ -249,7 +248,7 @@ func (g *Game) Update() error {
 			if float64(mx) >= droneX && float64(mx) <= droneX+droneSize &&
 				float64(my) >= centerY && float64(my) <= centerY+droneSize {
 				g.isDroneGraphExpanded = !g.isDroneGraphExpanded
-				g.clickCooldown = 10 // Set cooldown after successful click
+				g.clickCooldown = 10
 			}
 		}
 
@@ -345,7 +344,7 @@ func (g *Game) drawMenu(screen *ebiten.Image) {
 func (g *Game) drawStaticLayer() {
 	g.StaticLayer.Clear()
 
-	staticW, staticH := g.StaticLayer.Size() // normalement 800,600
+	staticW, staticH := g.StaticLayer.Size()
 	grassW := g.GrassImage.Bounds().Dx()
 	grassH := g.GrassImage.Bounds().Dy()
 
@@ -357,10 +356,6 @@ func (g *Game) drawStaticLayer() {
 		}
 	}
 
-	// tileW := g.TiledFloorImage.Bounds().Dx()
-	// tileH := g.TiledFloorImage.Bounds().Dy()
-
-	// Draw zones using world coordinates
 	worldWidth := float64(g.Sim.Map.Width)
 	worldHeight := float64(g.Sim.Map.Height)
 	entranceX1, y1 := g.transform.WorldToScreen(0, 0)
@@ -372,7 +367,6 @@ func (g *Game) drawStaticLayer() {
 		fmt.Printf("Drawing zones - Entrance: (%f,%f)->(%f,%f), Main: ->(%f), Exit: ->(%f)\n",
 			entranceX1, y1, entranceX2, y2, mainX2, exitX2)
 	}
-	//On dessine l'entrée
 	op := &ebiten.DrawImageOptions{}
 	op.GeoM.Translate(entranceX1, y1)
 	g.StaticLayer.DrawImage(g.TiledFloorImage, op)
@@ -388,10 +382,6 @@ func (g *Game) drawStaticLayer() {
 	op.GeoM.Scale(-1, 1) // Crée la symétrie horizontale
 	op.GeoM.Translate(debutsortieX, y1+218.0)
 	g.StaticLayer.DrawImage(g.TiledFloorImage, op)
-
-	// drawRectangle(g.StaticLayer, entranceX1, y1, entranceX2-entranceX1, y2-y1, EntranceZoneColor)
-	// drawRectangle(g.StaticLayer, entranceX2, y1, mainX2-entranceX2, y2-y1, MainZoneColor)
-	// drawRectangle(g.StaticLayer, mainX2, y1, exitX2-mainX2, y2-y1, ExitZoneColor)
 
 	// Draw POIs using world coordinates
 	poiMap := g.Sim.GetAvailablePOIs()
@@ -445,16 +435,6 @@ func (g *Game) drawDynamicLayer() {
 			op.GeoM.Translate(droneScreenX, droneScreenY)
 
 			g.DynamicLayer.DrawImage(g.DroneImage, op)
-
-			// for _, person := range drone.SeenPeople {
-			// 	personScreenX, personScreenY := g.transform.WorldToScreen(person.Position.X, person.Position.Y)
-			// 	if person.IsInDistress() {
-			// 		drawRectangle(g.DynamicLayer, personScreenX-2.5, personScreenY-2.5, 5, 5, color.RGBA{148, 0, 211, 255})
-			// 	} else {
-			// 		drawRectangle(g.DynamicLayer, personScreenX-2.5, personScreenY-2.5, 5, 5, color.RGBA{255, 255, 0, 255})
-			// 	}
-			// 	seenPeople[person.ID] = true
-			// }
 		} else {
 			drawCircle(g.DynamicLayer, droneScreenX, droneScreenY, 10, color.RGBA{0, 0, 255, 255})
 		}
@@ -581,32 +561,6 @@ func (g *Game) drawDynamicLayer() {
 				}
 			}
 
-			// if g.RescuerImage != nil {
-			// 	bounds := g.RescuerImage.Bounds()
-			// 	w, h := float64(bounds.Dx()), float64(bounds.Dy())
-
-			// 	op := &ebiten.DrawImageOptions{}
-			// 	scale := 0.1
-			// 	op.GeoM.Scale(scale, scale)
-			// 	op.GeoM.Translate(-w*scale/2, -h*scale/2)
-			// 	op.GeoM.Translate(screenX, screenY)
-
-			// 	g.DynamicLayer.DrawImage(g.RescuerImage, op)
-
-			// } else {
-			// 	drawCircle(g.DynamicLayer, screenX, screenY, 6, color.RGBA{0, 255, 0, 255})
-
-			// 	crossSize := 4.0
-			// 	drawRectangle(g.DynamicLayer,
-			// 		screenX-crossSize, screenY-1,
-			// 		crossSize*2, 2,
-			// 		color.RGBA{255, 0, 0, 255})
-			// 	drawRectangle(g.DynamicLayer,
-			// 		screenX-1, screenY-crossSize,
-			// 		2, crossSize*2,
-			// 		color.RGBA{255, 0, 0, 255})
-			// }
-
 			if rescuer.State == rescue.MovingToPerson && rescuer.Person != nil {
 				targetScreenX, targetScreenY := g.transform.WorldToScreen(
 					rescuer.Person.Position.X,
@@ -640,16 +594,6 @@ func (g *Game) drawDynamicLayer() {
 		}
 
 		screenX, screenY := g.transform.WorldToScreen(person.Position.X, person.Position.Y)
-
-		// personColor := color.RGBA{255, 0, 0, 255} // Default red
-		// if person.HasReachedPOI() {
-		// 	personColor = color.RGBA{0, 255, 0, 255} // Green for at POI
-		// }
-		// if person.IsInDistress() {
-		// 	personColor = color.RGBA{0, 0, 0, 255} // Black for distress
-		// }
-
-		// drawCircle(g.DynamicLayer, screenX, screenY, 3, personColor)
 
 		if !person.IsInDistress() {
 			if g.AttendeeImage != nil {
@@ -712,23 +656,18 @@ func (g *Game) drawDebugGrid() {
 	}
 }
 func (g *Game) drawSimulation(screen *ebiten.Image) {
-	// Draw the base layers
 	g.drawStaticLayer()
 	g.drawDynamicLayer()
 
-	// Draw both layers to screen
 	op := &ebiten.DrawImageOptions{}
 	screen.DrawImage(g.StaticLayer, op)
 	screen.DrawImage(g.DynamicLayer, op)
 
-	// Draw metrics window
 	g.drawMetricsWindow(screen)
 
-	// Draw buttons
 	g.PauseButton.Draw(screen)
 	g.SimButton.Draw(screen)
 
-	// Handle hover information
 	mx, my := ebiten.CursorPosition()
 	worldX, worldY := g.transform.ScreenToWorld(float64(mx), float64(my))
 
@@ -781,7 +720,6 @@ func (g *Game) drawSimulation(screen *ebiten.Image) {
 		}
 	}
 
-	// Handle hover information for persons
 	if hoveredPerson := g.getHoveredPerson(worldX, worldY); hoveredPerson != nil {
 		personInfo := fmt.Sprintf(
 			"Person Info:\n"+
@@ -800,7 +738,6 @@ func (g *Game) drawSimulation(screen *ebiten.Image) {
 		ebitenutil.DebugPrintAt(screen, personInfo, mx+10, my+10)
 	}
 
-	// Handle hover information for drones
 	if hoveredDrone := g.getHoveredDrone(worldX, worldY); hoveredDrone != nil {
 		droneInfo := fmt.Sprintf(
 			"Drone Info:\n"+
@@ -826,17 +763,16 @@ func (g *Game) drawSimulation(screen *ebiten.Image) {
 }
 
 func (g *Game) drawDensityMap(screen *ebiten.Image, density models.DensityGrid, x, y, size float64) {
-	baseSize := 120.0     // Smaller default size
-	expandedSize := 300.0 // Size when expanded
+	baseSize := 120.0 
+	expandedSize := 300.0
 
 	currentSize := baseSize
 	if g.isDensityMapExpanded {
 		currentSize = expandedSize
 	}
 
-	// Draw semi-transparent background
 	bgRect := ebiten.NewImage(int(currentSize), int(currentSize))
-	bgRect.Fill(color.RGBA{40, 40, 40, 180}) // More transparent background
+	bgRect.Fill(color.RGBA{40, 40, 40, 180})
 	op := &ebiten.DrawImageOptions{}
 	op.GeoM.Translate(x, y)
 	screen.DrawImage(bgRect, op)
@@ -848,7 +784,7 @@ func (g *Game) drawDensityMap(screen *ebiten.Image, density models.DensityGrid, 
 		for j, value := range row {
 			if value > 0 {
 				cellImg := ebiten.NewImage(int(cellSize-1), int(cellSize-1))
-				cellImg.Fill(color.RGBA{0, uint8(value * 200), 0, 200}) // More transparent
+				cellImg.Fill(color.RGBA{0, uint8(value * 200), 0, 200})
 
 				op := &ebiten.DrawImageOptions{}
 				op.GeoM.Translate(x+float64(j)*cellSize, y+float64(i)*cellSize)
@@ -857,7 +793,6 @@ func (g *Game) drawDensityMap(screen *ebiten.Image, density models.DensityGrid, 
 		}
 	}
 
-	// Draw grid lines with reduced opacity
 	for i := 0; i <= density.CellSize; i++ {
 		lineX := x + float64(i)*cellSize
 		lineY := y + float64(i)*cellSize
@@ -881,7 +816,6 @@ func (g *Game) drawDroneNetwork(screen *ebiten.Image, network models.DroneNetwor
 	op.GeoM.Translate(x, y)
 	screen.DrawImage(bgRect, op)
 
-	// Draw grid
 	gridSize := 10
 	cellSize := currentSize / float64(gridSize)
 	for i := 0; i <= gridSize; i++ {
@@ -897,7 +831,6 @@ func (g *Game) drawDroneNetwork(screen *ebiten.Image, network models.DroneNetwor
 		droneY := y + (pos.Y/float64(g.Sim.Map.Height))*currentSize
 		rangeRadius := (float64(g.Sim.DroneSeeRange) / float64(g.Sim.Map.Width)) * currentSize
 
-		// Draw range circle outline
 		for angle := 0.0; angle < 2*math.Pi; angle += 0.1 {
 			vector.StrokeLine(screen,
 				float32(droneX+math.Cos(angle)*rangeRadius),
@@ -908,7 +841,6 @@ func (g *Game) drawDroneNetwork(screen *ebiten.Image, network models.DroneNetwor
 		}
 	}
 
-	// Draw connections
 	for i := 0; i < len(network.DroneConnections); i += 2 {
 		start := network.DroneConnections[i]
 		end := network.DroneConnections[i+1]
@@ -921,7 +853,6 @@ func (g *Game) drawDroneNetwork(screen *ebiten.Image, network models.DroneNetwor
 		vector.StrokeLine(screen, float32(startX), float32(startY), float32(endX), float32(endY), 2, color.RGBA{0, 255, 255, 180}, false)
 	}
 
-	// Draw rescue connections
 	for i := 0; i < len(network.RescueConnections); i += 2 {
 		start := network.RescueConnections[i]
 		end := network.RescueConnections[i+1]
@@ -934,7 +865,6 @@ func (g *Game) drawDroneNetwork(screen *ebiten.Image, network models.DroneNetwor
 		vector.StrokeLine(screen, float32(startX), float32(startY), float32(endX), float32(endY), 2, color.RGBA{255, 0, 0, 180}, false)
 	}
 
-	// Draw drone positions last (on top)
 	for _, pos := range network.DronePositions {
 		droneX := x + (pos.X/float64(g.Sim.Map.Width))*currentSize
 		droneY := y + (pos.Y/float64(g.Sim.Map.Height))*currentSize
@@ -946,21 +876,18 @@ func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
 	screenWidth := float64(screen.Bounds().Dx())
 	screenHeight := float64(screen.Bounds().Dy())
 
-	// Fixed dimensions for graphs with adjusted positioning
 	const (
-		normalSize     = 200.0 // Fixed normal size
-		expandedSize   = 300.0 // Fixed expanded size
-		bottomPadding  = 120.0 // Increased padding from bottom
-		edgePadding    = 20.0  // Consistent padding from edges
-		cooldownFrames = 5     // Frames to wait between clicks
+		normalSize     = 200.0 
+		expandedSize   = 300.0
+		bottomPadding  = 120.0 
+		edgePadding    = 20.0  
+		cooldownFrames = 5 
 	)
 
-	// Calculate graph base Y position from bottom of screen
 	graphBaseY := screenHeight - bottomPadding
 
-	// Draw metrics text panel at top
 	metricsWidth := screenWidth * 0.95
-	metricsHeight := 80.0 // Increased height to accommodate festival time info
+	metricsHeight := 80.0
 	metrics := ebiten.NewImage(int(metricsWidth), int(metricsHeight))
 	metrics.Fill(color.RGBA{30, 30, 30, 200})
 
@@ -985,7 +912,6 @@ func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
 	opts.GeoM.Translate(screenWidth-metricsWidth-20, screenHeight*0.89)
 	screen.DrawImage(metrics, opts)
 
-	// Calculate current sizes based on expansion state
 	currentDensitySize := normalSize
 	if g.isDensityMapExpanded {
 		currentDensitySize = expandedSize
@@ -996,23 +922,18 @@ func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
 		currentDroneSize = expandedSize
 	}
 
-	// Calculate X positions with consistent edge padding
 	leftX := edgePadding
 	rightX := screenWidth - currentDroneSize - edgePadding
 
-	// Calculate Y positions for graphs
 	leftY := graphBaseY - currentDensitySize
 	rightY := graphBaseY - currentDroneSize
 
-	// Draw graphs
 	g.drawDensityMap(screen, stats.PeopleDensity, leftX, leftY, currentDensitySize)
 	g.drawDroneNetwork(screen, stats.DroneNetwork, rightX, rightY, currentDroneSize)
 
-	// Draw titles only once, positioned above graphs
 	densityTitle := "People Density (Click to expand)"
 	droneTitle := "Drone Network (Click to expand)"
 
-	// Position titles with consistent spacing
 	densityTitleY := leftY - 20
 	droneTitleY := rightY - 20
 
@@ -1049,20 +970,6 @@ func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
 			g.clickCooldown = cooldownFrames
 		}
 	}
-	//TODO : A revoir que faire apres ended graph ou just affichage fin for now commented
-	// Draw "Festival Ended" overlay if the event has ended
-	// if g.Sim.FestivalState == simulation.Ended {
-	// 	overlay := ebiten.NewImage(int(screenWidth), int(screenHeight))
-	// 	overlay.Fill(color.RGBA{0, 0, 0, 180})
-	// 	screen.DrawImage(overlay, &ebiten.DrawImageOptions{})
-
-	// 	endText := "Festival Has Ended"
-	// 	textWidth := len(endText) * 6 // Approximate width of text
-	// 	textX := int(screenWidth/2) - textWidth/2
-	// 	textY := int(screenHeight / 2)
-	// 	ebitenutil.DebugPrintAt(screen, endText, textX, textY)
-	// }
-
 	g.drawMetricsWindowButtons(screen)
 }
 

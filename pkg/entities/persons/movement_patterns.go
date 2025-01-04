@@ -35,7 +35,6 @@ func GetZonePreference(pattern MovementPattern) ZonePreference {
 		LastPOIVisit:   make(map[models.POIType]time.Time),
 	}
 
-	// Base exit times
 	baseExitTime := 3 * time.Hour
 
 	switch pattern {
@@ -88,7 +87,6 @@ func GetZonePreference(pattern MovementPattern) ZonePreference {
 		pref.POIPreferences[models.MainStage] = 0.3
 	}
 
-	// Set defaults for any unset POIs
 	for _, poiType := range []models.POIType{
 		models.Toilet,
 		models.RestArea,
@@ -109,21 +107,18 @@ func (z *ZonePreference) ShouldMoveToZone(currentZone string, entryTime time.Tim
 
 	switch currentZone {
 	case "entrance":
-		// Always encourage moving from entrance after some time
 		if timeSinceEntry > 15*time.Minute {
 			return true
 		}
 		return rand.Float64() > z.EntranceZoneWeight
 
 	case "main":
-		// Consider moving to exit if approaching exit time
 		if timeSinceEntry > z.ExitTime-30*time.Minute {
 			return true
 		}
 		return rand.Float64() > z.MainZoneWeight
 
 	case "exit":
-		// Strong tendency to stay in exit zone once there
 		return rand.Float64() > 0.9
 
 	default:
@@ -135,7 +130,7 @@ func (z *ZonePreference) GetPOIPreference(poiType models.POIType) float64 {
 	if pref, exists := z.POIPreferences[poiType]; exists {
 		return pref
 	}
-	return 0.5 // default preference
+	return 0.5
 }
 
 func (z *ZonePreference) ShouldVisitPOI(poiType models.POIType) bool {
@@ -147,16 +142,11 @@ func (z *ZonePreference) ShouldVisitPOI(poiType models.POIType) bool {
 		return rand.Float64() < baseProbability
 	}
 
-	// Increase probability based on time since last visit
 	timeSinceVisit := time.Since(lastVisit)
 	timeMultiplier := math.Min(timeSinceVisit.Hours()/2.0, 1.0)
 	adjustedProbability := baseProbability * (1 + timeMultiplier)
 
 	return rand.Float64() < adjustedProbability
-}
-
-func (z *ZonePreference) UpdatePOIVisit(poiType models.POIType) {
-	z.LastPOIVisit[poiType] = time.Now()
 }
 
 func (z *ZonePreference) GetNextZone(currentZone string, entryTime time.Time) string {

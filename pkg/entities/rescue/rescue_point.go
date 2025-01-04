@@ -17,7 +17,7 @@ type RescuePoint struct {
 	IsPersonBeingRescued chan RescueRequest
 	ResponseChan         chan RescueResponse
 	SavePersonByRescuer  chan models.RescuePeopleRequest
-	ActiveMissions       sync.Map // map[int]bool // PersonID -> isBeingRescued
+	ActiveMissions       sync.Map
 	AllRescuePoints      []*RescuePoint
 	debug                bool
 }
@@ -55,8 +55,6 @@ func (rp *RescuePoint) Start() {
 	rp.startWithRecover(rp.handleRequests, "handleRequests")
 	rp.startWithRecover(rp.isPersonBeingRescuedByThisRp, "isPersonBeingRescuedByThisRp")
 	rp.startWithRecover(rp.handleRPRequests, "handleRPRequests")
-
-	//rp.startWithRecover(rp.updateRescuers, "updateRescuers")
 }
 
 func (rp *RescuePoint) startWithRecover(f func(), name string) {
@@ -66,7 +64,7 @@ func (rp *RescuePoint) startWithRecover(f func(), name string) {
 				defer func() {
 					if r := recover(); r != nil {
 						fmt.Printf("[ERROR] %s panicked: %v - Restarting...\n", name, r)
-						time.Sleep(time.Second) // Petit délai avant redémarrage
+						time.Sleep(time.Second)
 					}
 				}()
 				f()
@@ -92,7 +90,6 @@ func (rp *RescuePoint) isPersonBeingRescuedByThisRp() {
 
 func (rp *RescuePoint) handleRequests() {
 	for req := range rp.RequestChan {
-		// Vérifier si la personne est déjà en cours de sauvetage
 		if _, exists := rp.ActiveMissions.Load(req.PersonID); exists {
 			req.ResponseChan <- RescueResponse{
 				Accepted: false,
@@ -128,7 +125,6 @@ func (rp *RescuePoint) handleRequests() {
 			continue
 		}
 
-		// Trouver le point de sauvetage le plus proche
 		closestRP := rp.findClosestRescuePoint(req.Position)
 		if closestRP.ID != rp.ID {
 			closestRP.RPRequestChan <- req
@@ -172,17 +168,12 @@ func (rp *RescuePoint) handleRPRequests() {
 			continue
 		}
 
-		// Assigner la mission
 		rp.assignMission(rescuer, req)
 		rp.ActiveMissions.Store(req.PersonID, true)
 
 		req.ResponseChan <- RescueResponse{
 			Accepted:      true,
 			RescuePointID: rp.ID,
-		}
-
-		if rp.debug {
-			fmt.Printf("[RP] Mission assigned to RescuePoint %d to Rescue Person : %d by Drone %d\n", rp.ID, req.PersonID, req.DroneSenderID)
 		}
 	}
 }

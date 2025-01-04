@@ -9,7 +9,6 @@ import (
 	"sync"
 )
 
-// MapCell represents a single cell on the map
 type MapCell struct {
 	Position  models.Position
 	Obstacles []*obstacles.Obstacle
@@ -18,12 +17,9 @@ type MapCell struct {
 	//mu        sync.RWMutex
 }
 
-// Map represents the entire simulation environment
 type Map struct {
-	Width  int
-	Height int
-	//Persons   []*persons.Person
-	//Drones    []*drones.Drone
+	Width     int
+	Height    int
 	Obstacles []*obstacles.Obstacle
 	Cells     map[models.Position]*MapCell
 	debug     bool
@@ -36,7 +32,6 @@ var (
 	once     sync.Once // Ensures Map is initialized only once
 )
 
-// NewMap creates a new map with the given dimensions, but we will only use it once due to the singleton pattern.
 func newMap(width, height int) *Map {
 	cells := make(map[models.Position]*MapCell)
 
@@ -50,21 +45,18 @@ func newMap(width, height int) *Map {
 						Obstacles: []*obstacles.Obstacle{},
 						Persons:   []*persons.Person{},
 						Drones:    []*drones.Drone{},
-						//mu:        sync.RWMutex{},
 					}
 				}
 			}
 		}
 	}
 
-	// CIMITIERE DES PERSONNES MORTES EN (-10, -10)
 	cimitierePos := models.Position{X: -10, Y: -10}
 	cells[cimitierePos] = &MapCell{
 		Position:  cimitierePos,
 		Obstacles: []*obstacles.Obstacle{},
 		Persons:   []*persons.Person{},
 		Drones:    []*drones.Drone{},
-		//mu:        sync.RWMutex{},
 	}
 
 	return &Map{
@@ -73,81 +65,40 @@ func newMap(width, height int) *Map {
 		Cells:     cells,
 		debug:     false,
 		hardDebug: false,
-		//Persons: []*persons.Person{},
-		//Drones:  []*drones.Drone{},
-		mu: sync.RWMutex{},
+		mu:        sync.RWMutex{},
 	}
 }
 
-// GetMap returns the singleton instance of the Map
 func GetMap(width, height int) *Map {
 	once.Do(func() {
-		// Initialize the singleton instance only once
 		instance = newMap(width, height)
 	})
 	return instance
 }
 
-// GetCells returns a pointer to the map cells
-func (m *Map) GetCells() map[models.Position]*MapCell {
-	return m.Cells
-}
-
-// GetDrones returns the drones at a specific position on the map
-func (m *Map) GetDrones(position models.Position) []*drones.Drone {
-	m.mu.RLock()
-	cell, exists := m.Cells[position]
-	m.mu.RUnlock()
-
-	if !exists {
-		return nil
-	}
-
-	//cell.mu.RLock()
-	//defer cell.mu.RUnlock()
-	return cell.Drones
-}
-
-// AddObstacle adds an obstacles to a specific position on the map
 func (m *Map) AddObstacle(obstacle *obstacles.Obstacle) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	cell := m.Cells[obstacle.Position]
-	//cell.mu.Lock()
 	cell.Obstacles = append(cell.Obstacles, obstacle)
-	//cell.mu.Unlock()
-
 	m.Obstacles = append(m.Obstacles, obstacle)
 }
 
-// AddCrowdMember adds a crowd member to a specific position on the map
 func (m *Map) AddCrowdMember(member *persons.Person) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
 	cell := m.Cells[member.Position]
-	//cell.mu.Lock()
 	cell.Persons = append(cell.Persons, member)
-	//cell.mu.Unlock()
-
-	//m.Persons = append(m.Persons, member)
 }
 
-// AddDrone adds a drones to a specific position on the map
 func (m *Map) AddDrone(drone *drones.Drone) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
 	cell := m.Cells[drone.Position]
-	//cell.mu.Lock()
 	cell.Drones = append(cell.Drones, drone)
-	//cell.mu.Unlock()
-
-	//m.Drones = append(m.Drones, drone)
 }
 
-// MoveEntity updates the position of an entity (e.g., drones, crowd member)
 func (m *Map) MoveEntity(entity interface{}, newPosition models.Position) {
 	var currentCell, newCell *MapCell
 
@@ -156,20 +107,9 @@ func (m *Map) MoveEntity(entity interface{}, newPosition models.Position) {
 	case *drones.Drone:
 		currentCell = m.Cells[e.Position]
 		newCell = m.Cells[newPosition]
-
-		// Lock cells in order to prevent deadlock
-		// if currentCell.Position.X < newCell.Position.X ||
-		// 	(currentCell.Position.X == newCell.Position.X && currentCell.Position.Y < newCell.Position.Y) {
-		// 	//currentCell.mu.Lock()
-		// 	//newCell.mu.Lock()
-		// }
-
 		removeDroneFromCell(currentCell, e)
 		newCell.Drones = append(newCell.Drones, e)
 		e.Position = newPosition
-
-		//currentCell.mu.Unlock()
-		//newCell.mu.Unlock()
 
 	case *persons.Person:
 		currentCell = m.Cells[e.Position]
@@ -179,19 +119,13 @@ func (m *Map) MoveEntity(entity interface{}, newPosition models.Position) {
 			fmt.Printf("Moving person %d from %v to %v\n", e.ID, e.Position, newPosition)
 		}
 
-		// Lock cells in order to prevent deadlock
 		if currentCell.Position.X < newCell.Position.X ||
 			(currentCell.Position.X == newCell.Position.X && currentCell.Position.Y < newCell.Position.Y) {
-			//currentCell.mu.Lock()
-			//newCell.mu.Lock()
 		}
 
 		removeCrowdMemberFromCell(currentCell, e)
 		newCell.Persons = append(newCell.Persons, e)
 		e.Position = newPosition
-
-		//currentCell.mu.Unlock()
-		//newCell.mu.Unlock()
 
 	default:
 		fmt.Println("Unknown entity type; cannot move entity")
@@ -207,58 +141,25 @@ func (m *Map) RemoveEntity(entity interface{}) {
 	switch e := entity.(type) {
 	case *drones.Drone:
 		currentCell = m.Cells[e.Position]
-		//currentCell.mu.Lock()
 		removeDroneFromCell(currentCell, e)
-		//currentCell.mu.Unlock()
 
 	case *persons.Person:
 		currentCell = m.Cells[e.Position]
-		//currentCell.mu.Lock()
 		removeCrowdMemberFromCell(currentCell, e)
-		//currentCell.mu.Unlock()
 
 	default:
 		fmt.Println("Unknown entity type")
 	}
 }
 
-//func (m *Map) DeleteEntity(entity interface{}) {
-//	m.mu.Lock()
-//	defer m.mu.Unlock()
-//
-//	switch e := entity.(type) {
-//	case *drones.Drone:
-//		for i, d := range m.Drones {
-//			if d.ID == e.ID {
-//				m.Drones = append(m.Drones[:i], m.Drones[i+1:]...)
-//				break
-//			}
-//		}
-//	case *persons.Person:
-//		for i, d := range m.Persons {
-//			if d.ID == e.ID {
-//				m.Persons = append(m.Persons[:i], m.Persons[i+1:]...)
-//				break
-//			}
-//		}
-//
-//	default:
-//		fmt.Println("Unknown entity type")
-//	}
-//}
-
-// IsBlocked checks if a position is blocked by obstacles
 func (m *Map) IsBlocked(position models.Position) bool {
 	m.mu.RLock()
 	cell, exists := m.Cells[position]
 	m.mu.RUnlock()
 
 	if !exists {
-		return true // Outside the map boundaries
+		return true
 	}
-
-	//cell.mu.RLock()
-	//defer cell.mu.RUnlock()
 	return len(cell.Obstacles) > 0
 }
 
@@ -280,7 +181,6 @@ func (m *Map) CountDrones() int {
 	return count
 }
 
-// removeDroneFromCell removes a drones from a map cell
 func removeDroneFromCell(cell *MapCell, drone *drones.Drone) {
 	moved := false
 	for i, d := range cell.Drones {
@@ -295,17 +195,12 @@ func removeDroneFromCell(cell *MapCell, drone *drones.Drone) {
 	}
 }
 
-// removeCrowdMemberFromCell removes a crowd member from a map cell
 func removeCrowdMemberFromCell(cell *MapCell, member *persons.Person) {
 	moved := false
-	//fmt.Printf("Removing crowd member %d from cell (%.2f, %.2f) \n", member.ID, cell.Position.X, cell.Position.Y)
 	for i, m := range cell.Persons {
 		if m.ID == member.ID {
 			cell.Persons = append(cell.Persons[:i], cell.Persons[i+1:]...)
 			moved = true
-			//for _, c := range cell.Persons {
-			//	fmt.Printf("Remaining member %d in cell\n", c.ID)
-			//}
 			break
 		}
 	}

@@ -73,14 +73,12 @@ func getNeighbors(pos Position, width, height int, obstacles map[Position]bool) 
 		// Check bounds and obstacles
 		if newPos.X >= 0 && newPos.X < float64(width) &&
 			newPos.Y >= 0 && newPos.Y < float64(height) {
-			// Convert to integer position for obstacle checking
 			intPos := Position{
 				X: math.Floor(newPos.X),
 				Y: math.Floor(newPos.Y),
 			}
 			if !obstacles[intPos] {
 				neighbors = append(neighbors, newPos)
-				//fmt.Printf("Valid neighbor found: {%.2f, %.2f}\n", newPos.X, newPos.Y)
 			}
 		}
 	}
@@ -91,8 +89,6 @@ func getNeighbors(pos Position, width, height int, obstacles map[Position]bool) 
 func ConvertPathToFloat(intPath []Position) []Position {
 	floatPath := make([]Position, len(intPath))
 	for i, pos := range intPath {
-		// Add small random offset to avoid collisions
-		// but stay within safe bounds of the cell
 		offsetX := 0.2 + rand.Float64()*0.6
 		offsetY := 0.2 + rand.Float64()*0.6
 
@@ -116,9 +112,6 @@ func FindPath(start, goal Position, width, height int, obstacles map[Position]bo
 		X: math.Floor(goal.X),
 		Y: math.Floor(goal.Y),
 	}
-
-	//fmt.Printf("\nFindPath starting: from {%.2f, %.2f} to {%.2f, %.2f}\n", startInt.X, startInt.Y, goalInt.X, goalInt.Y)
-
 	openSet := &PriorityQueue{}
 	heap.Init(openSet)
 
@@ -150,13 +143,11 @@ func FindPath(start, goal Position, width, height int, obstacles map[Position]bo
 		delete(openNodes, current.Position)
 
 		if current.Position == goalInt {
-			// Found the path - convert to float coordinates
 			intPath := make([]Position, 0)
 			for node := current; node != nil; node = node.parent {
 				intPath = append([]Position{node.Position}, intPath...)
 			}
 			floatPath := ConvertPathToFloat(intPath)
-			//fmt.Printf("Path found! Length: %d\n", len(floatPath))
 			return floatPath
 		}
 
@@ -164,7 +155,6 @@ func FindPath(start, goal Position, width, height int, obstacles map[Position]bo
 		neighbors := getNeighbors(current.Position, width, height, obstacles)
 
 		for _, neighbor := range neighbors {
-			// Convert neighbor to integer position for comparisons
 			neighborInt := Position{
 				X: math.Floor(neighbor.X),
 				Y: math.Floor(neighbor.Y),

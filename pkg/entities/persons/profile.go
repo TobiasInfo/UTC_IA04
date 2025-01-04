@@ -38,7 +38,6 @@ func NewPersonProfile(profileType ProfileType) PersonProfile {
 		profile.PersonalSpace = 1.0
 		profile.RestThreshold = 0.3
 		profile.MalaiseResistance = 0.8
-		// Higher interest in active areas
 		profile.POIInterestRates[models.MainStage] = 0.9
 		profile.POIInterestRates[models.SecondaryStage] = 0.8
 		profile.POIInterestRates[models.FoodStand] = 0.6
@@ -50,7 +49,6 @@ func NewPersonProfile(profileType ProfileType) PersonProfile {
 		profile.PersonalSpace = 2.0
 		profile.RestThreshold = 0.6
 		profile.MalaiseResistance = 0.6
-		// Higher interest in rest areas
 		profile.POIInterestRates[models.RestArea] = 0.9
 		profile.POIInterestRates[models.Toilet] = 0.8
 		profile.POIInterestRates[models.DrinkStand] = 0.7
@@ -62,7 +60,6 @@ func NewPersonProfile(profileType ProfileType) PersonProfile {
 		profile.PersonalSpace = 0.8
 		profile.RestThreshold = 0.4
 		profile.MalaiseResistance = 0.7
-		// Higher interest in social areas
 		profile.POIInterestRates[models.FoodStand] = 0.9
 		profile.POIInterestRates[models.DrinkStand] = 0.9
 		profile.POIInterestRates[models.MainStage] = 0.7
@@ -74,7 +71,6 @@ func NewPersonProfile(profileType ProfileType) PersonProfile {
 		profile.PersonalSpace = 1.5
 		profile.RestThreshold = 0.5
 		profile.MalaiseResistance = 0.9
-		// Balanced interest in all areas
 		profile.POIInterestRates[models.RestArea] = 0.6
 		profile.POIInterestRates[models.FoodStand] = 0.6
 		profile.POIInterestRates[models.MainStage] = 0.6

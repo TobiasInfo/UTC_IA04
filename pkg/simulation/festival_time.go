@@ -1,6 +1,3 @@
-// festival_time.go
-// Create this file in the pkg/simulation directory
-
 package simulation
 
 import (
@@ -60,66 +57,7 @@ func (ft *FestivalTime) updateTime() {
 			return
 		}
 
-		// Update simulation time based on time scale
 		ft.currentTime = ft.currentTime.Add(time.Duration(ft.timeScale * float64(time.Second)))
 		ft.mu.Unlock()
 	}
-}
-
-func (ft *FestivalTime) GetCurrentTime() time.Time {
-	ft.mu.RLock()
-	defer ft.mu.RUnlock()
-	return ft.currentTime
-}
-
-func (ft *FestivalTime) IsGateOpen() bool {
-	ft.mu.RLock()
-	defer ft.mu.RUnlock()
-	return ft.currentTime.After(ft.gateOpenTime) && ft.currentTime.Before(ft.gateCloseTime)
-}
-
-func (ft *FestivalTime) IsEventEnded() bool {
-	ft.mu.RLock()
-	defer ft.mu.RUnlock()
-	return ft.currentTime.After(ft.eventEndTime)
-}
-
-func (ft *FestivalTime) GetTimeScale() float64 {
-	ft.mu.RLock()
-	defer ft.mu.RUnlock()
-	return ft.timeScale
-}
-
-func (ft *FestivalTime) SetTimeScale(scale float64) {
-	ft.mu.Lock()
-	defer ft.mu.Unlock()
-	if scale > 0 {
-		ft.timeScale = scale
-	}
-}
-
-func (ft *FestivalTime) GetElapsedTime() time.Duration {
-	ft.mu.RLock()
-	defer ft.mu.RUnlock()
-	return ft.currentTime.Sub(ft.startTime)
-}
-
-func (ft *FestivalTime) GetRemainingTime() time.Duration {
-	ft.mu.RLock()
-	defer ft.mu.RUnlock()
-	return ft.eventEndTime.Sub(ft.currentTime)
-}
-
-func (ft *FestivalTime) GetPhase() string {
-	ft.mu.RLock()
-	defer ft.mu.RUnlock()
-
-	if ft.currentTime.Before(ft.gateOpenTime) {
-		return "setup"
-	} else if ft.currentTime.Before(ft.gateCloseTime) {
-		return "active"
-	} else if ft.currentTime.Before(ft.eventEndTime) {
-		return "closing"
-	}
-	return "ended"
 }

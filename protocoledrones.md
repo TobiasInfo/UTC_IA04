@@ -1,54 +1,73 @@
-# Protocoles de Surveillance par Drones pour Festival
+# Explication des protocoles de drones
 
-## Caractéristiques Communes des Drones
-- Communication P2P basique :
-  * Partage des positions des drones
-  * Partage des incidents détectés
-  * Partage du niveau de batterie
-  * Partage du statut actuel (en patrouille/en charge/en livraison)
+## Fonctionnement du protocole 1 :
 
-- Contraintes de ressources :
-  * Batterie limitée
-  * Nécessité de collecter le matériel médical au poste médical
-  * Nécessité de recharger aux stations de charge
+Step 1 :  
+- Je scanne les personnes en danger  
+- Si je vois une personne en danger, je la sauvegarde.  
 
-## 1. Protocole "Emergency First"
-### Gestion de la batterie
-- Retour à la station de charge si batterie ≤ 20%
-- Reprise de la patrouille si batterie ≥ 80%
+Step 2 :
+- Dès que ma liste est supérieur > 1 je m'en vais vers le RP le + Proche pour régler les problémes.  
+- Si je n'ai plus de batterie, je bouge vers le point de charge le plus proche.  
+    - J'essaye lors de mon mouvement de transmettre ma liste à mes voisins pour qu'ils aillent informer le rescurer à ma place.  
+- Une fois que ma charge est terminée, je bouge vers le point de sauvetage le plus proche.  
 
-### Flux d'intervention
-1. Détection d'incident
-2. Collection du matériel au poste médical le plus proche
-3. Livraison du matériel à la personne en détresse
-4. Retour à la patrouille
 
-### Priorités de déplacement
-1. Retour à la charge si batterie critique
-2. Collecte du matériel médical si incident détecté
-3. Livraison du matériel à l'incident
-4. Patrouille aléatoire si aucun incident
+## Fonctionnement du protocole 2 :
 
-## 2. Protocole Collaboratif
-### Drones de Patrouille (60% de la flotte)
-- Gestion batterie :
-  * Retour charge à 25%
-  * Reprise patrouille à 85%
-- Missions :
-  * Surveillance de zone
-  * Signalement des incidents aux drones de secours
-  * Intervention uniquement si aucun drone de secours disponible
+Step 0 :  
+- Si je n'ai plus de batterie, je bouge vers le point de charge le plus proche.  
+    - J'essaye lors de mon mouvement de transmettre ma liste à mes voisins pour qu'ils aillent informer le rescurer à ma place.  
+- Une fois que ma charge est terminée, je bouge vers le point de sauvetage le plus proche.  
 
-### Drones de Secours (40% de la flotte)
-- Gestion batterie :
-  * Retour charge à 30%
-  * Reprise service à 90%
-- Flux d'intervention :
-  1. Réception alerte incident
-  2. Collection matériel médical
-  3. Livraison à l'incident
-  4. Retour position centrale
+Step 1 :  
+- Je scanne les personnes en danger  
+- Si je vois une personne en danger, je la sauvegarde.  
 
-### Différences Principales
-- Emergency First : Tous les drones font tout
-- Collaboratif : Rôles spécialisés avec seuils de batterie différents
+Step 2 :  
+- J'essaye de communiquer avec un RP si un RP est dans mon rayon de communication.  
+   - Si aucun RP n'est dans mon rayon de communication.  
+		- J'essaye de voir si je peux envoyer l'information à un drone qui est en n+1 de mon rayon de communication.  
+		- Si je ne peux pas, je bouge vers le rescue point le plus proche.  
+- Je bouge vers le rescue point si je ne peux pas communiquer.  
+
+
+## Fonctionnement du protocole 3 :  
+
+Step 0 :  
+- Si je n'ai plus de batterie, je bouge vers le point de charge le plus proche.  
+    - J'essaye lors de mon mouvement de transmettre ma liste à mes voisins pour qu'ils aillent informer le rescurer à ma place.  
+- Une fois que ma charge est terminée, je bouge vers le point de sauvetage le plus proche.  
+
+Step 1 :  
+- Je scanne les personnes en danger  
+- Si je vois une personne en danger, je la sauvegarde.  
+
+Step 2 :  
+- J'essaye de communiquer avec un RP si un RP est dans mon rayon de communication.  
+   - Si aucun RP n'est dans mon rayon de communication.  
+		- J'essaye de voir si je peux envoyer l'information à un drone qui est dans mon network.  
+			- Un network est un sous-ensemble de drones qui peuvent communiquer entre eux, ils sont chainées et ils forment un sous-graphe.  
+		- Si je ne peux pas, je bouge vers le rescue point le plus proche.  
+- Je bouge vers le rescue point si je ne peux pas communiquer.  
+
+## Fonctionnement du protocole 4 :
+
+Step 0 :  
+- Si je n'ai plus de batterie, je bouge vers le point de charge le plus proche.  
+    - J'essaye lors de mon mouvement de transmettre ma liste à mes voisins pour qu'ils aillent informer le rescurer à ma place.  
+- Une fois que ma charge est terminée, je bouge vers le point de sauvetage le plus proche.  
+
+Step 1 :  
+- Je scanne les personnes en danger  
+- Si je vois une personne en danger, je la sauvegarde.  
+
+Step 2 :  
+- J'essaye de communiquer avec un RP si un RP est dans mon rayon de communication.  
+   - Si aucun RP n'est dans mon rayon de communication.  
+		- J'essaye de voir si je peux envoyer l'information à un drone qui est dans mon network.  
+			- Un network est un sous-ensemble de drones qui peuvent communiquer entre eux, ils sont chainées et ils forment un sous-graphe.  
+		- Si je ne peux pas, je prends le drone le plus proche dans mon network en terme de distance d'un RP et je lui transfère la resposnabilité de sauver les personnes.  
+
+Step 3 :  
+- Je bouge vers le rescue point si je suis le drone le plus proche.  

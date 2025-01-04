@@ -11,7 +11,6 @@ import (
 
 // LoadFestivalConfig loads a festival configuration from a JSON file
 func LoadFestivalConfig(configPath string) (*models.FestivalConfig, error) {
-	// Get absolute path
 	absPath, err := filepath.Abs(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("error getting absolute path: %v", err)
@@ -30,14 +29,10 @@ func LoadFestivalConfig(configPath string) (*models.FestivalConfig, error) {
 	return &config, nil
 }
 
-// ApplyFestivalConfig applies a festival configuration to an existing map
 func (m *Map) ApplyFestivalConfig(config *models.FestivalConfig) error {
-	// Clear existing obstacles
 	m.Obstacles = []*obstacles.Obstacle{}
 
-	// Create obstacles for each POI
 	for i, poi := range config.POILocations {
-		// Validate position
 		if poi.Position.X < 0 || poi.Position.X >= float64(m.Width) ||
 			poi.Position.Y < 0 || poi.Position.Y >= float64(m.Height) {
 			return fmt.Errorf("invalid POI position: %v", poi.Position)

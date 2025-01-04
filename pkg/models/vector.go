@@ -8,8 +8,6 @@ type Vector struct {
 	X, Y float64
 }
 
-// GenerateCircleValues generates the values of a circle with the given radius
-// func (v *Vector) GenerateCircleValues(radius int) ([]Position, []Position) {
 func (v *Vector) GenerateCircleValues(radius int) ([]Position, []Position) {
 	var floatValues []Position
 	var intValues []Position

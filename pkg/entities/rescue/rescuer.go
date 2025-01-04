@@ -71,12 +71,10 @@ func (rp *RescuePoint) UpdateRescuers() {
 					}
 				}
 			} else {
-				// Move one step closer to person
 				rescuer.Position = stepTowards(rescuer.Position, rescuer.Person.Position)
 			}
 		}
 		if rescuer.State == ReturningToBase {
-			// Faire bouger jusqu'à la base et mettre le rescuer en inactif
 			if rescuer.Position.CalculateDistance(rescuer.HomePoint) <= 1 {
 				rescuer.State = Idle
 				rescuer.Person = nil
@@ -87,10 +85,6 @@ func (rp *RescuePoint) UpdateRescuers() {
 			}
 		}
 	}
-	//for {
-	//
-	//	//time.Sleep(200 * time.Millisecond)
-	//}
 }
 
 func stepTowards(from models.Position, to models.Position) models.Position {
