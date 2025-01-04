@@ -45,10 +45,10 @@ func main() {
 	fmt.Printf("Results will be stored in: %s\n", resultsDir)
 
 	// Configuration parameters
-	droneConfigs := []int{5}
-	peopleConfigs := []int{500}
-	protocolConfigs := []int{1}
-	mapConfigs := []string{"festival_layout_3"}
+	droneConfigs := []int{2, 5, 10}
+	peopleConfigs := []int{200, 500, 1000}
+	protocolConfigs := []int{1, 2, 3, 4}
+	mapConfigs := []string{"festival_layout_1", "festival_layout_2", "festival_layout_3"}
 
 	// Run simulations for each configuration
 	for _, drones := range droneConfigs {
