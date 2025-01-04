@@ -1,7 +1,6 @@
 package drones
 
 import (
-	"UTC_IA04/pkg/entities/persons"
 	"UTC_IA04/pkg/models"
 	"math"
 	"math/rand"
@@ -97,30 +96,6 @@ func findBestDirection(scores map[models.Position]float64) (models.Position, flo
 		}
 	}
 	return bestDir, bestScore
-}
-
-// FindBestDroneForRescue trouve le meilleur drone pour sauver une personne
-func findBestDroneForRescue(drones []*Drone, person *persons.Person) *Drone {
-	var bestDrone *Drone
-	minCost := math.Inf(1)
-
-	for _, dr := range drones {
-		if dr.PeopleToSave != nil {
-			continue
-		}
-
-		medicalTentPos, _ := dr.closestPOI(models.MedicalTent)
-		_, distanceToCharging := dr.closestPOI(models.ChargingStation)
-		distanceToTent := dr.Position.CalculateManhattanDistance(medicalTentPos)
-		distanceTentToPerson := medicalTentPos.CalculateManhattanDistance(person.Position)
-		totalDistance := distanceToTent + distanceTentToPerson + distanceToCharging + 2
-
-		if dr.Battery >= totalDistance && totalDistance < minCost {
-			bestDrone = dr
-			minCost = totalDistance
-		}
-	}
-	return bestDrone
 }
 
 func (d *Drone) nextStepToPos(pos models.Position) models.Position {

@@ -119,10 +119,6 @@ func (m *Map) MoveEntity(entity interface{}, newPosition models.Position) {
 			fmt.Printf("Moving person %d from %v to %v\n", e.ID, e.Position, newPosition)
 		}
 
-		if currentCell.Position.X < newCell.Position.X ||
-			(currentCell.Position.X == newCell.Position.X && currentCell.Position.Y < newCell.Position.Y) {
-		}
-
 		removeCrowdMemberFromCell(currentCell, e)
 		newCell.Persons = append(newCell.Persons, e)
 		e.Position = newPosition

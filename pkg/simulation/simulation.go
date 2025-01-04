@@ -505,8 +505,7 @@ func (s *Simulation) createDrones(n int) {
 	droneSeeFunction := func(d *drones.Drone) []*persons.Person {
 		currentCell := d.Position
 		rangeDrone := s.DroneSeeRange
-
-		Vector := models.Vector{X: currentCell.X, Y: currentCell.Y}
+		Vector := models.Vector(currentCell)
 		cercleValuesFloat, _ := Vector.GenerateCircleValues(rangeDrone)
 
 		droneInformations := make([]*persons.Person, 0)
@@ -642,7 +641,7 @@ func (s *Simulation) Update() {
 
 	var rpWg sync.WaitGroup
 
-	for i, _ := range s.RescuePoints {
+	for i := range s.RescuePoints {
 		rpWg.Add(1)
 		go func(rp *rescue.RescuePoint) {
 			defer rpWg.Done()

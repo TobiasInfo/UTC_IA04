@@ -359,7 +359,7 @@ func (g *Game) drawStaticLayer() {
 	worldWidth := float64(g.Sim.Map.Width)
 	worldHeight := float64(g.Sim.Map.Height)
 	entranceX1, y1 := g.transform.WorldToScreen(0, 0)
-	entranceX2, y2 := g.transform.WorldToScreen(worldWidth*0.1, 0)
+	entranceX2, _ := g.transform.WorldToScreen(worldWidth*0.1, 0)
 	mainX2, _ := g.transform.WorldToScreen(worldWidth*0.9, 0)
 	exitX2, y2 := g.transform.WorldToScreen(worldWidth, worldHeight)
 
@@ -971,12 +971,6 @@ func (g *Game) drawMetricsWindow(screen *ebiten.Image) {
 		}
 	}
 	g.drawMetricsWindowButtons(screen)
-}
-
-func formatDuration(d time.Duration) string {
-	hours := int(d.Hours())
-	minutes := int(d.Minutes()) % 60
-	return fmt.Sprintf("%dh %dm", hours, minutes)
 }
 
 type Rectangle struct {

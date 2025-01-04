@@ -61,7 +61,7 @@ func (rp *RescuePoint) UpdateRescuers() {
 				personID := rescuer.Person.ID
 
 				rp.ActiveMissions.Delete(rescuer.Person.ID)
-				for i, _ := range rp.Rescuers {
+				for i := range rp.Rescuers {
 					tempRescuer := rp.Rescuers[i]
 					if tempRescuer.Person != nil {
 						if tempRescuer.Person.ID == personID {

@@ -3,7 +3,6 @@ package persons
 import (
 	"UTC_IA04/pkg/models"
 	"fmt"
-	"math"
 	"math/rand"
 	"time"
 )
@@ -213,63 +212,6 @@ func (c *Person) tryMove(target models.Position) bool {
 			return false
 		}
 	}
-}
-
-func (c *Person) shouldLeavePOI() bool {
-	minTime := 30 * time.Second
-	maxTime := 5 * time.Minute
-
-	if c.TimeAtPOI < minTime {
-		return false
-	}
-
-	// Probability of leaving increases with time
-	timeRatio := float64(c.TimeAtPOI) / float64(maxTime)
-	if timeRatio > 1 {
-		return true
-	}
-
-	// 1. Low stamina
-	if c.Profile.StaminaLevel < 0.3 {
-		return rand.Float64() < 0.8
-	}
-	// 2. Close to their exit time
-	if c.GetTimeSinceEntry() > c.ZonePreference.ExitTime-15*time.Minute {
-		return rand.Float64() < 0.9
-	}
-
-	return rand.Float64() < timeRatio
-}
-
-func (c *Person) hoverNearPOI(obstacles map[models.Position]bool) bool {
-	if c.TargetPOIPosition == nil {
-		return false
-	}
-
-	// Stay within a certain radius of the POI
-	radius := 2.0
-	angle := rand.Float64() * 2 * math.Pi
-
-	newX := c.TargetPOIPosition.X + math.Cos(angle)*radius
-	newY := c.TargetPOIPosition.Y + math.Sin(angle)*radius
-
-	// Ensure within bounds
-	newX = math.Max(0, math.Min(float64(c.width), newX))
-	newY = math.Max(0, math.Min(float64(c.height), newY))
-
-	newPos := models.Position{X: newX, Y: newY}
-
-	// Only move if not blocked
-	if !obstacles[newPos] {
-		moved := c.tryMove(newPos)
-		if moved {
-			fmt.Printf("Person %d hovering near POI\n", c.ID)
-		} else {
-			fmt.Printf("Person %d failed to hover near POI\n", c.ID)
-		}
-		return moved
-	}
-	return false
 }
 
 func (c *Person) generateNewPath(obstacles map[models.Position]bool) {
