@@ -75,9 +75,9 @@ type SimulationStatistics struct {
 }
 
 type SimulationRescueStats struct {
-	personsInDistress map[int]int
-	personsRescued    map[int]int
-	avgRescueTime     map[int][]int
+	PersonsInDistress map[int]int
+	PersonsRescued    map[int]int
+	AvgRescueTime     map[int][]int
 }
 
 // CIMITIERE DES PERSONNES MORTES EN (-10, -10)
@@ -104,9 +104,9 @@ func NewSimulation(numDrones, numCrowdMembers, numObstacles int) *Simulation {
 		RescuePoints:            make(map[models.Position]*rescue.RescuePoint),
 		FestivalState:           Active,
 		SimulationRescueStats: SimulationRescueStats{
-			personsInDistress: make(map[int]int),
-			personsRescued:    make(map[int]int),
-			avgRescueTime:     make(map[int][]int),
+			PersonsInDistress: make(map[int]int),
+			PersonsRescued:    make(map[int]int),
+			AvgRescueTime:     make(map[int][]int),
 		},
 	}
 	s.Initialize(numDrones, numCrowdMembers, numObstacles)
@@ -174,8 +174,8 @@ func (s *Simulation) handleSavePersonByRescuer() {
 		}
 
 		// ON SAUVE LES PERSONNES ICI
-		s.SimulationRescueStats.personsRescued[s.currentTick]++
-		s.SimulationRescueStats.avgRescueTime[s.currentTick] = append(s.SimulationRescueStats.avgRescueTime[s.currentTick], personToSave.CurrentDistressDuration)
+		s.SimulationRescueStats.PersonsRescued[s.currentTick]++
+		s.SimulationRescueStats.AvgRescueTime[s.currentTick] = append(s.SimulationRescueStats.AvgRescueTime[s.currentTick], personToSave.CurrentDistressDuration)
 
 		personToSave.InDistress = false
 		s.mu.Lock()
@@ -751,7 +751,7 @@ func (s *Simulation) Update() {
 
 	for i := range s.Persons {
 		if s.Persons[i].InDistress {
-			s.SimulationRescueStats.personsInDistress[s.currentTick]++
+			s.SimulationRescueStats.PersonsInDistress[s.currentTick]++
 		}
 	}
 
@@ -1167,30 +1167,30 @@ func (s *Simulation) PlotRescueStats() {
 	ticks := make([]float64, 0)
 	distressData := make([]float64, 0)
 	rescuedData := make([]float64, 0)
-	avgRescueTimeData := make([]float64, 0)
+	AvgRescueTimeData := make([]float64, 0)
 
 	// Parcourir tous les ticks de 0 au tick actuel
 	for i := 0; i <= s.currentTick; i++ {
 		ticks = append(ticks, float64(i))
 
 		// Nombre de personnes en détresse pour ce tick
-		distressCount := float64(s.SimulationRescueStats.personsInDistress[i])
+		distressCount := float64(s.SimulationRescueStats.PersonsInDistress[i])
 		distressData = append(distressData, distressCount)
 
 		// Nombre de personnes sauvées pour ce tick
-		rescuedCount := float64(s.SimulationRescueStats.personsRescued[i])
+		rescuedCount := float64(s.SimulationRescueStats.PersonsRescued[i])
 		rescuedData = append(rescuedData, rescuedCount)
 
 		// Temps moyen de sauvetage pour ce tick
 		var avgTime float64
-		if rescueTimes := s.SimulationRescueStats.avgRescueTime[i]; len(rescueTimes) > 0 {
+		if rescueTimes := s.SimulationRescueStats.AvgRescueTime[i]; len(rescueTimes) > 0 {
 			sum := 0
 			for _, time := range rescueTimes {
 				sum += time
 			}
 			avgTime = float64(sum) / float64(len(rescueTimes))
 		}
-		avgRescueTimeData = append(avgRescueTimeData, avgTime)
+		AvgRescueTimeData = append(AvgRescueTimeData, avgTime)
 	}
 
 	// Premier graphique pour les personnes en détresse et sauvées
@@ -1229,7 +1229,7 @@ func (s *Simulation) PlotRescueStats() {
 	p2.Y.Label.Text = "Time (ticks)"
 
 	// Ligne pour le temps moyen de sauvetage
-	avgTimeLine, err := plotter.NewLine(createXYs(ticks, avgRescueTimeData))
+	avgTimeLine, err := plotter.NewLine(createXYs(ticks, AvgRescueTimeData))
 	if err == nil {
 		avgTimeLine.Color = color.RGBA{B: 255, A: 255} // Bleu
 		avgTimeLine.Width = vg.Points(1)

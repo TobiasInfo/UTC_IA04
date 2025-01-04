@@ -3,7 +3,6 @@ package drones
 import (
 	"UTC_IA04/pkg/entities/persons"
 	"UTC_IA04/pkg/models"
-	"fmt"
 	"math"
 	"math/rand"
 )
@@ -58,8 +57,6 @@ func (d *Drone) randomMovement() models.Position {
 			return target
 		}
 	}
-
-	fmt.Printf("Drone %d is at (%.0f, %.0f) and he's stuck (Oh no step-brother I am stuck in the washing machine :c)\n", d.ID, d.Position.X, d.Position.Y)
 	return d.nextStepToPos(models.Position{X: d.MyWatch.CornerBottomLeft.X, Y: d.MyWatch.CornerBottomLeft.Y})
 }
 

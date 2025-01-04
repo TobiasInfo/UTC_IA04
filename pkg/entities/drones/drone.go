@@ -85,7 +85,6 @@ func NewSurveillanceDrone(id int,
 	debug bool,
 
 ) Drone {
-	fmt.Printf("[DRONE %d] And now My watch at %v begin - My protocole is %d !\n", id, myWatch, protocolMode)
 	return Drone{
 		ID:                  id,
 		Position:            position,
