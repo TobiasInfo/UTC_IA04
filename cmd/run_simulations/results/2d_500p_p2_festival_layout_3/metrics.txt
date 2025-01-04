@@ -1,0 +1,15 @@
+Simulation Results (Averaged over 5 runs)
+=====================================
+Total People: 500.00
+People in Distress: 0.00
+Cases Treated: 51.00
+Cases Dead: 15.20
+Average Battery: 0.00%
+Average Coverage: 0.00%
+Average Runtime: 803.013975ms
+Total Ticks: 690
+
+Performance Metrics:
+- Treatment Success Rate: +Inf%
+- Mortality Rate: +Inf%
+- Average Response Time: 15.745372ms
