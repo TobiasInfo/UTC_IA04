@@ -34,15 +34,8 @@ type AggregatedMetrics struct {
 }
 
 func main() {
-	// Get the directory where the program is running
-	execDir, err := filepath.Abs(filepath.Dir(os.Args[0]))
-	if err != nil {
-		fmt.Printf("Error getting executable directory: %v\n", err)
-		return
-	}
-
-	// Create results directory inside the run_simulations folder
-	resultsDir := filepath.Join(execDir, "results")
+	// Create results directory in the current project directory
+	resultsDir := filepath.Join(".", "results")
 	if err := os.MkdirAll(resultsDir, 0755); err != nil {
 		fmt.Printf("Error creating results directory: %v\n", err)
 		return
@@ -51,11 +44,13 @@ func main() {
 	fmt.Println("Starting simulation runs...")
 	fmt.Printf("Results will be stored in: %s\n", resultsDir)
 
-	droneConfigs := []int{2, 5, 10}
-	peopleConfigs := []int{200, 500, 1000}
-	protocolConfigs := []int{1, 2, 3, 4}
-	mapConfigs := []string{"festival_layout_1", "festival_layout_2", "festival_layout_3"}
+	// Configuration parameters
+	droneConfigs := []int{5}
+	peopleConfigs := []int{500}
+	protocolConfigs := []int{1}
+	mapConfigs := []string{"festival_layout_3"}
 
+	// Run simulations for each configuration
 	for _, drones := range droneConfigs {
 		for _, people := range peopleConfigs {
 			for _, protocol := range protocolConfigs {
@@ -70,6 +65,13 @@ func main() {
 					dirName := fmt.Sprintf("%dd_%dp_p%d_%s", drones, people, protocol, mapName)
 					configDir := filepath.Join(resultsDir, dirName)
 					fmt.Printf("\n===== Starting configuration: %s =====\n", dirName)
+
+					// Create directory for this configuration
+					if err := os.MkdirAll(configDir, 0755); err != nil {
+						fmt.Printf("Error creating directory for configuration: %v\n", err)
+						continue
+					}
+
 					runSimulationSeries(config, configDir)
 				}
 			}
@@ -79,23 +81,21 @@ func main() {
 }
 
 func runSimulationSeries(config SimulationConfig, resultDir string) {
-	if err := os.MkdirAll(resultDir, 0755); err != nil {
-		fmt.Printf("Error creating directory %s: %v\n", resultDir, err)
-		return
-	}
-
 	var metrics []AggregatedMetrics
 
-	// Run 5 iterations sequentially
+	// Run 5 iterations
 	for i := 0; i < 5; i++ {
 		fmt.Printf("Starting run %d/5\n", i+1)
 		metric := runSingleSimulation(config, i)
 		metrics = append(metrics, metric)
 		fmt.Printf("Completed run %d/5 (took %d ticks)\n", i+1, metric.TotalTicks)
 
-		time.Sleep(100 * time.Millisecond)
+		// Save individual run results
+		saveRunResults(metric, resultDir, i+1)
+
 	}
 
+	// Process and save aggregated results
 	fmt.Printf("Averaging metrics and generating final outputs...\n")
 	avgMetrics := averageMetrics(metrics)
 	exportResults(avgMetrics, resultDir)
@@ -106,22 +106,14 @@ func runSimulationSeries(config SimulationConfig, resultDir string) {
 func runSingleSimulation(config SimulationConfig, runNum int) AggregatedMetrics {
 	startTime := time.Now()
 
-	// Create new simulation with defaults
+	// Initialize simulation with defaults
 	sim := simulation.NewSimulation(0, 0, 0)
 
-	// Update configuration in correct order
-	fmt.Printf("Loading Map %s\n", config.MapName)
+	// Configure simulation
 	sim.UpdateMap(config.MapName)
-
-	fmt.Printf("Updating configuration - Drones: %d, People: %d, Protocol: %d\n",
-		config.NumDrones, config.NumPeople, config.Protocol)
 	sim.UpdateDroneSize(config.NumDrones)
 	sim.UpdateCrowdSize(config.NumPeople)
-
-	fmt.Printf("Setting protocol to %d\n", config.Protocol)
 	sim.UpdateDroneProtocole(config.Protocol)
-
-	fmt.Printf("Initializing drone protocols\n")
 	sim.InitDronesProtocols()
 
 	tick := 0
@@ -129,34 +121,19 @@ func runSingleSimulation(config SimulationConfig, runNum int) AggregatedMetrics 
 		sim.Update()
 		tick++
 
+		// Progress update every 100 ticks
 		if tick%100 == 0 {
 			fmt.Printf("Run %d: Tick %d\n", runNum+1, tick)
 		}
 
-		allPeopleOut := true
-		for _, person := range sim.Persons {
-			if person.StillInSim {
-				allPeopleOut = false
-				break
-			}
-		}
-
-		if allPeopleOut {
-			allDronesCharging := true
-			for _, drone := range sim.Drones {
-				if !drone.IsCharging {
-					allDronesCharging = false
-					break
-				}
-			}
-
-			if allDronesCharging {
-				fmt.Printf("Run %d: Natural completion at tick %d\n", runNum+1, tick)
-				break
-			}
+		// Check if simulation is complete
+		if isSimulationComplete(sim) {
+			fmt.Printf("Run %d: Completed at tick %d\n", runNum+1, tick)
+			break
 		}
 	}
 
+	// Collect final statistics
 	stats := sim.GetStatistics()
 	return AggregatedMetrics{
 		TotalPeople:     float64(stats.TotalPeople),
@@ -171,117 +148,154 @@ func runSingleSimulation(config SimulationConfig, runNum int) AggregatedMetrics 
 	}
 }
 
+func isSimulationComplete(sim *simulation.Simulation) bool {
+	allPeopleOut := true
+	for _, person := range sim.Persons {
+		if person.StillInSim {
+			allPeopleOut = false
+			break
+		}
+	}
+
+	if !allPeopleOut {
+		return false
+	}
+
+	allDronesCharging := true
+	for _, drone := range sim.Drones {
+		if !drone.IsCharging {
+			allDronesCharging = false
+			break
+		}
+	}
+
+	return allDronesCharging
+}
+
+func saveRunResults(metrics AggregatedMetrics, dirPath string, runNum int) {
+	content := fmt.Sprintf(`Run %d Results
+================
+Total People: %.2f
+People in Distress: %.2f
+Cases Treated: %.2f
+Cases Dead: %.2f
+Average Battery: %.2f%%
+Average Coverage: %.2f%%
+Runtime: %v
+Total Ticks: %d
+`,
+		runNum,
+		metrics.TotalPeople,
+		metrics.InDistress,
+		metrics.CasesTreated,
+		metrics.CasesDead,
+		metrics.AverageBattery,
+		metrics.AverageCoverage,
+		metrics.Runtime,
+		metrics.TotalTicks,
+	)
+
+	filename := fmt.Sprintf("run_%d_metrics.txt", runNum)
+	filepath := filepath.Join(dirPath, filename)
+	if err := os.WriteFile(filepath, []byte(content), 0644); err != nil {
+		fmt.Printf("Error saving run %d results: %v\n", runNum, err)
+	}
+}
+
 func plotAggregatedResults(metrics AggregatedMetrics, dirPath string) {
-	// Plot people data (distress and rescued)
+	// Create people statistics plot
 	p1 := plot.New()
 	p1.Title.Text = "Festival Rescue Statistics - People"
 	p1.X.Label.Text = "Ticks"
 	p1.Y.Label.Text = "Number of People"
 
-	// Convert map data to plottable points
+	// Collect and sort ticks
 	ticks := make([]float64, 0)
-	distressData := make([]float64, 0)
-	rescuedData := make([]float64, 0)
-
-	// Get all ticks in order
 	for tick := range metrics.RescueStats.PersonsInDistress {
 		ticks = append(ticks, float64(tick))
 	}
 	sort.Float64s(ticks)
 
-	// Create data points
-	for _, tick := range ticks {
+	// Prepare data series
+	distressData := make(plotter.XYs, len(ticks))
+	rescuedData := make(plotter.XYs, len(ticks))
+	for i, tick := range ticks {
 		t := int(tick)
-		distressData = append(distressData, float64(metrics.RescueStats.PersonsInDistress[t]))
-		rescuedData = append(rescuedData, float64(metrics.RescueStats.PersonsRescued[t]))
+		distressData[i].X = tick
+		distressData[i].Y = float64(metrics.RescueStats.PersonsInDistress[t])
+		rescuedData[i].X = tick
+		rescuedData[i].Y = float64(metrics.RescueStats.PersonsRescued[t])
 	}
 
-	// Create and style distress line
-	distressPoints := make(plotter.XYs, len(ticks))
-	for i := range ticks {
-		distressPoints[i].X = ticks[i]
-		distressPoints[i].Y = distressData[i]
-	}
-	distressLine, err := plotter.NewLine(distressPoints)
-	if err == nil {
-		distressLine.Color = color.RGBA{R: 255, A: 255} // Red
+	// Add distress line
+	if distressLine, err := plotter.NewLine(distressData); err == nil {
+		distressLine.Color = color.RGBA{R: 255, A: 255}
 		distressLine.Width = vg.Points(1)
 		p1.Add(distressLine)
 		p1.Legend.Add("In Distress", distressLine)
 	}
 
-	// Create and style rescued line
-	rescuedPoints := make(plotter.XYs, len(ticks))
-	for i := range ticks {
-		rescuedPoints[i].X = ticks[i]
-		rescuedPoints[i].Y = rescuedData[i]
-	}
-	rescuedLine, err := plotter.NewLine(rescuedPoints)
-	if err == nil {
-		rescuedLine.Color = color.RGBA{G: 255, A: 255} // Green
+	// Add rescued line
+	if rescuedLine, err := plotter.NewLine(rescuedData); err == nil {
+		rescuedLine.Color = color.RGBA{G: 255, A: 255}
 		rescuedLine.Width = vg.Points(1)
 		p1.Add(rescuedLine)
 		p1.Legend.Add("Rescued", rescuedLine)
 	}
 
 	// Save people plot
-	peopleFile := filepath.Join(dirPath, "rescue_stats_people.png")
-	if err := p1.Save(8*vg.Inch, 4*vg.Inch, peopleFile); err != nil {
+	if err := p1.Save(8*vg.Inch, 4*vg.Inch, filepath.Join(dirPath, "rescue_stats_people.png")); err != nil {
 		fmt.Printf("Error saving people plot: %v\n", err)
 	}
 
-	// Plot average rescue time
+	// Create average rescue time plot
 	p2 := plot.New()
 	p2.Title.Text = "Festival Rescue Statistics - Average Rescue Time"
 	p2.X.Label.Text = "Ticks"
 	p2.Y.Label.Text = "Time (ticks)"
 
-	// Calculate average rescue times
-	avgTimeData := make([]float64, 0)
-	for _, tick := range ticks {
+	// Calculate and plot average rescue times
+	avgTimeData := make(plotter.XYs, len(ticks))
+	for i, tick := range ticks {
 		t := int(tick)
 		times := metrics.RescueStats.AvgRescueTime[t]
+		avgTimeData[i].X = tick
 		if len(times) > 0 {
 			sum := 0
 			for _, time := range times {
 				sum += time
 			}
-			avgTimeData = append(avgTimeData, float64(sum)/float64(len(times)))
-		} else {
-			avgTimeData = append(avgTimeData, 0)
+			avgTimeData[i].Y = float64(sum) / float64(len(times))
 		}
 	}
 
-	// Create and style average time line
-	avgTimePoints := make(plotter.XYs, len(ticks))
-	for i := range ticks {
-		avgTimePoints[i].X = ticks[i]
-		avgTimePoints[i].Y = avgTimeData[i]
-	}
-	avgTimeLine, err := plotter.NewLine(avgTimePoints)
-	if err == nil {
-		avgTimeLine.Color = color.RGBA{B: 255, A: 255} // Blue
+	if avgTimeLine, err := plotter.NewLine(avgTimeData); err == nil {
+		avgTimeLine.Color = color.RGBA{B: 255, A: 255}
 		avgTimeLine.Width = vg.Points(1)
 		p2.Add(avgTimeLine)
 		p2.Legend.Add("Avg Rescue Time", avgTimeLine)
 	}
 
 	// Save time plot
-	timeFile := filepath.Join(dirPath, "rescue_stats_time.png")
-	if err := p2.Save(8*vg.Inch, 4*vg.Inch, timeFile); err != nil {
+	if err := p2.Save(8*vg.Inch, 4*vg.Inch, filepath.Join(dirPath, "rescue_stats_time.png")); err != nil {
 		fmt.Printf("Error saving time plot: %v\n", err)
 	}
 }
 
 func averageMetrics(metrics []AggregatedMetrics) AggregatedMetrics {
+	if len(metrics) == 0 {
+		return AggregatedMetrics{}
+	}
+
 	var avg AggregatedMetrics
 	count := float64(len(metrics))
 
-	// Initialize maps in avg.RescueStats
+	// Initialize rescue stats maps
 	avg.RescueStats.PersonsInDistress = make(map[int]int)
 	avg.RescueStats.PersonsRescued = make(map[int]int)
 	avg.RescueStats.AvgRescueTime = make(map[int][]int)
 
+	// Sum all metrics
 	for _, m := range metrics {
 		avg.TotalPeople += m.TotalPeople
 		avg.InDistress += m.InDistress
@@ -355,8 +369,7 @@ Performance Metrics:
 		metrics.Runtime/time.Duration(metrics.CasesTreated),
 	)
 
-	metricsPath := filepath.Join(dirPath, "metrics.txt")
-	if err := os.WriteFile(metricsPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dirPath, "metrics.txt"), []byte(content), 0644); err != nil {
 		fmt.Printf("Error writing metrics file: %v\n", err)
 	}
 }
