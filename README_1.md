@@ -8,6 +8,7 @@ Dans cet écosystème complexe, trois types d'agents interagissent constamment :
 
 ## Architecture du Projet
 
+```text
 UTC_IA04/
 ├── cmd/
 │   ├── run_simulations/          # Exécution des simulations benchmark
@@ -30,7 +31,7 @@ UTC_IA04/
 │   ├── models/                 # Structures de données
 │   └── simulation/             # Moteur de simulation
 └── vendor/                     # Dépendances externes
-
+```
 ## Les Acteurs du Système
 
 ### Les Festivaliers : Des Comportements Humains Complexes
