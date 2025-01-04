@@ -3,13 +3,11 @@
 
 # Table des Matières
 1. [Objectifs et Vue d'Ensemble](#1-objectifs-et-vue-densemble)
-2. [Architecture du Système](#2-architecture-du-système)
-3. [Modèle de Simulation](#3-modèle-de-simulation)
-4. [Implémentation Technique](#4-implémentation-technique)
+2. [Lancement de la simulation](#2-lancement-de-la-simulation)
+3. [Architecture du Système](#3-architecture-du-système)
+4. [Implémentation](#4-implémentation)
 5. [Métriques et Évaluation](#5-métriques-et-évaluation)
-6. [Plan de Test](#6-plan-de-test)
-7. [Configuration et Paramètres](#7-configuration-et-paramètres)
-8. [Bibliographie](#8-bibliographie)
+6. [Bibliographie](#6-bibliographie)
 
 ## 1. Objectifs et Vue d'Ensemble
 
@@ -17,266 +15,214 @@
 Développer une simulation en Go pour évaluer l'efficacité des protocoles de surveillance par drones lors d'événements publics, utilisant une approche distribuée et des communications P2P.
 
 ### 1.2 Sous-Objectifs
-- Optimiser la détection des incidents
-- Minimiser le temps de réponse
-- Maximiser la couverture spatiale
-- Évaluer différents protocoles de surveillance
+- Pouvoir modifier l'agencement des éléments de la carte
+- Pouvoir modifier le nombre de personnes et de drones présents
+- Obtenir des informations sur la simulation pour évaluer la performance des différents protocoles de surveillance
 
 ### 1.3 Contexte
 Surveillance d'événements publics avec contraintes :
 - Durée : 2-8 heures
 - Participants : 1,000-10,000
-- Surface : Variable selon configuration
+- Agencement : Variable selon configuration
 
 [Source: [8], [10]]
 
-## 2. Architecture du Système
+## 2. Lancement de la simulation
 
-### 2.1 Environnement de Simulation
+### 2.1 Ouvrir l'application
 
-#### 2.1.1 Structure Spatiale
-- **Grille 2D**
-  - Taille cellule : 5m x 5m
-  - Coordonnées réelles pour positionnement précis
-  - Capacité maximale : 6 personnes/m²
+Pour lancer la simulation, veuillez :
+1. Télécharger le répertoire accessible sur https://github.com/TobiasInfo/UTC_IA04
+2. Accéder au répertoire en ligne de commande : cd XXX\UTC_IA04\cmd
+3. Executer en ligne de commande le fichier main : go run .\main_gui_ebiten.go
 
-#### 2.1.2 Zones Définies
-- **Entrées/Sorties**
-  - 4 points aux extrémités
-  - Capacité : 50 personnes/minute
-- **Zone Centrale (Scène)**
-  - Surface définie : ~2000m²
-  - Densité maximale plus élevée
-- **Zones Périphériques**
-  - Restauration
-  - Repos
-  - Services
-- **Stations de Recharge Drones**
-  - Points fixes
-  - Capacité : 2 drones simultanés
+### 2.2 Paramétrage
+
+Dans le Menu principal peuvent être choisis :
+1. Le nombre de drones d'observation
+2. Le nombre de festivaliers
+3. La carte parmis celles proposées
+4. Le protocole de communication et d'observation des drones
+
+Une fois ces paramètres choisis, cliquer sur "Start Simulation".
+Le mode "Debug" désactive l'évolution automatique du système, et impose à l'utilisateur d'utiliser le bouton "Update Simulation" à chaque étape.
+
+### 2.3 Fonctionnalités
+
+Une fois la simulation lancée, elle peut à tout moment être mise en pause à l'aide du bouton "Pause". Il est également possible une fois la simulation pausée de la mettre à jour manuellement avec "Update Simulation" pour que le système évolue au rythme voulu.
+
+Des informations sur la simulation sont affichées sur le bandeau inférieur et rende compte de l'état actuel de la simulation.
+Des graphiques représentant l'évolution au cours du temps des informations clés sont sauvegardées dans le fichier UTC_IA04 à la fin de la simulation. La simulation prend fin lorsque tous les participants ont quitté le festival, et que les drones sont allés se poser.
+
+Au cours de la simulation des graphes sont également affichés, celui de gauche représente la densité de participants sur la carte, pour savoir où les festivaliers sont le plus présents. Celui de droite représente les drones, leur champ de communication ainsi que les réseaux de communication formés. Il est également possible de lire qu'un drone est entré en communication avec la tente de secours. Ces graphiques peuvent être aggrandis ou réduit selon la convenance en cliquant dessus.
+
+Il est possible d'obtenir des informations supplémentaires sur un participant, un drone ou un point d'intérêt en le survolant avec la souris. Attention, lorsque trop d'agents se superposent, l'info-bulle perd en lisibilité.
+
+
+### 2.4 Lecture de l'interface
+
+La fenêtre représente un festival, où l'on trouve des points d'intérêts pour les festivaliers (que l'on appelera par la suite POI), des participants, des drones, et des POI pour les drones.
+L'entrée du festival se trouve sur la gauche de la fenêtre tandis que la sortie se trouve à droite. Les festivaliers de peuvent pas sortir de la carte centrale, sauf dans le cas d'une sortie définitive du festival.
+Les drones survolent les participants, et l'on peut observer la portée de vision d'un drone avec le disque d'ombre autour de lui. 
+Les POI des participants sont représentés selon leur fonction (scène, aire de repos, stand de nourriture, toilettes,...).
+Les POI des drones (station de recharge et tente infirmerie) sont représentés avec des images différentes.
+Les sauveteurs sont représentés avec une image de pompier, il sont reliés par une ligne verte à leur poste de secours et à la position de la personne qu'ils vont sauver.
+
+
+## 3. Architecture du Système
+
+### 3.1 Environnement de Simulation
+
+#### 3.1.1 Structure Spatiale
+- **Plan 2D+**
+  - Coordonnées réelles pour les participants
+  - Grille de 30 sur 20 pour les drones et les POI
+  - Les participants ne peuvent pas traverser les POI, les drones les survolent
+
+#### 3.1.2 Zones Définies
+- **Entrée/Sortie**
+  - Entrée sur la gauche de l'écran et sortie sur la droite
+  - Phases : Les premières minutes permettent à nouveaux participants d'arriver, mais les entrées sont ensuite fermées. Tout au long de la simulation les participants peuvent sortir, mais lorsque le temps est écoulé, les participants sont obligés de se diriger vers la sortie.
 
 [Source: [1], [9], [10]]
 
-### 2.2 Composants du Système
+### 3.2 Composants du Système
 
-#### 2.2.1 Caractéristiques des Drones
+#### 3.2.1 Caractéristiques des Drones
 
-**Spécifications Techniques**
-```yaml
-Performance:
-  Autonomie: 45 minutes (charge)
-  Temps_recharge: 40 minutes (80%)
-  Hauteur_optimale: 40m
-  Vitesse_max: 15 m/s
-  Accélération_max: 3 m/s²
+**Paramètres d'un drone**
+- Batterie
+- Portée de Communication
+- Champ de Vision
+- Protocole
+
+**Champ de Vision**
+Pour chaque participant en situation de détresse dans le champ de vision d'un drone, la probabilité qu'il soit identifié correctement dépend de sa distance par rapport au drone et de la quantité de personne dans le champ de vision du drone et est calculée :
+```go
+probaDetection := max(0, 1.0/float64(s.DroneSeeRange)-(float64(nbPersDetected)*0.03))
 ```
+**Protocole 1**
 
-**Capacités de Détection**
-```yaml
-Détection:
-  Champ_vision: 84° horizontal
-  Précision_centre: 95%
-  Décroissance: exponentielle
-  Fréquence_scan: 10 Hz
-```
+Step 1 :
+- Je scanne les personnes en danger
+- Si je vois une personne en danger, je la sauvegarde.
 
-[Source: [2], [9]]
+Step 2 :
+- Dès que ma liste est supérieur > 1 je m'en vais vers le RP le + Proche pour régler les problémes.
+- Si je n'ai plus de batterie, je bouge vers le point de charge le plus proche.
+    - J'essaye lors de mon mouvement de transmettre ma liste à mes voisins pour qu'ils aillent informer le rescurer à ma place.
+- Une fois que ma charge est terminée, je bouge vers le point de sauvetage le plus proche.
 
-#### 2.2.2 Modèle des Individus
+**Protocole 2**
+
+Step 0 :
+- Si je n'ai plus de batterie, je bouge vers le point de charge le plus proche.
+    - J'essaye lors de mon mouvement de transmettre ma liste à mes voisins pour qu'ils aillent informer le rescurer à ma place.
+- Une fois que ma charge est terminée, je bouge vers le point de sauvetage le plus proche.
+
+Step 1 :
+- Je scanne les personnes en danger
+- Si je vois une personne en danger, je la sauvegarde.
+
+Step 2 :
+- J'essaye de communiquer avec un RP si un RP est dans mon rayon de communication.
+   - Si aucun RP n'est dans mon rayon de communication.
+		- J'essaye de voir si je peux envoyer l'information à un drone qui est en n+1 de mon rayon de communication.
+		- Si je ne peux pas, je bouge vers le rescue point le plus proche.
+- Je bouge vers le rescue point si je ne peux pas communiquer.
+
+**Protocole 3**
+
+Step 0 :
+- Si je n'ai plus de batterie, je bouge vers le point de charge le plus proche.
+    - J'essaye lors de mon mouvement de transmettre ma liste à mes voisins pour qu'ils aillent informer le rescurer à ma place.
+- Une fois que ma charge est terminée, je bouge vers le point de sauvetage le plus proche.
+
+Step 1 :
+- Je scanne les personnes en danger
+- Si je vois une personne en danger, je la sauvegarde.
+
+Step 2 :
+- J'essaye de communiquer avec un RP si un RP est dans mon rayon de communication.
+   - Si aucun RP n'est dans mon rayon de communication.
+		- J'essaye de voir si je peux envoyer l'information à un drone qui est dans mon network.
+			- Un network est un sous-ensemble de drones qui peuvent communiquer entre eux, ils sont chainées et ils forment un sous-graphe.
+		- Si je ne peux pas, je bouge vers le rescue point le plus proche.
+- Je bouge vers le rescue point si je ne peux pas communiquer.
+
+**Protocole 4**
+
+Step 0 :
+- Si je n'ai plus de batterie, je bouge vers le point de charge le plus proche.
+    - J'essaye lors de mon mouvement de transmettre ma liste à mes voisins pour qu'ils aillent informer le rescurer à ma place.
+- Une fois que ma charge est terminée, je bouge vers le point de sauvetage le plus proche.
+
+Step 1 :
+- Je scanne les personnes en danger
+- Si je vois une personne en danger, je la sauvegarde.
+
+Step 2 :
+- J'essaye de communiquer avec un RP si un RP est dans mon rayon de communication.
+   - Si aucun RP n'est dans mon rayon de communication.
+		- J'essaye de voir si je peux envoyer l'information à un drone qui est dans mon network.
+			- Un network est un sous-ensemble de drones qui peuvent communiquer entre eux, ils sont chainées et ils forment un sous-graphe.
+		- Si je ne peux pas, je prends le drone le plus proche dans mon network en terme de distance d'un RP et je lui transfère la resposnabilité de sauver les personnes.
+
+Step 3 :
+- Je bouge vers le rescue point si je suis le drone le plus proche.
+
+
+[Source: = [3], [4], [2], [9]]
+
+#### 3.2.2 Modèle des Participants
 
 **États Possibles**
-- Normal (debout)
-- Malaise (allongé)
-- Critique (urgence)
+- Normal (debout) - Consommation faible d'énergie
+- Repos - Récupération d'énergie
+- Malaise (allongé) - Consommation rapide d'énergie
 
 **Modèle de Probabilité de Malaise**
 ```python
-P(malaise) = P_base * (1 + Σ facteurs_risque)
+P(malaise) = P_base x (1 - Resistance au Malaise du participant) * (1 - Energie du participant)
 où:
-P_base = 0.001 par personne/heure
+P_base = 0.005
 ```
 
-**Facteurs de Risque**
-```yaml
-Facteurs:
-  Température_30C+: +0.5
-  Densité_4p/m²: +0.3
-  Durée_6h+: +0.2
-  Proximité_scène: +0.4
-```
+**Intérêts**
+4 profils de participants :
+- Adventurous
+- Cautious
+- Social
+- Independent
+Ces profils ont une influence sur :
+- La vitesse de déplacement de l'individu
+- les variables "CrowdFollowingTendency" et "PersonalSpace" qui influe sur la tendance de l'individu à aller ou non dans les zones avec de nombreux autres individus
+- Le niveau d'énergie à partir duquel un individu passera en mode repos
+- La résistance au malaise de l'individu
+- L'intérêt porté par l'individu à chaque POI, et donc vers lesquels il préferera se diriger.
+
+Lorsque un participant atteint un POI, il va y rester pendant une durée variable, puis repartir à la recherche d'un autre POI.
+
+#### 3.2.3 Sauvetage d'un participant en détresse
+
+Lorsqu'un participant en situation de détresse a été remarqué, l'information doit être remontée à la tente infirmerie qui détachera ensuite un pompier qui ira sauver le participant.
+
+Les Drones peuvent communiquer entre eux pour remonter l'information à la tente de secours. Il faut être à portée de communication de la tente de secours pour transmettre une information. 
+
 
 [Source: [5], [6], [7]]
 
-## 3. Modèle de Simulation
 
-### 3.1 Capacités de Détection et Couverture
+## 4. Implémentation 
 
-#### 3.1.1 Modèle de Couverture Spatiale
-```python
-# Calcul de la surface couverte
-Rayon_couverture = hauteur * tan(angle_vision/2)
-Surface_couverte = π * Rayon_couverture²
+Les Agents utilisent une boucle de Perception/Délibération/Action, et évoluent en parallèle avec des goroutines pour permettre une évolution indépendante et non-déterministe dans la mesure des fonctionnalités du langage go.
+Il a été choisi de synchroniser les agents pour ne leur permettre qu'une itération de leur cycle de perception/délibération/action par tick de la simulation globale pour conserver une cohérence des actions des agents entre eux, et rester plus fidèle aux conditions réelles.
 
-# Pour h=40m, angle=84°
-Rayon_effectif = 37.2m
-Surface_couverte = 4,347m²
-Cellules_couvertes = ~174 cellules
-```
+Un objet Simulation contient l'ensemble des éléments utiles à notre simulation, dont une instance de Carte, qui mémorise et gère les positions et déplacements des agents.
 
-[Source: [1], [2]]
+Pour l'interface graphique l'outil Ebiten a été utilisé, pour permettre une implémentation globale 100% en Go. 
 
-#### 3.1.2 Modèle de Précision
-```python
-Précision(d) = Précision_max * exp(-α * (d/R_max)²)
-où:
-- Précision_max = 0.95
-- α = 2.3
-- d = distance au centre
-- R_max = rayon maximum
-```
-
-[Source: [2]]
-
-### 3.2 Protocoles de Surveillance
-
-#### 3.2.1 Protocole Standard (PS)
-1. **Couverture Systématique**
-   - Découpage en zones régulières
-   - Rotation selon pattern prédéfini
-   - Temps fixe par zone
-
-2. **Détection**
-   - Scan continu à 10 Hz
-   - Confirmation multi-angle
-   - Seuil de confiance : 85%
-
-#### 3.2.2 Protocole Adaptatif (PA)
-1. **Évaluation des Risques**
-   ```python
-   Risque(cellule) = (
-       Base +
-       Densité * 0.3 +
-       Historique * 0.2 +
-       Proximité_scène * 0.3
-   )
-   ```
-
-2. **Allocation Dynamique**
-   - Actualisation : 60 secondes
-   - Prioritisation zones à risque
-   - Maintien couverture minimale
-
-#### 3.2.3 Protocole Collaboratif (PC)
-1. **Communication**
-   - Broadcast état : 5 secondes
-   - Partage immédiat détections
-   - Consensus distribué
-
-2. **Optimisation**
-   ```python
-   Score_global = Σ(Couverture_i * Qualité_détection_i)
-   ```
-
-[Source: [3], [4]]
-
-## 4. Implémentation Technique
-
-### 4.1 Structures de Données
-
-```go
-// Structure principale
-type Simulation struct {
-    Grid        *Grid
-    Drones      []*Drone
-    Agents      []*Agent
-    Metrics     *Metrics
-    Config      *Config
-}
-
-// Représentation spatiale
-type Grid struct {
-    Cells       [][]*Cell
-    Updates     chan UpdateMsg
-    mutex       sync.RWMutex
-}
-
-type Cell struct {
-    Occupants    []Agent
-    Density      float64
-    RiskScore    float64
-    mutex        sync.RWMutex
-}
-
-// Composants actifs
-type Drone struct {
-    Position    Position3D
-    Coverage    [][]float64
-    Battery     float64
-    Channel     chan DroneMsg
-    State       DroneState
-}
-
-type Agent struct {
-    Position    Position2D
-    State       AgentState
-    TimeOnSite  time.Duration
-}
-```
-
-### 4.2 Système de Communication
-
-```go
-// Messages
-type DroneMsg struct {
-    Type        MsgType
-    Position    Position3D
-    Detection   *Detection
-    Timestamp   time.Time
-}
-
-// Communication P2P
-func (d *Drone) Broadcast(msg DroneMsg) {
-    for _, neighbor := range d.Neighbors {
-        select {
-        case neighbor.Channel <- msg:
-        default:
-            metrics.IncrementDroppedMessages()
-        }
-    }
-}
-```
-
-### 4.3 Cycle de Mise à Jour
-
-```go
-func (s *Simulation) Update() {
-    // 1. Update Agents
-    s.updateAgents()
-    
-    // 2. Update Drones
-    s.updateDrones()
-    
-    // 3. Process Detections
-    s.processDetections()
-    
-    // 4. Update Metrics
-    s.updateMetrics()
-}
-
-// Exemple d'update des agents
-func (s *Simulation) updateAgents() {
-    for _, agent := range s.Agents {
-        s.Grid.mutex.Lock()
-        oldCell := s.Grid.GetCell(agent.Position)
-        newPos := agent.UpdatePosition()
-        newCell := s.Grid.GetCell(newPos)
-        
-        oldCell.RemoveAgent(agent)
-        newCell.AddAgent(agent)
-        s.Grid.mutex.Unlock()
-    }
-}
-```
+Les images utilisées ont été générées par des IA génératives, puis retouchées ensuite à la main.
 
 [Source: [4], [8]]
 
@@ -284,136 +230,23 @@ func (s *Simulation) updateAgents() {
 
 ### 5.1 Métriques en Temps Réel
 
-```go
-type Metrics struct {
-    // Couverture
-    CoverageRate       float64    // % zone couverte
-    CoverageQuality    float64    // qualité moyenne
-    
-    // Détection
-    DetectionRate      float64    // % incidents détectés
-    FalsePositives     int
-    FalseNegatives     int
-    
-    // Performance
-    ResponseTime       []float64  // temps de réponse
-    BatteryEfficiency  float64
-    DroneUtilization   float64
-}
-```
+Au cours de la simulation sont calculées et affichées quelques informations pour permettre de juger de l'état du système en temps réel :
+- Le nombre de participants
+- Combien sont en situation de détresse
+- Combien ont été traité
+- Combien n'ont pas été pris en charge à temps
+- La batterie moyenne des drones de la flotte
+- La proportion de la surface totale de terrain observée
 
 ### 5.2 Calcul de Performance
 
-```python
-Performance_globale = (
-    0.4 * Taux_détection +
-    0.3 * Temps_réponse_normalisé +
-    0.2 * Couverture_moyenne +
-    0.1 * Efficacité_batterie
-)
-```
+Pour évaluer les performances de la flotte de drone, une fois la simulation terminée deux graphiques sont également générés et sauvegardés.
+Le premier graphique représente l'évolution du nombre de personnes en situation de détresse, ainsi que le moments de prise en charge des personnes en fonction du temps.
+Le second graphique représente pour chaque personne sauvée, le temps pris pour le sauvetage. On a ainsi une estimation du temps nécessaire entre le début d'un malaise et l'arrivée d'un secouriste auprès du participant, pour chaque protocole de drone.
 
-[Source: [8]]
 
-## 6. Plan de Test
 
-### 6.1 Tests Unitaires
-
-```go
-func TestDetection(t *testing.T) {
-    tests := []struct {
-        name     string
-        distance float64
-        expected float64
-    }{
-        {"CentreZone", 0.0, 0.95},
-        {"MiDistance", 18.6, 0.75},
-        {"LimiteCouverture", 37.2, 0.50},
-    }
-    
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            result := CalculatePrecision(tt.distance)
-            if math.Abs(result-tt.expected) > 0.01 {
-                t.Errorf("got %v, want %v", result, tt.expected)
-            }
-        })
-    }
-}
-```
-
-### 6.2 Scénarios de Test
-
-#### 6.2.1 Scénario de Base
-- 1000 agents
-- 4 drones
-- 2 heures simulation
-- Conditions normales
-
-#### 6.2.2 Scénario Haute Densité
-- 5000 agents
-- 8 drones
-- Zones congestionnées
-
-#### 6.2.3 Scénario Dégradé
-- Perte de drones
-- Communications perturbées
-- Conditions météo défavorables
-
-### 6.3 Validation
-
-Pour chaque scénario:
-1. Exécuter 30 itérations
-2. Calculer:
-   - Moyenne
-   - Écart-type
-   - Intervalles de confiance
-3. Analyser:
-   - Stabilité
-   - Performance
-   - Ressources
-
-[Source: [8]]
-
-## 7. Configuration et Paramètres
-
-```yaml
-simulation:
-  tick_rate: 100ms
-  grid_size: [100, 100]
-  cell_size: 5m
-  duration: 2h
-
-drones:
-  count: 4
-  height: 40m
-  battery_capacity: 45min
-  detection_rate: 10Hz
-  max_speed: 15
-  acceleration: 3
-
-detection:
-  base_precision: 0.95
-  decay_factor: 2.3
-  min_confidence: 0.85
-  scan_frequency: 10
-
-communication:
-  broadcast_rate: 5s
-  message_timeout: 100ms
-  buffer_size: 100
-
-crowd:
-  max_density: 6
-  base_malaise_prob: 0.001
-  risk_factors:
-    temperature: 0.5
-    density: 0.3
-    duration: 0.2
-    proximity: 0.4
-```
-
-## 8. Bibliographie
+## 6. Bibliographie
 
 [1] "UAV Coverage Optimization for Urban Surveillance", Robotics and Automation Letters, 2023
 
