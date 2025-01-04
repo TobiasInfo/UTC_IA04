@@ -192,6 +192,7 @@ P_base = 0.005
 - Cautious
 - Social
 - Independent
+- 
 Ces profils ont une influence sur :
 - La vitesse de déplacement de l'individu
 - les variables "CrowdFollowingTendency" et "PersonalSpace" qui influe sur la tendance de l'individu à aller ou non dans les zones avec de nombreux autres individus
