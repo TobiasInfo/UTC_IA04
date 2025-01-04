@@ -73,13 +73,11 @@ Les sauveteurs sont représentés avec une image de pompier, il sont reliés par
 
 ### 3.1 Environnement de Simulation
 
-#### 3.1.1 Structure Spatiale
 - **Plan 2D+**
   - Coordonnées réelles pour les participants
   - Grille de 30 sur 20 pour les drones et les POI
   - Les participants ne peuvent pas traverser les POI, les drones les survolent
 
-#### 3.1.2 Zones Définies
 - **Entrée/Sortie**
   - Entrée sur la gauche de l'écran et sortie sur la droite
   - Phases : Les premières minutes permettent à nouveaux participants d'arriver, mais les entrées sont ensuite fermées. Tout au long de la simulation les participants peuvent sortir, mais lorsque le temps est écoulé, les participants sont obligés de se diriger vers la sortie.
