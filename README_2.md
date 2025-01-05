@@ -1,5 +1,4 @@
 # 🎪 Système Multi-Drones pour la Sécurité d'Événements Festifs
-> Système intelligent de surveillance et d'intervention pour grands événements
 
 ## 📑 Table des Matières
 1. [Introduction](#introduction)
@@ -135,9 +134,9 @@ Les drones constituent le cœur du système de détection. Chaque drone est un a
 - Un système de détection avec une portée configurable (DroneSeeRange)
 - Un système de communication avec une portée définie (DroneCommRange)
 - Une gestion autonome de l'énergie avec :
-  - 📊 Surveillance du niveau de batterie
-  - 🔍 Recherche de points de recharge
-  - ⚡ Planification des recharges
+  - Surveillance du niveau de batterie
+  - Recherche de points de recharge
+  - Planification des recharges
 
 #### 2. 🎯 Détection et Surveillance
 Le drone effectue une surveillance continue de sa zone assignée. La probabilité de détection d'une personne en détresse suit la formule :
@@ -201,12 +200,6 @@ Le protocole 3 étend le protocole 2 avec les fonctionnalités réseau suivantes
 - Transmission d'informations à travers le réseau de drones
 - Coordination via le réseau pour atteindre les points de secours
 
-##### Structures de Données Ajoutées
-- Tables de routage pour la communication multi-sauts
-- Base de données distribuée des cas détectés
-- Graphe des connexions entre drones
-- Système de propagation des messages à travers le réseau
-
 #### ⚡ Protocole 4 : Optimisation du Réseau
 
 Le protocole 4 complète le protocole 3 avec ces mécanismes d'optimisation :
@@ -230,13 +223,13 @@ go run ./main_gui_ebiten.go
 
 ### 🏁 Écran d'Accueil
 L'interface permet de configurer :
-- 🛸 Le nombre de drones détermine la capacité de surveillance du système. Un équilibre doit être trouvé entre une couverture suffisante et une utilisation efficiente des ressources.
+- Le nombre de drones détermine la capacité de surveillance du système. Un équilibre doit être trouvé entre une couverture suffisante et une utilisation efficiente des ressources.
 
-- 👥 La population initiale de festivaliers influence directement la complexité des interactions et la charge sur le système de surveillance.
+- La population initiale de festivaliers influence directement la complexité des interactions et la charge sur le système de surveillance.
 
-- 🗺️ La sélection de la carte définit la disposition physique du festival, avec ses zones et points d'intérêt spécifiques.
+- La sélection de la carte définit la disposition physique du festival, avec ses zones et points d'intérêt spécifiques.
 
-- 📡 Le choix du protocole de communication des drones impacte significativement leur efficacité collective.
+- Le choix du protocole de communication des drones impacte significativement leur efficacité collective.
 
 ### 🖥️ Vue Principale
 L'interface graphique, développée avec le moteur Ebiten, offre une visualisation claire et interactive de la simulation. Elle se compose de plusieurs éléments clés :
@@ -250,13 +243,13 @@ Le panneau de contrôle permet de :
 
 Deux visualisations dynamiques enrichissent l'analyse :
 
-- 📈 La carte de densité (à gauche) représente la distribution des festivaliers sur le site. Cette visualisation peut être agrandie pour une analyse plus détaillée des mouvements de foule.
-- 🕸️ Le graphe de réseau (à droite) illustre les communications entre drones et leur connexion avec les points de secours. Il permet de comprendre la topologie du réseau et d'identifier d'éventuelles zones de faible couverture.
+- La carte de densité (à gauche) représente la distribution des festivaliers sur le site. Cette visualisation peut être agrandie pour une analyse plus détaillée des mouvements de foule.
+- Le graphe de réseau (à droite) illustre les communications entre drones et leur connexion avec les points de secours. Il permet de comprendre la topologie du réseau et d'identifier d'éventuelles zones de faible couverture.
 
 Pour évaluer les performances de la flotte de drone, une fois la simulation terminée deux graphiques sont également générés et sauvegardés:
 
-- 📊 Le premier graphique représente l'évolution du nombre de personnes en situation de détresse, ainsi que les moments de prise en charge des personnes en fonction du temps.  
-- ⏱️ Le second graphique représente pour chaque personne sauvée, le temps pris pour le sauvetage. On a ainsi une estimation du temps nécessaire entre le début d'un malaise et l'arrivée d'un secouriste auprès du participant, pour chaque protocole de drone.
+- Le premier graphique représente l'évolution du nombre de personnes en situation de détresse, ainsi que les moments de prise en charge des personnes en fonction du temps.  
+- Le second graphique représente pour chaque personne sauvée, le temps pris pour le sauvetage. On a ainsi une estimation du temps nécessaire entre le début d'un malaise et l'arrivée d'un secouriste auprès du participant, pour chaque protocole de drone.
 
 ## 📊 Analyse par Lots et Résultats
 
@@ -281,23 +274,23 @@ go run main.go
 
 L'outil teste systématiquement les combinaisons des paramètres suivants :
 
-#### 🛸 Taille de la Flotte de Drones
+#### Taille de la Flotte de Drones
 - **2 drones** : Couverture minimale pour tester la résilience
 - **5 drones** : Configuration moyenne, équilibre coût/efficacité
 - **10 drones** : Couverture intensive pour événements majeurs
 
-#### 👥 Population de Festivaliers
+#### Population de Festivaliers
 - **200 personnes** : Petits événements, charge faible
 - **500 personnes** : Événements moyens, charge normale
 - **1000 personnes** : Grands événements, charge élevée
 
-#### 📡 Protocoles de Communication
+#### Protocoles de Communication
 - **Protocole 1** : Système de base, communication directe
 - **Protocole 2** : Patrouille structurée et communication locale
 - **Protocole 3** : Communication multi-sauts en réseau
 - **Protocole 4** : Optimisation du réseau et des décisions
 
-#### 🗺️ Configurations de Carte
+#### Configurations de Carte
 - **festival_layout_1** : Point de secours latéral
 - **festival_layout_2** : Double points de secours
 - **festival_layout_3** : Point de secours central
@@ -329,7 +322,7 @@ Où :
 
 ### 📊 Métriques Analysées
 
-#### 📈 Métriques Globales (metrics.txt)
+#### Métriques Globales (metrics.txt)
 ```text
 Simulation Results (Averaged over 5 runs)
 =====================================
@@ -348,32 +341,32 @@ Performance Metrics:
 - Average Response Time: [durée]
 ```
 
-#### 📋 Métriques Détaillées (run_X_metrics.txt)
+#### Métriques Détaillées (run_X_metrics.txt)
 Chaque simulation individuelle génère un rapport détaillé incluant :
-- 👥 Statistiques complètes de population
-- 🛸 États des drones (batterie, couverture)
-- ⏱️ Temps de réponse aux incidents
-- ⌛ Durée totale de simulation
+- Statistiques complètes de population
+- États des drones (batterie, couverture)
+- Temps de réponse aux incidents
+- Durée totale de simulation
 
 ### 📊 Visualisations Générées
 
-#### 📈 Évolution des Sauvetages (rescue_stats_people.png)
+#### Évolution des Sauvetages (rescue_stats_people.png)
 Graphique temporel montrant :
 - **Courbe rouge** : Nombre de personnes en détresse
 - **Courbe verte** : Nombre de personnes sauvées
 Permet d'identifier les pics d'activité et l'efficacité des interventions.
 
-#### ⏱️ Analyse des Temps de Réponse (rescue_stats_time.png)
+#### Analyse des Temps de Réponse (rescue_stats_time.png)
 - **Courbe bleue** : Temps moyen de sauvetage
 - Permet d'évaluer la réactivité du système et sa stabilité sous charge
 
-### 🎯 Utilisation des Résultats
+### Utilisation des Résultats
 
 Ces analyses permettent de :
-1. 🛸 Optimiser le dimensionnement de la flotte
-2. 📡 Sélectionner le protocole le plus adapté selon le contexte
-3. 🗺️ Valider le positionnement des points de secours
-4. ⚠️ Identifier les configurations critiques
-5. 📊 Estimer les ressources nécessaires selon la taille de l'événement
+1. Optimiser le dimensionnement de la flotte
+2. Sélectionner le protocole le plus adapté selon le contexte
+3. Valider le positionnement des points de secours
+4. Identifier les configurations critiques
+5. Estimer les ressources nécessaires selon la taille de l'événement
 
 Les résultats fournissent une base quantitative pour les décisions de déploiement et l'amélioration continue du système.
