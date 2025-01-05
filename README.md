@@ -1,195 +1,115 @@
-# Spécifications Complètes - Système de Surveillance par Drones
-## Version 1.0 - Novembre 2024
+# 🎪 Système Multi-Drones pour la Sécurité d'Événements Festifs
 
-# Table des Matières
-1. [Objectifs et Vue d'Ensemble](#1-objectifs-et-vue-densemble)  
-2. [Lancement de la simulation](#2-lancement-de-la-simulation)  
-3. [Architecture du Système](#3-architecture-du-système)  
-4. [Implémentation](#4-implémentation)  
-5. [Métriques et Évaluation](#5-métriques-et-évaluation)  
-6. [Bibliographie](#6-bibliographie)  
+## 📑 Table des Matières
+1. [Introduction](#introduction)
+2. [Architecture du Projet](#architecture-du-projet)
+3. [Environnement et Interactions](#environnement-et-interactions)
+4. [Implémentation](#implémentation)
+5. [Modélisation des Agents](#modélisation-des-agents)
+6. [Interface Graphique de Simulation](#interface-graphique-de-simulation)
+7. [Analyse par Lots et Résultats](#analyse-par-lots-et-résultats)
+8. [Bibliographie](#bibliographie)
 
-## 1. Objectifs et Vue d'Ensemble
+## 🚀 Introduction
 
-### 1.1 Objectif Principal
-Développer une simulation en Go pour évaluer l'efficacité des protocoles de surveillance par drones lors d'événements publics, utilisant une approche distribuée et des communications P2P.
+### Vue d'ensemble
 
-### 1.2 Sous-Objectifs
-- Pouvoir modifier l'agencement des éléments de la carte  
-- Pouvoir modifier le nombre de personnes et de drones présents  
-- Obtenir des informations sur la simulation pour évaluer la performance des différents protocoles de surveillance  
+Les festivals de grande envergure présentent des défis majeurs en termes de sécurité et de gestion des urgences médicales. Notre système propose une solution basée sur une flotte de drones autonomes collaborant avec des équipes de secours au sol pour assurer une surveillance continue et une intervention rapide.
 
-### 1.3 Contexte
-Surveillance d'événements publics avec contraintes :  
-- Durée : 2-8 heures  
-- Participants : 1,000-10,000  
-- Agencement : Variable selon configuration  
+#### Principaux Agents
+- 🛸 Les drones de surveillance, équipés de systèmes de détection et de communication
+- 🚑 Les équipes de secours, intervenant sur le terrain
+- 👥 Les festivaliers, avec leurs comportements et besoins
 
-[Source: [8], [10]]
+## 🏗 Architecture du Projet
 
-## 2. Lancement de la simulation
-
-### 2.1 Ouvrir l'application
-
-Pour lancer la simulation, veuillez :  
-1. Télécharger le répertoire accessible sur https://github.com/TobiasInfo/UTC_IA04  
-2. Accéder au répertoire en ligne de commande : cd XXX\UTC_IA04\cmd  
-3. Exécuter en ligne de commande le fichier main : go run .\main_gui_ebiten.go  
-
-### 2.2 Paramétrage
-
-Dans le Menu principal peuvent être choisis :  
-1. Le nombre de drones d'observation  
-2. Le nombre de festivaliers  
-3. La carte parmi celles proposées  
-4. Le protocole de communication et d'observation des drones  
-
-Une fois ces paramètres choisis, cliquer sur "Start Simulation".  
-Le mode "Debug" désactive l'évolution automatique du système, et impose à l'utilisateur d'utiliser le bouton "Update Simulation" à chaque étape.
-
-### 2.3 Fonctionnalités
-
-Une fois la simulation lancée, elle peut à tout moment être mise en pause à l'aide du bouton "Pause". Il est également possible une fois la simulation pausée de la mettre à jour manuellement avec "Update Simulation" pour que le système évolue au rythme voulu.
-
-Des informations sur la simulation sont affichées sur le bandeau inférieur et rendent compte de l'état actuel de la simulation.  
-Des graphiques représentant l'évolution au cours du temps des informations clés sont sauvegardés dans le fichier UTC_IA04 à la fin de la simulation. La simulation prend fin lorsque tous les participants ont quitté le festival, et que les drones sont allés se poser.
-
-Au cours de la simulation des graphes sont également affichés, celui de gauche représente la densité de participants sur la carte, pour savoir où les festivaliers sont le plus présents. Celui de droite représente les drones, leur champ de communication ainsi que les réseaux de communication formés. Il est également possible de lire qu'un drone est entré en communication avec la tente de secours. Ces graphiques peuvent être agrandis ou réduits selon la convenance en cliquant dessus.
-
-Il est possible d'obtenir des informations supplémentaires sur un participant, un drone ou un point d'intérêt en le survolant avec la souris. Attention, lorsque trop d'agents se superposent, l'info-bulle perd en lisibilité.
-
-### 2.4 Lecture de l'interface
-
-La fenêtre représente un festival, où l'on trouve des points d'intérêts pour les festivaliers (que l'on appellera par la suite POI), des participants, des drones, et des POI pour les drones.  
-L'entrée du festival se trouve sur la gauche de la fenêtre tandis que la sortie se trouve à droite. Les festivaliers ne peuvent pas sortir de la carte centrale, sauf dans le cas d'une sortie définitive du festival.  
-Les drones survolent les participants, et l'on peut observer la portée de vision d'un drone avec le disque d'ombre autour de lui.  
-Les POI des participants sont représentés selon leur fonction (scène, aire de repos, stand de nourriture, toilettes,...).  
-Les POI des drones (station de recharge et tente infirmerie) sont représentés avec des images différentes.  
-Les sauveteurs sont représentés avec une image de pompier, ils sont reliés par une ligne verte à leur poste de secours et à la position de la personne qu'ils vont sauver.
-
-## 3. Architecture du Système
-
-### 3.1 Environnement de Simulation
-
-- **Plan 2D+**  
-  - Coordonnées réelles pour les participants  
-  - Grille de 30 sur 20 pour les drones et les POI  
-  - Les participants ne peuvent pas traverser les POI, les drones les survolent  
-
-- **Entrée/Sortie**  
-  - Entrée sur la gauche de l'écran et sortie sur la droite  
-  - Phases : Les premières minutes permettent à nouveaux participants d'arriver, mais les entrées sont ensuite fermées. Tout au long de la simulation les participants peuvent sortir, mais lorsque le temps est écoulé, les participants sont obligés de se diriger vers la sortie.
-
-[Source: [1], [9], [10]]
-
-### 3.2 Composants du Système
-
-#### 3.2.1 Caractéristiques des Drones
-
-**Paramètres d'un drone**  
-- Batterie  
-- Portée de Communication  
-- Champ de Vision  
-- Protocole  
-
-**Champ de Vision**  
-Pour chaque participant en situation de détresse dans le champ de vision d'un drone, la probabilité qu'il soit identifié correctement dépend de sa distance par rapport au drone et de la quantité de personnes dans le champ de vision du drone et est calculée :
-```go
-probaDetection := max(0, 1.0/float64(s.DroneSeeRange)-(float64(nbPersDetected)*0.03))
+```text
+UTC_IA04/
+├── cmd/
+│   ├── run_simulations/          # Exécution des simulations benchmark
+│   │   ├── results/              # Stockage des résultats d'analyse
+│   │   └── main.go              # Point d'entrée benchmark
+│   ├── simu/                    # Simulation graphique
+│   │   ├── drawutils.go         # Utilitaires de dessin
+│   │   └── simu.go             # Logique de simulation
+│   └── ui/                      # Interface utilisateur
+│       ├── assets/              # Ressources graphiques
+│       ├── components/          # Composants réutilisables
+│       ├── constants/           # Constantes UI
+│       ├── button.go           # Gestion des boutons
+│       ├── liste_deroulante.go # Menus déroulants
+│       ├── textfield.go        # Champs de texte
+│       └── main_gui_ebiten.go  # Point d'entrée interface graphique
+├── configs/                     # Configurations des cartes
+├── pkg/                        # Logique métier
+│   ├── entities/               # Agents autonomes
+│   ├── models/                 # Structures de données
+│   └── simulation/             # Moteur de simulation
+└── vendor/                     # Dépendances externes
 ```
 
-**Protocole 1**
+## 🌍 Environnement et Interactions
 
-Step 1 :  
-- Je scanne les personnes en danger  
-- Si je vois une personne en danger, je la sauvegarde.
+### 🎯 Le Terrain du Festival
 
-Step 2 :  
-- Dès que ma liste est supérieure > 1 je m'en vais vers le RP le + Proche pour régler les problèmes.  
-- Si je n'ai plus de batterie, je bouge vers le point de charge le plus proche.  
-    - J'essaye lors de mon mouvement de transmettre ma liste à mes voisins pour qu'ils aillent informer le rescuer à ma place.  
-- Une fois que ma charge est terminée, je bouge vers le point de sauvetage le plus proche.
+L'environnement de simulation reproduit la configuration d'un festival avec trois zones distinctes :
 
-**Protocole 2**
+#### Zone d'Entrée
+La zone d'entrée constitue le point d'accès des festivaliers. Elle permet de contrôler le flux d'entrée des participants et d'établir le premier niveau de surveillance.
 
-Step 0 :  
-- Si je n'ai plus de batterie, je bouge vers le point de charge le plus proche.  
-    - J'essaye lors de mon mouvement de transmettre ma liste à mes voisins pour qu'ils aillent informer le rescuer à ma place.  
-- Une fois que ma charge est terminée, je bouge vers le point de sauvetage le plus proche.
+#### Zone Principale
+La zone principale concentre l'essentiel des activités et des points d'intérêt :
+- 🎭 Scènes de spectacle
+- 🍕 Stands de restauration et de boissons
+- 🛋 Zones de repos
+- 🚽 Installations sanitaires
+- 🏥 Postes de secours
+- 🔋 Stations de recharge pour les drones
 
-Step 1 :  
-- Je scanne les personnes en danger  
-- Si je vois une personne en danger, je la sauvegarde.
+#### Zone de Sortie
+La zone de sortie permet une gestion ordonnée des départs.
 
-Step 2 :  
-- J'essaye de communiquer avec un RP si un RP est dans mon rayon de communication.  
-   - Si aucun RP n'est dans mon rayon de communication.  
-		- J'essaye de voir si je peux envoyer l'information à un drone qui est en n+1 de mon rayon de communication.  
-		- Si je ne peux pas, je bouge vers le rescue point le plus proche.  
-- Je bouge vers le rescue point si je ne peux pas communiquer.
+### ⏱ Dynamique Temporelle
 
-**Protocole 3**
+La simulation utilise un ratio temporel de 1:60, où une seconde réelle correspond à une minute simulée. Cette compression permet d'observer l'évolution d'un festival complet tout en maintenant une précision suffisante pour l'analyse des interventions.
 
-Step 0 :  
-- Si je n'ai plus de batterie, je bouge vers le point de charge le plus proche.  
-    - J'essaye lors de mon mouvement de transmettre ma liste à mes voisins pour qu'ils aillent informer le rescuer à ma place.  
-- Une fois que ma charge est terminée, je bouge vers le point de sauvetage le plus proche.
+## 💻 Implémentation 
 
-Step 1 :  
-- Je scanne les personnes en danger  
-- Si je vois une personne en danger, je la sauvegarde.
+Les Agents utilisent une boucle de Perception/Délibération/Action, et évoluent en parallèle avec des goroutines pour permettre une évolution indépendante et non-déterministe dans la mesure des fonctionnalités du langage go.  
 
-Step 2 :  
-- J'essaye de communiquer avec un RP si un RP est dans mon rayon de communication.  
-   - Si aucun RP n'est dans mon rayon de communication.  
-		- J'essaye de voir si je peux envoyer l'information à un drone qui est dans mon network.  
-			- Un network est un sous-ensemble de drones qui peuvent communiquer entre eux, ils sont chaînés et ils forment un sous-graphe.  
-		- Si je ne peux pas, je bouge vers le rescue point le plus proche.  
-- Je bouge vers le rescue point si je ne peux pas communiquer.
+Il a été choisi de synchroniser les agents pour ne leur permettre qu'une itération de leur cycle de perception/délibération/action par tick de la simulation globale pour conserver une cohérence des actions des agents entre eux, et rester plus fidèle aux conditions réelles.
 
-**Protocole 4**
+Un objet Simulation contient l'ensemble des éléments utiles à notre simulation, dont une instance de Carte, qui mémorise et gère les positions et déplacements des agents.
 
-Step 0 :  
-- Si je n'ai plus de batterie, je bouge vers le point de charge le plus proche.  
-    - J'essaye lors de mon mouvement de transmettre ma liste à mes voisins pour qu'ils aillent informer le rescuer à ma place.  
-- Une fois que ma charge est terminée, je bouge vers le point de sauvetage le plus proche.
+Pour l'interface graphique l'outil Ebiten a été utilisé, pour permettre une implémentation globale 100% en Go.
 
-Step 1 :  
-- Je scanne les personnes en danger  
-- Si je vois une personne en danger, je la sauvegarde.
+Les images utilisées ont été générées par des IA génératives, puis retouchées ensuite à la main.
 
-Step 2 :  
-- J'essaye de communiquer avec un RP si un RP est dans mon rayon de communication.  
-   - Si aucun RP n'est dans mon rayon de communication.  
-		- J'essaye de voir si je peux envoyer l'information à un drone qui est dans mon network.  
-			- Un network est un sous-ensemble de drones qui peuvent communiquer entre eux, ils sont chaînés et ils forment un sous-graphe.  
-		- Si je ne peux pas, je prends le drone le plus proche dans mon network en termes de distance d'un RP et je lui transfère la responsabilité de sauver les personnes.
+## 🤖 Modélisation des Agents
 
-Step 3 :  
-- Je bouge vers le rescue point si je suis le drone le plus proche.
+### 👥 Les Festivaliers
 
-[Source: = [3], [4], [2], [9]]
+Chaque festivalier possède un profil qui influence son comportement :
 
-#### 3.2.2 Modèle des Participants
+#### 1. L'Aventurier 🏃
+- Grande mobilité dans l'espace
+- Exploration active des différentes zones
+- Niveau de fatigue augmentant rapidement
 
-**États Possibles**  
-- Normal (debout) - Consommation faible d'énergie  
-- Repos - Récupération d'énergie  
-- Malaise (allongé) - Consommation rapide d'énergie  
+#### 2. Le Prudent 🚶
+- Préfère les zones moins denses
+- Maintient une distance de sécurité importante
+- Progression méthodique entre les points d'intérêt
 
-**Modèle de Probabilité de Malaise**
-```python
-P(malaise) = P_base x (1 - Resistance au Malaise du participant) * (1 - Energie du participant)
-où:
-P_base = 0.005
-```
+#### 3. Le Social 👯
+- Tendance à suivre les groupes
+- Préférence pour les zones animées
+- Interactions fréquentes avec les points d'intérêt
 
-**Intérêts**  
-4 profils de participants :  
-- Adventurous  
-- Cautious  
-- Social  
-- Independent  
+#### 4. L'Indépendant 🧘
+- Parcours personnalisé du site
+- Faible influence des mouvements de foule
+- Rythme d'activité régulier
 
 Ces profils ont une influence sur :  
 - La vitesse de déplacement de l'individu  
@@ -200,54 +120,278 @@ Ces profils ont une influence sur :
 
 Lorsque qu'un participant atteint un POI, il va y rester pendant une durée variable, puis repartir à la recherche d'un autre POI.
 
-#### 3.2.3 Sauvetage d'un participant en détresse
-
+Le système modélise la fatigue et les risques de malaise selon :
+```python
+P(malaise) = P_base x (1 - Resistance_Malaise) x (1 - Niveau_Energie)
+où P_base = 0.005
+```
 Lorsqu'un participant en situation de détresse a été remarqué, l'information doit être remontée à la tente infirmerie qui détachera ensuite un pompier qui ira sauver le participant.
 
-Les Drones peuvent communiquer entre eux pour remonter l'information à la tente de secours. Il faut être à portée de communication de la tente de secours pour transmettre une information.
+### 🛸 Les Drones de Surveillance
 
-[Source: [5], [6], [7]]
+Les drones constituent le cœur du système de détection. Chaque drone est un agent autonome disposant des capacités suivantes :
 
-## 4. Implémentation 
+#### 1. Capacités de Base
+- Un système de détection avec une portée configurable (DroneSeeRange)
+- Un système de communication avec une portée définie (DroneCommRange)
+- Une gestion autonome de l'énergie avec :
+  - Surveillance du niveau de batterie
+  - Recherche de points de recharge
+  - Planification des recharges
 
-Les Agents utilisent une boucle de Perception/Délibération/Action, et évoluent en parallèle avec des goroutines pour permettre une évolution indépendante et non-déterministe dans la mesure des fonctionnalités du langage go.  
-Il a été choisi de synchroniser les agents pour ne leur permettre qu'une itération de leur cycle de perception/délibération/action par tick de la simulation globale pour conserver une cohérence des actions des agents entre eux, et rester plus fidèle aux conditions réelles.
+#### 2. 🎯 Détection et Surveillance
+Le drone effectue une surveillance continue de sa zone assignée. La probabilité de détection d'une personne en détresse suit la formule :
+```go
+probaDetection := max(0, 1.0/float64(s.DroneSeeRange)-(float64(nbPersDetected)*0.03))
+```
+Cette formule modélise la diminution de l'efficacité de détection avec la distance et le nombre de personnes déjà détectées.
 
-Un objet Simulation contient l'ensemble des éléments utiles à notre simulation, dont une instance de Carte, qui mémorise et gère les positions et déplacements des agents.
+#### 3. 📡 Patrouille et Communication
+Le drone maintient une patrouille systématique de sa zone. En cas de détection d'une personne en détresse, il peut :
+- Alerter directement un point de secours si à portée
+- Relayer l'information via d'autres drones
+- Coordonner une intervention avec les équipes au sol
 
-Pour l'interface graphique l'outil Ebiten a été utilisé, pour permettre une implémentation globale 100% en Go.
+### 🚑 Les Équipes de Secours
 
-Les images utilisées ont été générées par des IA génératives, puis retouchées ensuite à la main.
+Les sauveteurs représentent l'interface entre la surveillance automatisée et l'intervention humaine. Positionnés dans des postes de secours stratégiques, ils :
+- Reçoivent les alertes des drones
+- Se déplacent vers les personnes en détresse
+- Administrent les premiers soins
+- Retournent à leur poste après intervention
 
-[Source: [4], [8]]
+### 📡 Protocoles de Communication des Drones
 
-## 5. Métriques et Évaluation
+#### 🔰 Protocole 1 : Système de Base
 
-### 5.1 Métriques en Temps Réel
+Le protocole 1 implémente les mécanismes fondamentaux du système. Il définit les capacités individuelles des drones :
 
-Au cours de la simulation sont calculées et affichées quelques informations pour permettre de juger de l'état du système en temps réel :  
-- Le nombre de participants  
-- Combien sont en situation de détresse  
-- Combien ont été traités  
-- Combien n'ont pas été pris en charge à temps  
-- La batterie moyenne des drones de la flotte  
-- La proportion de la surface totale de terrain observée  
+##### Fonctionnalités Implémentées
+- Scan continu de la zone de surveillance du drone
+- Détection des personnes en détresse
+- Mémorisation des cas détectés dans une liste interne
+- Déplacement vers le point de secours le plus proche en cas de détection
+- Gestion autonome de la batterie avec recherche de point de recharge quand nécessaire
 
-### 5.2 Calcul de Performance
+#### 🔄 Protocole 2 : Communication Locale
 
-Pour évaluer les performances de la flotte de drone, une fois la simulation terminée deux graphiques sont également générés et sauvegardés.  
-Le premier graphique représente l'évolution du nombre de personnes en situation de détresse, ainsi que les moments de prise en charge des personnes en fonction du temps.  
-Le second graphique représente pour chaque personne sauvée, le temps pris pour le sauvetage. On a ainsi une estimation du temps nécessaire entre le début d'un malaise et l'arrivée d'un secouriste auprès du participant, pour chaque protocole de drone.
+Le protocole 2 ajoute au protocole 1 les fonctionnalités suivantes :
 
-## 6. Bibliographie
+##### Nouvelles Fonctionnalités
+- Implémentation d'un pattern de patrouille en zigzag remplaçant le mouvement aléatoire
+- Établissement de communication entre drones à portée directe
+- Capacité de transmission des informations aux drones voisins
+- Fonction de transfert de responsabilité entre drones proches
+- Mécanisme de délégation des cas détectés aux drones mieux positionnés
 
-[1] "UAV Coverage Optimization for Urban Surveillance", Robotics and Automation Letters, 2023  
-[2] "Spatial Accuracy Models in UAV Surveillance", Sensors Journal IEEE, 2023  
-[3] "Adaptive UAV Patrol Strategies", Autonomous Robots, 2023  
-[4] "Distributed UAV Coordination Protocols", ICRA 2023  
-[5] "Medical Incidents at Outdoor Music Festivals", Prehospital and Disaster Medicine, 2022  
-[6] "Risk Factors for Medical Emergencies at Large Public Events", International Journal of Environmental Research and Public Health, 2021  
-[7] "Analysis of Medical Interventions at Music Festivals", Scandinavian Journal of Trauma, 2023  
-[8] "Validation Protocols for Multi-Agent Simulations", Simulation Modelling Practice and Theory, 2023  
-[9] "Professional Drone Operations and Maintenance", IEEE Aerospace Conference, 2022  
-[10] "Crowd Dynamics and Safety at Mass Events", Safety Science Journal, 2023  
+##### Mécanismes Techniques Ajoutés
+- Vérification de la portée de communication entre drones
+- Système de transfert de données entre drones à portée
+- Algorithme de patrouille structurée
+- Protocole de délégation des responsabilités
+
+#### 🌐 Protocole 3 : Réseau Multi-Sauts
+
+Le protocole 3 étend le protocole 2 avec les fonctionnalités réseau suivantes :
+
+##### Extensions Techniques
+- Implémentation d'un réseau de communication maillé entre drones
+- Communication possible au-delà de la portée directe via des relais
+- Formation dynamique de sous-réseaux de communication
+- Transmission d'informations à travers le réseau de drones
+- Coordination via le réseau pour atteindre les points de secours
+
+#### ⚡ Protocole 4 : Optimisation du Réseau
+
+Le protocole 4 complète le protocole 3 avec ces mécanismes d'optimisation :
+
+##### Fonctionnalités Additionnelles
+- Calcul des distances effectives aux points de secours pour chaque drone
+- Sélection automatique du drone le plus proche pour chaque intervention
+- Distribution optimisée des responsabilités dans le réseau
+- Transfert intelligent des cas selon la topologie du réseau
+- Prise en compte de la distance au point de secours dans les décisions
+
+## 🎮 Interface Graphique de Simulation
+
+### ⚙️ Configuration Initiale
+Pour lancer la simulation :
+```bash
+git clone https://github.com/TobiasInfo/UTC_IA04
+cd UTC_IA04/cmd
+go run ./main_gui_ebiten.go
+```
+
+### 🏁 Écran d'Accueil
+L'interface permet de configurer :
+- Le nombre de drones détermine la capacité de surveillance du système. Un équilibre doit être trouvé entre une couverture suffisante et une utilisation efficiente des ressources.
+
+- La population initiale de festivaliers influence directement la complexité des interactions et la charge sur le système de surveillance.
+
+- La sélection de la carte définit la disposition physique du festival, avec ses zones et points d'intérêt spécifiques.
+
+- Le choix du protocole de communication des drones impacte significativement leur efficacité collective.
+
+### 🖥️ Vue Principale
+L'interface graphique, développée avec le moteur Ebiten, offre une visualisation claire et interactive de la simulation. Elle se compose de plusieurs éléments clés :
+
+La vue principale présente une représentation en temps réel du festival. Les festivaliers, les drones et les points d'intérêt sont représentés par des icônes distinctives. Les drones affichent leur champ de vision sous forme d'un cercle d'ombre, permettant de visualiser la couverture de surveillance.
+
+Le panneau de contrôle permet de :
+- ⏸️ Mettre en pause la simulation
+- 🔍 Avancer pas à pas en mode debug
+- 📊 Visualiser les métriques en temps réel
+
+Deux visualisations dynamiques enrichissent l'analyse :
+
+- La carte de densité (à gauche) représente la distribution des festivaliers sur le site. Cette visualisation peut être agrandie pour une analyse plus détaillée des mouvements de foule.
+- Le graphe de réseau (à droite) illustre les communications entre drones et leur connexion avec les points de secours. Il permet de comprendre la topologie du réseau et d'identifier d'éventuelles zones de faible couverture.
+
+Pour évaluer les performances de la flotte de drone, une fois la simulation terminée deux graphiques sont également générés et sauvegardés:
+
+- Le premier graphique représente l'évolution du nombre de personnes en situation de détresse, ainsi que les moments de prise en charge des personnes en fonction du temps.  
+- Le second graphique représente pour chaque personne sauvée, le temps pris pour le sauvetage. On a ainsi une estimation du temps nécessaire entre le début d'un malaise et l'arrivée d'un secouriste auprès du participant, pour chaque protocole de drone.
+
+## 📊 Analyse par Lots et Résultats
+
+Cette section présente l'outil d'analyse par lots (benchmarking) développé pour évaluer systématiquement les performances du système multi-drones sans interface graphique. Contrairement à la simulation visuelle qui permet une observation qualitative, cet outil fournit une analyse quantitative approfondie des différentes configurations.
+
+### 🔍 Vue d'ensemble
+
+L'analyse par lots s'exécute via le fichier `main.go` et automatise l'exécution de multiples simulations avec différentes combinaisons de paramètres. Pour chaque configuration, l'outil :
+1. Lance 5 simulations identiques
+2. Collecte les métriques détaillées
+3. Calcule les moyennes et écarts
+4. Génère des visualisations des résultats
+5. Exporte les données dans une structure organisée
+
+Pour lancer l'analyse :
+```bash
+cd UTC_IA04
+go run main.go
+```
+
+### 🎛️ Paramètres d'Analyse
+
+L'outil teste systématiquement les combinaisons des paramètres suivants :
+
+#### Taille de la Flotte de Drones
+- **2 drones** : Couverture minimale pour tester la résilience
+- **5 drones** : Configuration moyenne, équilibre coût/efficacité
+- **10 drones** : Couverture intensive pour événements majeurs
+
+#### Population de Festivaliers
+- **200 personnes** : Petits événements, charge faible
+- **500 personnes** : Événements moyens, charge normale
+- **1000 personnes** : Grands événements, charge élevée
+
+#### Protocoles de Communication
+- **Protocole 1** : Système de base, communication directe
+- **Protocole 2** : Patrouille structurée et communication locale
+- **Protocole 3** : Communication multi-sauts en réseau
+- **Protocole 4** : Optimisation du réseau et des décisions
+
+#### Configurations de Carte
+- **festival_layout_1** : Point de secours latéral
+- **festival_layout_2** : Double points de secours
+- **festival_layout_3** : Point de secours central
+
+Au total, l'analyse couvre 108 configurations uniques (3×3×4×3), chacune répétée 5 fois pour assurer la significativité statistique.
+
+### 📂 Structure des Résultats
+
+L'outil génère une hiérarchie de dossiers dans `./results/` organisée comme suit :
+
+```text
+results/
+├── {n}d_{p}p_p{x}_{layout}/    # Un dossier par configuration
+│   ├── metrics.txt             # Synthèse statistique
+│   ├── rescue_stats_people.png # Évolution des sauvetages
+│   ├── rescue_stats_time.png   # Temps de réponse
+│   ├── run_1_metrics.txt       # Détails par simulation
+│   ├── run_2_metrics.txt
+│   ├── run_3_metrics.txt
+│   ├── run_4_metrics.txt
+│   └── run_5_metrics.txt
+```
+
+Où :
+- `n` : nombre de drones (2, 5, 10)
+- `p` : population (200, 500, 1000)
+- `x` : numéro de protocole (1-4)
+- `layout` : configuration de carte
+
+### 📊 Métriques Analysées
+
+#### Métriques Globales (metrics.txt)
+```text
+Simulation Results (Averaged over 5 runs)
+=====================================
+Total People: [moyenne]
+People in Distress: [moyenne]
+Cases Treated: [moyenne]
+Cases Dead: [moyenne]
+Average Battery: [moyenne]%
+Average Coverage: [moyenne]%
+Average Runtime: [durée]
+Total Ticks: [ticks]
+
+Performance Metrics:
+- Treatment Success Rate: [pourcentage]%
+- Mortality Rate: [pourcentage]%
+- Average Response Time: [durée]
+```
+
+#### Métriques Détaillées (run_X_metrics.txt)
+Chaque simulation individuelle génère un rapport détaillé incluant :
+- Statistiques complètes de population
+- États des drones (batterie, couverture)
+- Temps de réponse aux incidents
+- Durée totale de simulation
+
+### 📊 Visualisations Générées
+
+#### Évolution des Sauvetages (rescue_stats_people.png)
+Graphique temporel montrant :
+- **Courbe rouge** : Nombre de personnes en détresse
+- **Courbe verte** : Nombre de personnes sauvées
+Permet d'identifier les pics d'activité et l'efficacité des interventions.
+
+#### Analyse des Temps de Réponse (rescue_stats_time.png)
+- **Courbe bleue** : Temps moyen de sauvetage
+- Permet d'évaluer la réactivité du système et sa stabilité sous charge
+
+### Utilisation des Résultats
+
+Ces analyses permettent de :
+1. Optimiser le dimensionnement de la flotte
+2. Sélectionner le protocole le plus adapté selon le contexte
+3. Valider le positionnement des points de secours
+4. Identifier les configurations critiques
+5. Estimer les ressources nécessaires selon la taille de l'événement
+
+Les résultats fournissent une base quantitative pour les décisions de déploiement et l'amélioration continue du système.
+
+## 📚 Bibliographie
+
+### Systèmes Multi-Agents
+- Ferber, J. (1999). *Multi-Agent Systems: An Introduction to Distributed Artificial Intelligence*. Addison-Wesley.
+- Wooldridge, M. (2009). *An Introduction to MultiAgent Systems*. John Wiley & Sons.
+- Weiss, G. (2013). *Multiagent Systems*. MIT Press.
+
+### Drones et Surveillance
+- Floreano, D., & Wood, R. J. (2015). *Science, technology and the future of small autonomous drones*. Nature, 521(7553), 460-466.
+- Shakhatreh, H., et al. (2019). *Unmanned Aerial Vehicles (UAVs): A Survey on Civil Applications and Key Research Challenges*. IEEE Access.
+
+### Gestion d'Événements et Sécurité
+- Still, G. K. (2014). *Introduction to Crowd Science*. CRC Press.
+- Fruin, J. J. (1993). *The causes and prevention of crowd disasters*. Engineering for Crowd Safety.
+
+### Technologies et Implémentation
+- Kennedy, Alan A. (2019). *Go in Practice*. Manning Publications.
+- Butcher, Matt. (2017). *Go in Action*. Manning Publications.
+- Documentation Ebiten: [https://ebiten.org/documents.html](https://ebiten.org/documents.html)
+
+### Algorithmes et Optimisation
+- Cormen, T. H., et al. (2009). *Introduction to Algorithms*. MIT Press.
+- Bonabeau, E., et al. (1999). *Swarm Intelligence: From Natural to Artificial Systems*. Oxford University Press.
