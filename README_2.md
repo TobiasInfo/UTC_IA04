@@ -8,6 +8,7 @@
 5. [Modélisation des Agents](#modélisation-des-agents)
 6. [Interface Graphique de Simulation](#interface-graphique-de-simulation)
 7. [Analyse par Lots et Résultats](#analyse-par-lots-et-résultats)
+8. [Bibliographie](#bibliographie)
 
 ## 🚀 Introduction
 
@@ -370,3 +371,27 @@ Ces analyses permettent de :
 5. Estimer les ressources nécessaires selon la taille de l'événement
 
 Les résultats fournissent une base quantitative pour les décisions de déploiement et l'amélioration continue du système.
+
+## 📚 Bibliographie
+
+### Systèmes Multi-Agents
+- Ferber, J. (1999). *Multi-Agent Systems: An Introduction to Distributed Artificial Intelligence*. Addison-Wesley.
+- Wooldridge, M. (2009). *An Introduction to MultiAgent Systems*. John Wiley & Sons.
+- Weiss, G. (2013). *Multiagent Systems*. MIT Press.
+
+### Drones et Surveillance
+- Floreano, D., & Wood, R. J. (2015). *Science, technology and the future of small autonomous drones*. Nature, 521(7553), 460-466.
+- Shakhatreh, H., et al. (2019). *Unmanned Aerial Vehicles (UAVs): A Survey on Civil Applications and Key Research Challenges*. IEEE Access.
+
+### Gestion d'Événements et Sécurité
+- Still, G. K. (2014). *Introduction to Crowd Science*. CRC Press.
+- Fruin, J. J. (1993). *The causes and prevention of crowd disasters*. Engineering for Crowd Safety.
+
+### Technologies et Implémentation
+- Kennedy, Alan A. (2019). *Go in Practice*. Manning Publications.
+- Butcher, Matt. (2017). *Go in Action*. Manning Publications.
+- Documentation Ebiten: [https://ebiten.org/documents.html](https://ebiten.org/documents.html)
+
+### Algorithmes et Optimisation
+- Cormen, T. H., et al. (2009). *Introduction to Algorithms*. MIT Press.
+- Bonabeau, E., et al. (1999). *Swarm Intelligence: From Natural to Artificial Systems*. Oxford University Press.
