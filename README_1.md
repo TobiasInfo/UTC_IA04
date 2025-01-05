@@ -3,18 +3,19 @@
 ## Table des Matières
 1. [Introduction](#introduction)
 2. [Architecture du Projet](#architecture-du-projet)
-3. [Modélisation des Agents](#modélisation-des-agents)
-4. [Interface Graphique de Simulation](#interface-graphique-de-simulation)
-5. [Analyse par Lots et Résultats](#analyse-par-lots-et-résultats)
+3. [Environnement et Interactions](#environnement-et-interactions)
+4. [Modélisation des Agents](#modélisation-des-agents)
+5. [Interface Graphique de Simulation](#interface-graphique-de-simulation)
+6. [Analyse par Lots et Résultats](#analyse-par-lots-et-résultats)
 
 ## Introduction
 
-Les festivals de grande envergure présentent des défis majeurs en termes de sécurité et de gestion des urgences médicales. Notre système propose une approche innovante : une flotte de drones autonomes collaborant avec des équipes de secours au sol pour assurer une surveillance continue et une intervention rapide.
+Les festivals de grande envergure présentent des défis majeurs en termes de sécurité et de gestion des urgences médicales. Notre système propose une solution basée sur une flotte de drones autonomes collaborant avec des équipes de secours au sol pour assurer une surveillance continue et une intervention rapide.
 
-Dans cet écosystème, trois types d'agents interagissent constamment :
-- Les festivaliers, avec leurs comportements et besoins variés
-- Les drones de surveillance, équipés de systèmes de détection sophistiqués
-- Les équipes de secours, prêtes à intervenir sur le terrain
+Le système repose sur trois types d'agents :
+- Les drones de surveillance, équipés de systèmes de détection et de communication
+- Les équipes de secours, intervenant sur le terrain
+- Les festivaliers, avec leurs comportements et besoins
 
 ## Architecture du Projet
 
@@ -42,15 +43,16 @@ UTC_IA04/
 │   └── simulation/             # Moteur de simulation
 └── vendor/                     # Dépendances externes
 ```
+
 ## Environnement et Interactions
 
 ### Le Terrain du Festival
 
-L'environnement de simulation reproduit fidèlement la configuration d'un festival avec trois zones distinctes :
+L'environnement de simulation reproduit la configuration d'un festival avec trois zones distinctes :
 
-La zone d'entrée constitue le point d'accès principal des festivaliers. Elle joue un rôle crucial dans la gestion des flux de participants.
+La zone d'entrée constitue le point d'accès des festivaliers. Elle permet de contrôler le flux d'entrée des participants et d'établir le premier niveau de surveillance.
 
-La zone principale concentre l'essentiel des activités et des points d'intérêt. Elle est parsemée de différents POI (Points of Interest) :
+La zone principale concentre l'essentiel des activités et des points d'intérêt :
 - Scènes de spectacle
 - Stands de restauration et de boissons
 - Zones de repos
@@ -58,46 +60,75 @@ La zone principale concentre l'essentiel des activités et des points d'intérê
 - Postes de secours
 - Stations de recharge pour les drones
 
-La zone de sortie permet aux participants de quitter le site de manière fluide et contrôlée.
+La zone de sortie permet une gestion ordonnée des départs.
 
 ### Dynamique Temporelle
 
-Le temps dans la simulation s'écoule de manière accélérée, avec un ratio de 1:60 (une seconde réelle équivaut à une minute simulée). Cette compression temporelle permet d'observer l'évolution complète d'un festival tout en maintenant une granularité suffisante pour l'analyse des interventions d'urgence.
+La simulation utilise un ratio temporel de 1:60, où une seconde réelle correspond à une minute simulée. Cette compression permet d'observer l'évolution d'un festival complet tout en maintenant une précision suffisante pour l'analyse des interventions.
 
 ## Modélisation des Agents
 
-### Festivaliers
-Chaque festivalier possède un profil psychologique qui influence son comportement :
+### Les Festivaliers
 
-1. **L'Aventurier (Adventurous)**
-   - Grande mobilité
-   - Exploration active
-   - Risque accru de fatigue
+Chaque festivalier possède un profil qui influence son comportement :
 
-2. **Le Prudent (Cautious)**
-   - Préfère les zones calmes
-   - Maintient ses distances
-   - Comportement méthodique
+1. L'Aventurier
+- Grande mobilité dans l'espace
+- Exploration active des différentes zones
+- Niveau de fatigue augmentant rapidement
 
-3. **Le Social**
-   - Recherche les rassemblements
-   - Suit les mouvements de foule
-   - Interactions fréquentes
+2. Le Prudent
+- Préfère les zones moins denses
+- Maintient une distance de sécurité importante
+- Progression méthodique entre les points d'intérêt
 
-4. **L'Indépendant**
-   - Autonome dans ses choix
-   - Peu influencé par la foule
-   - Parcours personnalisé
+3. Le Social
+- Tendance à suivre les groupes
+- Préférence pour les zones animées
+- Interactions fréquentes avec les points d'intérêt
 
-Chaque festivalier possède également un niveau d'énergie qui évolue au fil du temps et des activités. Le système modélise la fatigue et les risques de malaise selon la formule :
+4. L'Indépendant
+- Parcours personnalisé du site
+- Faible influence des mouvements de foule
+- Rythme d'activité régulier
 
+Le système modélise la fatigue et les risques de malaise selon :
 ```python
 P(malaise) = P_base x (1 - Resistance_Malaise) x (1 - Niveau_Energie)
 où P_base = 0.005
 ```
-### Les Équipes de Secours : L'Interface Humaine
+### Les Drones de Surveillance
 
-Les sauveteurs représentent le lien crucial entre la surveillance automatisée et l'intervention humaine. Basés dans des postes de secours stratégiquement positionnés, ils réagissent aux alertes transmises par les drones pour porter assistance aux festivaliers en détresse.
+Les drones constituent le cœur du système de détection. Chaque drone est un agent autonome disposant des capacités suivantes :
+
+1. Capacités de Base
+- Un système de détection avec une portée configurable (DroneSeeRange)
+- Un système de communication avec une portée définie (DroneCommRange)
+- Une gestion autonome de l'énergie avec :
+  - Surveillance du niveau de batterie
+  - Recherche de points de recharge
+  - Planification des recharges
+
+2. Détection et Surveillance
+Le drone effectue une surveillance continue de sa zone assignée. La probabilité de détection d'une personne en détresse suit la formule :
+```go
+probaDetection := max(0, 1.0/float64(s.DroneSeeRange)-(float64(nbPersDetected)*0.03))
+```
+Cette formule modélise la diminution de l'efficacité de détection avec la distance et le nombre de personnes déjà détectées.
+
+3. Patrouille et Communication
+Le drone maintient une patrouille systématique de sa zone. En cas de détection d'une personne en détresse, il peut :
+- Alerter directement un point de secours si à portée
+- Relayer l'information via d'autres drones
+- Coordonner une intervention avec les équipes au sol
+  
+### Les Équipes de Secours
+
+Les sauveteurs représentent l'interface entre la surveillance automatisée et l'intervention humaine. Positionnés dans des postes de secours stratégiques, ils :
+- Reçoivent les alertes des drones
+- Se déplacent vers les personnes en détresse
+- Administrent les premiers soins
+- Retournent à leur poste après intervention
 
 ### Protocoles de Communication des Drones
 
@@ -107,10 +138,7 @@ Le protocole 1 implémente les mécanismes fondamentaux du système. Il définit
 
 ##### Fonctionnalités Implémentées
 - Scan continu de la zone de surveillance du drone
-- Détection des personnes en détresse selon la formule :
-```go
-probaDetection := max(0, 1.0/float64(s.DroneSeeRange)-(float64(nbPersDetected)*0.03))
-```
+- Détection des personnes en détresse
 - Mémorisation des cas détectés dans une liste interne
 - Déplacement vers le point de secours le plus proche en cas de détection
 - Gestion autonome de la batterie avec recherche de point de recharge quand nécessaire
