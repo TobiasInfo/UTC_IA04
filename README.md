@@ -178,28 +178,28 @@ Le protocole 1 implémente les mécanismes fondamentaux du système. Il définit
 Le protocole 2 ajoute au protocole 1 les fonctionnalités suivantes :
 
 ##### Nouvelles Fonctionnalités
-- Implémentation d'un pattern de patrouille en zigzag remplaçant le mouvement aléatoire
-- Établissement de communication entre drones à portée directe
-- Capacité de transmission des informations aux drones voisins
-- Fonction de transfert de responsabilité entre drones proches
-- Mécanisme de délégation des cas détectés aux drones mieux positionnés
+- Implémentation d’un schéma de patrouille en zigzag, remplaçant les mouvements aléatoires, pour assurer un quadrillage efficace de toute la zone.
+- Mise en place de communications entre drones dans un rayon de portée directe.
+- Capacité de transmettre des informations aux drones voisins pour maintenir la fluidité des échanges.
+- Fonctionnalité de transfert de responsabilité entre drones à proximité immédiate.
+- Mécanisme de délégation des cas détectés aux drones mieux positionnés, y compris ceux situés au niveau supérieur hiérarchique (n+1).
 
 ##### Mécanismes Techniques Ajoutés
 - Vérification de la portée de communication entre drones
 - Système de transfert de données entre drones à portée
 - Algorithme de patrouille structurée
-- Protocole de délégation des responsabilités
+- Mécanisme de délégation des responsabilités
 
 #### 🌐 Protocole 3 : Réseau Multi-Sauts
 
 Le protocole 3 étend le protocole 2 avec les fonctionnalités réseau suivantes :
 
 ##### Extensions Techniques
-- Implémentation d'un réseau de communication maillé entre drones
-- Communication possible au-delà de la portée directe via des relais
-- Formation dynamique de sous-réseaux de communication
-- Transmission d'informations à travers le réseau de drones
-- Coordination via le réseau pour atteindre les points de secours
+- Implémentation d’un réseau de communication maillé entre drones (chaque drone appartient à un sous-réseau, équivalent à un sous-graphe de drones).
+- Communication possible au-delà de la portée directe grâce à un système de relais (les drones se relaient les informations entre eux).
+- Formation dynamique de sous-réseaux de communication (les sous-réseaux correspondent à des sous-graphes).
+- Transmission d’informations à travers le réseau de drones.
+- Si aucun drone ne peut transmettre l’information directement à un point de relais principal (RP), le drone ayant détecté l’incident prend en charge la mission de se déplacer pour informer le RP.
 
 #### ⚡ Protocole 4 : Optimisation du Réseau
 
