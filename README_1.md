@@ -4,9 +4,10 @@
 1. [Introduction](#introduction)
 2. [Architecture du Projet](#architecture-du-projet)
 3. [Environnement et Interactions](#environnement-et-interactions)
-4. [Modélisation des Agents](#modélisation-des-agents)
-5. [Interface Graphique de Simulation](#interface-graphique-de-simulation)
-6. [Analyse par Lots et Résultats](#analyse-par-lots-et-résultats)
+4. [Implémentation](#implémentation)
+5. [Modélisation des Agents](#modélisation-des-agents)
+6. [Interface Graphique de Simulation](#interface-graphique-de-simulation)
+7. [Analyse par Lots et Résultats](#analyse-par-lots-et-résultats)
 
 ## Introduction
 
@@ -66,6 +67,17 @@ La zone de sortie permet une gestion ordonnée des départs.
 
 La simulation utilise un ratio temporel de 1:60, où une seconde réelle correspond à une minute simulée. Cette compression permet d'observer l'évolution d'un festival complet tout en maintenant une précision suffisante pour l'analyse des interventions.
 
+## Implémentation 
+
+Les Agents utilisent une boucle de Perception/Délibération/Action, et évoluent en parallèle avec des goroutines pour permettre une évolution indépendante et non-déterministe dans la mesure des fonctionnalités du langage go.  
+Il a été choisi de synchroniser les agents pour ne leur permettre qu'une itération de leur cycle de perception/délibération/action par tick de la simulation globale pour conserver une cohérence des actions des agents entre eux, et rester plus fidèle aux conditions réelles.
+
+Un objet Simulation contient l'ensemble des éléments utiles à notre simulation, dont une instance de Carte, qui mémorise et gère les positions et déplacements des agents.
+
+Pour l'interface graphique l'outil Ebiten a été utilisé, pour permettre une implémentation globale 100% en Go.
+
+Les images utilisées ont été générées par des IA génératives, puis retouchées ensuite à la main.
+
 ## Modélisation des Agents
 
 ### Les Festivaliers
@@ -92,11 +104,23 @@ Chaque festivalier possède un profil qui influence son comportement :
 - Faible influence des mouvements de foule
 - Rythme d'activité régulier
 
+Ces profils ont une influence sur :  
+- La vitesse de déplacement de l'individu  
+- les variables "CrowdFollowingTendency" et "PersonalSpace" qui influe sur la tendance de l'individu à aller ou non dans les zones avec de nombreux autres individus  
+- Le niveau d'énergie à partir duquel un individu passera en mode repos  
+- La résistance au malaise de l'individu  
+- L'intérêt porté par l'individu à chaque POI, et donc vers lesquels il préférera se diriger.
+
+Lorsque qu'un participant atteint un POI, il va y rester pendant une durée variable, puis repartir à la recherche d'un autre POI.
+
 Le système modélise la fatigue et les risques de malaise selon :
 ```python
 P(malaise) = P_base x (1 - Resistance_Malaise) x (1 - Niveau_Energie)
 où P_base = 0.005
 ```
+Lorsqu'un participant en situation de détresse a été remarqué, l'information doit être remontée à la tente infirmerie qui détachera ensuite un pompier qui ira sauver le participant.
+
+
 ### Les Drones de Surveillance
 
 Les drones constituent le cœur du système de détection. Chaque drone est un agent autonome disposant des capacités suivantes :
@@ -222,91 +246,87 @@ Le panneau de contrôle permet de :
 
 Deux visualisations dynamiques enrichissent l'analyse :
 
-La carte de densité (à gauche) représente la distribution des festivaliers sur le site. Cette visualisation peut être agrandie pour une analyse plus détaillée des mouvements de foule.
+- La carte de densité (à gauche) représente la distribution des festivaliers sur le site. Cette visualisation peut être agrandie pour une analyse plus détaillée des mouvements de foule.
+- Le graphe de réseau (à droite) illustre les communications entre drones et leur connexion avec les points de secours. Il permet de comprendre la topologie du réseau et d'identifier d'éventuelles zones de faible couverture.
 
-Le graphe de réseau (à droite) illustre les communications entre drones et leur connexion avec les points de secours. Il permet de comprendre la topologie du réseau et d'identifier d'éventuelles zones de faible couverture.
+Pour évaluer les performances de la flotte de drone, une fois la simulation terminée deux graphiques sont également générés et sauvegardés:
+
+- Le premier graphique représente l'évolution du nombre de personnes en situation de détresse, ainsi que les moments de prise en charge des personnes en fonction du temps.  
+- Le second graphique représente pour chaque personne sauvée, le temps pris pour le sauvetage. On a ainsi une estimation du temps nécessaire entre le début d'un malaise et l'arrivée d'un secouriste auprès du participant, pour chaque protocole de drone.
 
 
-## Analyse par Lots et Résultats
+# Analyse par Lots et Résultats
 
-Cette section présente l'analyse exhaustive du système via des simulations non graphiques.
+Cette section présente l'outil d'analyse par lots (benchmarking) développé pour évaluer systématiquement les performances du système multi-drones sans interface graphique. Contrairement à la simulation visuelle qui permet une observation qualitative, cet outil fournit une analyse quantitative approfondie des différentes configurations.
 
+## Vue d'ensemble
 
-## Configuration des Tests
+L'analyse par lots s'exécute via le fichier `main.go` et automatise l'exécution de multiples simulations avec différentes combinaisons de paramètres. Pour chaque configuration, l'outil :
+1. Lance 5 simulations identiques
+2. Collecte les métriques détaillées
+3. Calcule les moyennes et écarts
+4. Génère des visualisations des résultats
+5. Exporte les données dans une structure organisée
 
-Le système effectue une analyse exhaustive en testant toutes les combinaisons possibles des paramètres suivants :
+Pour lancer l'analyse :
+```bash
+cd UTC_IA04
+go run main.go
+```
 
-### Paramètres Variables
-- **Nombre de drones** : 2, 5, et 10 drones
-  - 2 drones représente une couverture minimale
-  - 5 drones offre une couverture moyenne
-  - 10 drones permet une couverture intensive
-  
-- **Nombre de festivaliers** : 200, 500, et 1000 personnes
-  - 200 personnes simule un petit événement
-  - 500 personnes représente un événement moyen
-  - 1000 personnes teste le système en charge élevée
+## Paramètres d'Analyse
 
-- **Protocoles** : 1, 2, 3, et 4
-  - Protocole 1 : système baseline avec communication simple
-  - Protocole 2 : ajout de la patrouille structurée
-  - Protocole 3 : introduction du réseau de communication
-  - Protocole 4 : optimisation du réseau et des décisions
+L'outil teste systématiquement les combinaisons des paramètres suivants :
 
-- **Configurations de carte** : 
-  - festival_layout_1 : configuration avec point de secours sur le côté
-  - festival_layout_2 : configuration avec deux points de secours
-  - festival_layout_3 : configuration avec point de secours central
+### Taille de la Flotte de Drones
+- **2 drones** : Couverture minimale pour tester la résilience
+- **5 drones** : Configuration moyenne, équilibre coût/efficacité
+- **10 drones** : Couverture intensive pour événements majeurs
 
-Au total, cela représente 108 configurations différentes (3 x 3 x 4 x 3 = 108 configurations), chacune exécutée 5 fois pour assurer la fiabilité statistique.
+### Population de Festivaliers
+- **200 personnes** : Petits événements, charge faible
+- **500 personnes** : Événements moyens, charge normale
+- **1000 personnes** : Grands événements, charge élevée
+
+### Protocoles de Communication
+- **Protocole 1** : Système de base, communication directe
+- **Protocole 2** : Patrouille structurée et communication locale
+- **Protocole 3** : Communication multi-sauts en réseau
+- **Protocole 4** : Optimisation du réseau et des décisions
+
+### Configurations de Carte
+- **festival_layout_1** : Point de secours latéral
+- **festival_layout_2** : Double points de secours
+- **festival_layout_3** : Point de secours central
+
+Au total, l'analyse couvre 108 configurations uniques (3×3×4×3), chacune répétée 5 fois pour assurer la significativité statistique.
 
 ## Structure des Résultats
 
-Le programme génère un dossier `results` organisé comme suit :
+L'outil génère une hiérarchie de dossiers dans `./results/` organisée comme suit :
 
 ```text
 results/
-├── 2d_200p_p1_festival_layout_1/    # Configuration minimale, protocole 1, carte 1
-├── 2d_200p_p1_festival_layout_2/
-├── ...
-├── 5d_500p_p2_festival_layout_1/    # Configuration moyenne, protocole 2
-├── 5d_500p_p2_festival_layout_2/
-├── ...
-└── 10d_1000p_p4_festival_layout_3/  # Configuration maximale, protocole 4, carte 3
+├── {n}d_{p}p_p{x}_{layout}/    # Un dossier par configuration
+│   ├── metrics.txt             # Synthèse statistique
+│   ├── rescue_stats_people.png # Évolution des sauvetages
+│   ├── rescue_stats_time.png   # Temps de réponse
+│   ├── run_1_metrics.txt       # Détails par simulation
+│   ├── run_2_metrics.txt
+│   ├── run_3_metrics.txt
+│   ├── run_4_metrics.txt
+│   └── run_5_metrics.txt
 ```
 
-Chaque dossier de configuration contient :
-```text
-configuration_folder/
-├── run_1_metrics.txt            # Données de la première exécution
-├── run_2_metrics.txt
-├── run_3_metrics.txt
-├── run_4_metrics.txt
-├── run_5_metrics.txt
-├── metrics.txt                  # Moyennes et analyses statistiques
-├── rescue_stats_people.png      # Graphique temporel des sauvetages
-└── rescue_stats_time.png        # Graphique des temps de réponse
-```
+Où :
+- `n` : nombre de drones (2, 5, 10)
+- `p` : population (200, 500, 1000)
+- `x` : numéro de protocole (1-4)
+- `layout` : configuration de carte
 
 ## Métriques Analysées
 
-### Par Exécution (run_X_metrics.txt)
-Chaque fichier d'exécution enregistre :
-```text
-Run X Results
-================
-Total People: [nombre]
-People in Distress: [nombre]
-Cases Treated: [nombre]
-Cases Dead: [nombre]
-Average Battery: [pourcentage]%
-Average Coverage: [pourcentage]%
-Runtime: [durée]
-Total Ticks: [nombre]
-```
-
-### Analyse Globale (metrics.txt)
-Le fichier de synthèse comprend :
+### Métriques Globales (metrics.txt)
 ```text
 Simulation Results (Averaged over 5 runs)
 =====================================
@@ -316,27 +336,41 @@ Cases Treated: [moyenne]
 Cases Dead: [moyenne]
 Average Battery: [moyenne]%
 Average Coverage: [moyenne]%
-Average Runtime: [durée moyenne]
-Total Ticks: [moyenne]
+Average Runtime: [durée]
+Total Ticks: [ticks]
 
 Performance Metrics:
 - Treatment Success Rate: [pourcentage]%
 - Mortality Rate: [pourcentage]%
 - Average Response Time: [durée]
 ```
+
+### Métriques Détaillées (run_X_metrics.txt)
+Chaque simulation individuelle génère un rapport détaillé incluant :
+- Statistiques complètes de population
+- États des drones (batterie, couverture)
+- Temps de réponse aux incidents
+- Durée totale de simulation
+
 ## Visualisations Générées
 
-### Graphique de Sauvetages (rescue_stats_people.png)
-Ce graphique présente deux courbes principales :
-- En rouge : l'évolution du nombre de personnes en détresse
-- En vert : l'évolution du nombre de personnes sauvées
-L'axe des abscisses représente le temps de simulation en ticks, permettant d'observer les moments critiques et l'efficacité des interventions.
+### Évolution des Sauvetages (rescue_stats_people.png)
+Graphique temporel montrant :
+- **Courbe rouge** : Nombre de personnes en détresse
+- **Courbe verte** : Nombre de personnes sauvées
+Permet d'identifier les pics d'activité et l'efficacité des interventions.
 
-### Graphique des Temps de Réponse (rescue_stats_time.png)
-Ce graphique montre une courbe bleue représentant l'évolution du temps moyen de sauvetage au cours de la simulation. Il permet d'évaluer si le système maintient son efficacité même sous charge.
+### Analyse des Temps de Réponse (rescue_stats_time.png)
+- **Courbe bleue** : Temps moyen de sauvetage
+- Permet d'évaluer la réactivité du système et sa stabilité sous charge
 
-Cette analyse complète permet d'optimiser :
-- Le dimensionnement de la flotte de drones
-- Le choix du protocole selon le contexte
-- Le positionnement des points de secours
-- L'allocation des ressources d'intervention
+## Utilisation des Résultats
+
+Ces analyses permettent de :
+1. Optimiser le dimensionnement de la flotte
+2. Sélectionner le protocole le plus adapté selon le contexte
+3. Valider le positionnement des points de secours
+4. Identifier les configurations critiques
+5. Estimer les ressources nécessaires selon la taille de l'événement
+
+Les résultats fournissent une base quantitative pour les décisions de déploiement et l'amélioration continue du système.
