@@ -1,14 +1,15 @@
 # 🎪 Système Multi-Drones pour la Sécurité d'Événements Festifs
 
 ## 📑 Table des Matières
-1. [Introduction](#introduction)
-2. [Architecture du Projet](#architecture-du-projet)
-3. [Environnement et Interactions](#environnement-et-interactions)
-4. [Implémentation](#implémentation)
-5. [Modélisation des Agents](#modélisation-des-agents)
-6. [Interface Graphique de Simulation](#interface-graphique-de-simulation)
-7. [Analyse par Lots et Résultats](#analyse-par-lots-et-résultats)
-8. [Bibliographie](#bibliographie)
+1. [Introduction](#-introduction)
+2. [Introduction](#-démarrage-et-lancement-du-projet)
+3. [Architecture du Projet](#-architecture-du-projet)
+4. [Environnement et Interactions](#-environnement-et-interactions)
+5. [Implémentation](#-implémentation-)
+6. [Modélisation des Agents](#-modélisation-des-agents)
+7. [Interface Graphique de Simulation](#-interface-graphique-de-simulation)
+8. [Analyse par Lots et Résultats](#-analyse-par-lots-et-résultats)
+9. [Bibliographie](#-bibliographie)
 
 ## 🚀 Introduction
 
@@ -20,6 +21,7 @@ Les festivals de grande envergure présentent des défis majeurs en termes de s�
 - 🛸 Les drones de surveillance, équipés de systèmes de détection et de communication
 - 🚑 Les équipes de secours, intervenant sur le terrain
 - 👥 Les festivaliers, avec leurs comportements et besoins
+
 
 ## 🏗 Architecture du Projet
 
@@ -47,6 +49,45 @@ UTC_IA04/
 │   └── simulation/             # Moteur de simulation
 └── vendor/                     # Dépendances externes
 ```
+
+## 🏁 Démarrage et Lancement du Projet
+
+### 🛠️ Prérequis
+
+- **Go** (version 1.23.3+)
+- **Git**
+
+### 📥 Installation
+
+Il faut éxecuter les commandes suivantes pour installer le projet :
+
+   ```bash
+   git clone https://github.com/TobiasInfo/UTC_IA04.git
+   cd UTC_IA04
+   go mod vendor
+   go mod tidy
+   ```
+
+### 🚀 Lancer la Simulation
+
+- Pour lancer la simulation avec l'interface Graphique :
+
+  ```bash
+  go run ./cmd/ui/main_gui_ebiten.go
+  ```
+
+### 🔧 Configuration Supplémentaire
+
+- Modifier les configurations des maps dans `configs/`
+- Ajuster les paramètres via le GUI du démarrage.
+
+### 🧹 Nettoyage
+
+- Nettoyer les modules
+
+  ```bash
+  go mod tidy
+  ```
 
 ## 🌍 Environnement et Interactions
 
